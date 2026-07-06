@@ -1,16 +1,19 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
+import 'package:yourhome/screens/owner/owner_profile_screen.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/owner_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../services/api_service.dart';
 import '../chat/chat_list_screen.dart';
 import '../notifications/notification_screen.dart';
-import '../profile_screen.dart';
 import 'owner_property_management_page.dart';
 import 'owner_booking_management_page.dart';
 import 'property_access_subscription_page.dart';
@@ -28,6 +31,8 @@ class _OwnerPalette {
   static const darkBg = Color(0xFF0A0E1A);
   static const darkSurface = Color(0xFF141A2C);
   static const lightBg = Color(0xFFF7F8FC);
+  static const teal = Color(0xFF14B8A6);
+  static const pink = Color(0xFFEC4899);
 }
 
 class OwnerDashboardPage extends StatefulWidget {
@@ -41,26 +46,24 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     with SingleTickerProviderStateMixin {
   bool _isFirstLoad = true;
   int _unreadNotifications = 0;
-  int _unreadChats = 0;
-  late AnimationController _fadeController;
+
+  late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Property data for navigation
   int _selectedPropertyId = 0;
   String _selectedPropertyTitle = 'Property Access';
 
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
+    _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOutCubic,
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOutCubic),
     );
-    _fadeController.forward();
+    _animationController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isFirstLoad && mounted) {
@@ -72,34 +75,23 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
 
   @override
   void dispose() {
-    _fadeController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _loadAll() async {
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
     await ownerProvider.loadAllOwnerData();
-    
-    // Property data load karo
     _loadPropertyData(ownerProvider);
-    
     _loadUnreadNotifications();
-    _loadUnreadChats();
   }
 
-  // ============== PROPERTY DATA LOAD ==============
   void _loadPropertyData(OwnerProvider provider) {
-    // FIXED: 'myProperties' use karo - yeh tumhare provider mein hai
     if (provider.myProperties.isNotEmpty) {
       final firstProperty = provider.myProperties.first;
       setState(() {
         _selectedPropertyId = firstProperty.propertyId ?? 0;
         _selectedPropertyTitle = firstProperty.title ?? 'Property';
-      });
-    } else {
-      setState(() {
-        _selectedPropertyId = 0;
-        _selectedPropertyTitle = 'Property Access';
       });
     }
   }
@@ -113,25 +105,15 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     } catch (_) {}
   }
 
-  Future<void> _loadUnreadChats() async {
-    try {
-      final res = await ApiService().get('/chat/conversations');
-      if (mounted && res.data['success'] == true) {
-        final list = res.data['data'] as List;
-        final total = list.fold<int>(0, (sum, c) => sum + ((c['unreadCount'] ?? 0) as int));
-        setState(() => _unreadChats = total);
-      }
-    } catch (_) {}
-  }
-
   String _greeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return 'Good Morning ☀️';
+    if (hour < 17) return 'Good Afternoon 🌤️';
+    return 'Good Evening 🌙';
   }
 
   void _navigateTo(Widget screen) {
+    HapticFeedback.selectionClick();
     Navigator.push(
       context,
       PageRouteBuilder(
@@ -140,7 +122,9 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
           return FadeTransition(
             opacity: animation,
             child: ScaleTransition(
-              scale: Tween<double>(begin: 0.95, end: 1.0).animate(animation),
+              scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              ),
               child: child,
             ),
           );
@@ -150,7 +134,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
-  // ============== NAVIGATION WITH ACTUAL DATA ==============
   void _navigateToPropertyAccess() {
     _navigateTo(
       PropertyAccessSubscriptionPage(
@@ -164,14 +147,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
     String listingTitle = 'Listing Subscription';
     int listingId = 0;
-    
-    // FIXED: 'myProperties' use karo
     if (ownerProvider.myProperties.isNotEmpty) {
       final firstProperty = ownerProvider.myProperties.first;
       listingId = firstProperty.propertyId ?? 0;
       listingTitle = firstProperty.title ?? 'Listing';
     }
-    
     _navigateTo(
       ListingSubscriptionPage(
         listingId: listingId,
@@ -186,6 +166,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final authProvider = Provider.of<AuthProvider>(context);
     final profileProvider = Provider.of<ProfileProvider>(context);
     final ownerProvider = Provider.of<OwnerProvider>(context);
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     final user = authProvider.user;
     final profileImage = profileProvider.profile?.profilePic;
@@ -193,64 +174,198 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final verification = ownerProvider.verificationStatus;
     final accessStatus = ownerProvider.propertyAccessStatus;
     final listingSub = ownerProvider.listingSubscription;
+    final ownerProfile = ownerProvider.ownerProfile;
 
-    // Har build pe property data update karo
     _loadPropertyData(ownerProvider);
 
     return Scaffold(
       backgroundColor: isDark ? _OwnerPalette.darkBg : _OwnerPalette.lightBg,
-      body: SafeArea(
-        child: ownerProvider.isLoading && stats == null
-            ? const Center(child: CircularProgressIndicator(color: _OwnerPalette.primary))
-            : RefreshIndicator(
-                onRefresh: _loadAll,
-                color: _OwnerPalette.primary,
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(context, isDark, user, profileImage, verification),
-                        const SizedBox(height: 16),
-                        if (verification != null && !verification.isVerified)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: _buildVerificationBanner(context, verification, isDark),
-                          ),
-                        if (accessStatus != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: _buildAccessBanner(context, accessStatus, isDark),
-                          ),
-                        const SizedBox(height: 8),
-                        if (stats != null) _buildStatsGrid(isDark, stats),
-                        const SizedBox(height: 20),
-                        _buildSubscriptionCards(context, isDark, accessStatus, listingSub),
-                        const SizedBox(height: 24),
-                        _buildQuickActions(context, isDark, verification),
-                      ],
-                    ),
+      appBar: _buildAppBar(context, isDark),
+      body: ownerProvider.isLoading && stats == null
+          ? _buildLoadingState(isDark)
+          : RefreshIndicator(
+              onRefresh: _loadAll,
+              color: _OwnerPalette.primary,
+              backgroundColor: isDark ? _OwnerPalette.darkSurface : Colors.white,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    bottom: 16 + bottomPadding, // 🔥 FIX: Bottom nav overlap
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Profile Header
+                      _buildProfileHeader(
+                        context,
+                        isDark,
+                        user,
+                        profileImage,
+                        verification,
+                        ownerProfile,
+                      ),
+                      const SizedBox(height: 16),
+                      // Verification Status Card
+                      if (verification != null)
+                        _buildVerificationStatusCard(isDark, verification),
+                      const SizedBox(height: 14),
+                      // Stats Grid
+                      if (stats != null) _buildStatsGrid(isDark, stats),
+                      const SizedBox(height: 18),
+                      // Subscription Section
+                      _buildSubscriptionSection(
+                        context,
+                        isDark,
+                        accessStatus,
+                        listingSub,
+                      ),
+                      const SizedBox(height: 18),
+                      // Quick Actions
+                      _buildQuickActions(context, isDark, verification),
+                      const SizedBox(height: 18),
+                      // Pending Items
+                      _buildPendingItems(context, isDark, ownerProvider),
+                      const SizedBox(height: 8),
+                    ],
                   ),
                 ),
               ),
+            ),
+    );
+  }
+
+  // ============== APP BAR ==============
+  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
+    return AppBar(
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: _OwnerPalette.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.home_rounded,
+              color: _OwnerPalette.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Dashboard',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: 18,
+              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            ),
+          ),
+        ],
+      ),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      actions: [
+        IconButton(
+          icon: Icon(
+            Icons.refresh_rounded,
+            color: isDark ? Colors.white : const Color(0xFF4B5563),
+            size: 22,
+          ),
+          onPressed: _loadAll,
+        ),
+      ],
+    );
+  }
+
+  // ============== LOADING STATE ==============
+  Widget _buildLoadingState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_OwnerPalette.primary, _OwnerPalette.primaryLight],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: _OwnerPalette.primary.withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading dashboard...',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // ================= HEADER =================
-  Widget _buildHeader(BuildContext context, bool isDark, dynamic user, String? profileImage,
-      dynamic verification) {
+  // ============== PROFILE HEADER ==============
+  Widget _buildProfileHeader(
+    BuildContext context,
+    bool isDark,
+    dynamic user,
+    String? profileImage,
+    dynamic verification,
+    dynamic ownerProfile,
+  ) {
     final hasImage = profileImage != null && profileImage.isNotEmpty;
+    final isVerified = verification?.isVerified ?? false;
+    final businessName = ownerProfile?.businessName;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+          width: 1,
+        ),
+      ),
       child: Row(
         children: [
+          // Profile Picture
           GestureDetector(
-            onTap: () => _navigateTo(const ProfileScreen()),
+            onTap: () => _navigateTo(const OwnerProfileScreen()),
             child: Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -263,455 +378,771 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                       ),
                 boxShadow: [
                   BoxShadow(
-                    color: _OwnerPalette.primary.withOpacity(0.3),
-                    blurRadius: 16,
+                    color: _OwnerPalette.primary.withOpacity(0.25),
+                    blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: CircleAvatar(
-                radius: 26,
+                radius: 28,
                 backgroundColor: Colors.transparent,
-                backgroundImage: hasImage ? CachedNetworkImageProvider(profileImage) : null,
+                backgroundImage:
+                    hasImage ? CachedNetworkImageProvider(profileImage) : null,
                 child: hasImage
                     ? null
                     : Text(
-                        user?.name?.isNotEmpty == true ? user!.name[0].toUpperCase() : 'O',
+                        user?.name?.isNotEmpty == true
+                            ? user!.name[0].toUpperCase()
+                            : 'O',
                         style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
                       ),
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
+          // User Info - 🔥 FIXED: Smaller text
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_greeting(),
-                    style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? Colors.grey[400] : Colors.grey[500])),
-                const SizedBox(height: 2),
+                Text(
+                  _greeting(),
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.grey[400] : Colors.grey[500],
+                  ),
+                ),
+                const SizedBox(height: 1),
                 Text(
                   user?.name?.isNotEmpty == true ? user!.name : 'Owner',
                   style: GoogleFonts.playfairDisplay(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E)),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                if (verification != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: (verification.isVerified ? _OwnerPalette.success : Colors.orange)
-                          .withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
+                if (businessName != null && businessName.isNotEmpty)
+                  Text(
+                    businessName,
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.grey[400] : Colors.grey[500],
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          verification.isVerified ? Icons.verified_rounded : Icons.hourglass_top_rounded,
-                          size: 11,
-                          color: verification.isVerified ? _OwnerPalette.success : Colors.orange,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          verification.isVerified
-                              ? 'Verified Owner'
-                              : verification.isRejected
-                                  ? 'Rejected'
-                                  : 'Pending Verification',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: verification.isVerified ? _OwnerPalette.success : Colors.orange,
-                          ),
-                        ),
-                      ],
-                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                const SizedBox(height: 2),
+                // Verification Badge - 🔥 FIXED: Smaller
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (isVerified ? Colors.green : Colors.orange).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isVerified
+                            ? Icons.verified_rounded
+                            : Icons.hourglass_top_rounded,
+                        size: 10,
+                        color: isVerified ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        isVerified
+                            ? 'Verified Owner'
+                            : verification?.isRejected == true
+                                ? 'Rejected'
+                                : 'Pending',
+                        style: GoogleFonts.poppins(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w600,
+                          color: isVerified ? Colors.green : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-          _buildIconButton(
-            isDark,
-            Icons.chat_bubble_outline_rounded,
-            _unreadChats,
-            () => _navigateTo(const ChatListScreen()),
-          ),
-          const SizedBox(width: 8),
-          _buildIconButton(
-            isDark,
-            Icons.notifications_outlined,
-            _unreadNotifications,
-            () => _navigateTo(const NotificationScreen()),
-          ),
+          // 🔥 FIXED: Only Notification icon, removed chat
+          _buildNotificationButton(isDark),
         ],
       ),
     );
   }
 
-  Widget _buildIconButton(bool isDark, IconData icon, int badgeCount, VoidCallback onTap) {
+  // 🔥 FIXED: Only Notification button (removed chat)
+  Widget _buildNotificationButton(bool isDark) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? _OwnerPalette.darkSurface : Colors.white,
+        color: isDark ? const Color(0xFF141A2C) : Colors.grey[100],
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
       ),
       child: IconButton(
         icon: Stack(
           clipBehavior: Clip.none,
           children: [
-            Icon(icon, color: isDark ? Colors.white70 : const Color(0xFF4B5563), size: 24),
-            if (badgeCount > 0)
+            Icon(
+              Icons.notifications_outlined,
+              color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+              size: 22,
+            ),
+            if (_unreadNotifications > 0)
               Positioned(
                 right: -2,
                 top: -2,
                 child: Container(
                   padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(color: _OwnerPalette.danger, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: _OwnerPalette.danger,
+                    shape: BoxShape.circle,
+                  ),
                   constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
                   child: Text(
-                    badgeCount > 9 ? '9+' : badgeCount.toString(),
-                    style: GoogleFonts.poppins(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
+                    _unreadNotifications > 9 ? '9+' : _unreadNotifications.toString(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 8,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
               ),
           ],
         ),
-        onPressed: onTap,
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          _navigateTo(const NotificationScreen());
+        },
       ),
     );
   }
 
-  // ================= BANNERS =================
-  Widget _buildVerificationBanner(BuildContext context, dynamic verification, bool isDark) {
+  // ============== VERIFICATION STATUS CARD ==============
+  Widget _buildVerificationStatusCard(bool isDark, dynamic verification) {
+    final isVerified = verification.isVerified;
     final isRejected = verification.isRejected;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: (isRejected ? _OwnerPalette.danger : Colors.orange).withOpacity(0.1),
+        gradient: LinearGradient(
+          colors: isVerified
+              ? [Colors.green.withOpacity(0.10), Colors.teal.withOpacity(0.04)]
+              : isRejected
+                  ? [Colors.red.withOpacity(0.10), Colors.red.withOpacity(0.04)]
+                  : [Colors.orange.withOpacity(0.10), Colors.orange.withOpacity(0.04)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: (isRejected ? _OwnerPalette.danger : Colors.orange).withOpacity(0.3)),
+        border: Border.all(
+          color: isVerified
+              ? Colors.green.withOpacity(0.25)
+              : isRejected
+                  ? Colors.red.withOpacity(0.25)
+                  : Colors.orange.withOpacity(0.25),
+        ),
       ),
       child: Row(
         children: [
-          Icon(isRejected ? Icons.error_outline_rounded : Icons.hourglass_empty_rounded,
-              color: isRejected ? _OwnerPalette.danger : Colors.orange),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: isVerified
+                  ? Colors.green.withOpacity(0.15)
+                  : isRejected
+                      ? Colors.red.withOpacity(0.15)
+                      : Colors.orange.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isVerified
+                  ? Icons.verified_rounded
+                  : isRejected
+                      ? Icons.error_outline_rounded
+                      : Icons.hourglass_top_rounded,
+              color: isVerified ? Colors.green : isRejected ? Colors.red : Colors.orange,
+              size: 16,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              isRejected
-                  ? 'Rejected: ${verification.rejectionReason ?? "Please re-apply"}'
-                  : 'Verification pending — Admin reviews within 24-48 hrs',
-              style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white : Colors.black87),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isVerified
+                      ? '✔ Verified Owner'
+                      : isRejected
+                          ? '✖ Verification Rejected'
+                          : '⏳ Verification Pending',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                ),
+                Text(
+                  isVerified
+                      ? 'You can add properties & receive bookings'
+                      : isRejected
+                          ? '${verification.rejectionReason ?? "Please re-apply"}'
+                          : 'Admin reviews within 24-48 hours',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: isDark ? Colors.grey[400] : Colors.grey[500],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
           if (isRejected)
             TextButton(
               onPressed: () => _navigateTo(const OwnerApplyPage()),
-              child: const Text('Re-apply'),
+              style: TextButton.styleFrom(
+                foregroundColor: _OwnerPalette.primary,
+                minimumSize: const Size(50, 28),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: _OwnerPalette.primary.withOpacity(0.3)),
+                ),
+              ),
+              child: Text(
+                'Re-apply',
+                style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600),
+              ),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildAccessBanner(BuildContext context, dynamic accessStatus, bool isDark) {
-    if (!accessStatus.hasActiveSubscription) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _OwnerPalette.danger.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _OwnerPalette.danger.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.lock_rounded, color: _OwnerPalette.danger),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text('No active Property Access — buy to add properties',
-                  style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white : Colors.black87)),
-            ),
-            TextButton(
-              onPressed: _navigateToPropertyAccess,
-              child: const Text('Buy'),
-            ),
-          ],
-        ),
-      );
-    }
-    if (accessStatus.isExpiringSoon) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.orange.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text('${accessStatus.daysRemaining} din mein Property Access expire hoga',
-                  style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white : Colors.black87)),
-            ),
-            TextButton(
-              onPressed: _navigateToPropertyAccess,
-              child: const Text('Renew'),
-            ),
-          ],
-        ),
-      );
-    }
-    return const SizedBox.shrink();
-  }
-
-  // ================= STATS =================
+  // ============== STATS GRID ==============
   Widget _buildStatsGrid(bool isDark, dynamic stats) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              _statCard('Properties', stats.totalProperties.toString(), Icons.apartment_rounded,
-                  _OwnerPalette.blue, isDark),
-              const SizedBox(width: 10),
-              _statCard('Published', stats.publishedProperties.toString(), Icons.check_circle_rounded,
-                  _OwnerPalette.success, isDark),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _statCard('Total Rooms', stats.totalRooms.toString(), Icons.bed_rounded,
-                  _OwnerPalette.purple, isDark),
-              const SizedBox(width: 10),
-              _statCard('Available', stats.availableRooms.toString(), Icons.meeting_room_rounded,
-                  const Color(0xFF06B6D4), isDark),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _statCard('Pending Req.', stats.pendingRequests.toString(), Icons.pending_actions_rounded,
-                  Colors.orange, isDark),
-              const SizedBox(width: 10),
-              _statCard('Avg Rating', stats.averageRating.toStringAsFixed(1), Icons.star_rounded,
-                  Colors.amber, isDark),
-            ],
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        Row(
+          children: [
+            _buildStatCard('Properties', stats.totalProperties.toString(), Icons.apartment_rounded, const Color(0xFF3B82F6), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Published', stats.publishedProperties.toString(), Icons.check_circle_rounded, const Color(0xFF22C55E), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Rooms', stats.totalRooms.toString(), Icons.bed_rounded, const Color(0xFF8B5CF6), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Available', stats.availableRooms.toString(), Icons.meeting_room_rounded, const Color(0xFF06B6D4), isDark),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _buildStatCard('Bookings', stats.pendingRequests.toString(), Icons.book_online_rounded, const Color(0xFFF59E0B), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Accepted', stats.acceptedRequests?.toString() ?? '0', Icons.check_rounded, const Color(0xFF22C55E), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Rating', stats.averageRating.toStringAsFixed(1), Icons.star_rounded, const Color(0xFFF59E0B), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Views', stats.totalViews?.toString() ?? '0', Icons.visibility_rounded, const Color(0xFF8B5CF6), isDark),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _statCard(String label, String value, IconData icon, Color color, bool isDark) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isDark) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isDark ? _OwnerPalette.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+          border: Border.all(
+            color: color.withOpacity(0.08),
+            width: 1,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, color: color, size: 18),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(icon, color: color, size: 14),
             ),
-            const SizedBox(height: 8),
-            Text(value,
-                style: GoogleFonts.poppins(
-                    fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
-            Text(label,
-                style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.grey[400] : Colors.grey[500]),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 8,
+                color: isDark ? Colors.grey[400] : Colors.grey[500],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ================= SUBSCRIPTION CARDS =================
-  Widget _buildSubscriptionCards(
-      BuildContext context, bool isDark, dynamic accessStatus, dynamic listingSub) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+  // ============== SUBSCRIPTION SECTION ==============
+  Widget _buildSubscriptionSection(
+    BuildContext context,
+    bool isDark,
+    dynamic accessStatus,
+    dynamic listingSub,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+          width: 1,
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Subscriptions',
-              style: GoogleFonts.poppins(
-                  fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: _navigateToPropertyAccess,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_OwnerPalette.primary, _OwnerPalette.gold],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _OwnerPalette.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(color: _OwnerPalette.primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 6)),
-                ],
+                child: const Icon(
+                  Icons.workspace_premium_rounded,
+                  color: _OwnerPalette.primary,
+                  size: 18,
+                ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.vpn_key_rounded, color: Colors.white, size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Property Access',
-                            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                        const SizedBox(height: 2),
-                        Text(
-                          accessStatus != null && accessStatus.hasActiveSubscription
-                              ? '${accessStatus.plan} • ${accessStatus.daysRemaining} days left'
-                              : 'No active plan — tap to buy',
-                          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
-                ],
+              const SizedBox(width: 8),
+              Text(
+                'Subscriptions',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
               ),
-            ),
+            ],
           ),
-          GestureDetector(
+          const SizedBox(height: 10),
+          _buildSubscriptionItem(
+            context,
+            '🏠 Property Access',
+            accessStatus != null && accessStatus.hasActiveSubscription
+                ? '${accessStatus.plan} • ${accessStatus.daysRemaining} days'
+                : 'No active plan — tap to buy',
+            accessStatus != null && accessStatus.hasActiveSubscription,
+            const Color(0xFF3B82F6),
+            isDark,
+            onTap: _navigateToPropertyAccess,
+          ),
+          const SizedBox(height: 10),
+          _buildSubscriptionItem(
+            context,
+            '📋 Listing Subscription',
+            listingSub != null && listingSub.isActive
+                ? '${listingSub.planDisplayName} • ${listingSub.daysRemaining} days'
+                : 'Boost search — tap to buy',
+            listingSub != null && listingSub.isActive,
+            const Color(0xFF8B5CF6),
+            isDark,
             onTap: _navigateToListingSubscription,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_OwnerPalette.purple, Color(0xFFEC4899)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(color: _OwnerPalette.purple.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 6)),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Listing Subscription',
-                            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                        const SizedBox(height: 2),
-                        Text(
-                          listingSub != null && listingSub.isActive
-                              ? '${listingSub.planDisplayName} • ${listingSub.daysRemaining} days left'
-                              : 'Boost search ranking — tap to buy',
-                          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
-                ],
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 
-  // ================= QUICK ACTIONS =================
-  Widget _buildQuickActions(BuildContext context, bool isDark, dynamic verification) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+  Widget _buildSubscriptionItem(
+    BuildContext context,
+    String title,
+    String subtitle,
+    bool isActive,
+    Color color,
+    bool isDark, {
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isDark ? _OwnerPalette.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 8))],
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.12),
+            width: 1,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Text('Quick Actions',
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isActive ? Icons.check_circle_rounded : Icons.circle_outlined,
+                color: isActive ? Colors.green : Colors.grey,
+                size: 14,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      fontSize: 9,
+                      color: isDark ? Colors.grey[400] : Colors.grey[500],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isActive ? Colors.green.withOpacity(0.12) : Colors.red.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                isActive ? 'Active' : 'Inactive',
                 style: GoogleFonts.poppins(
-                    fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
-            const SizedBox(height: 12),
-            _actionTile(context, '🏢 Manage Properties', Icons.apartment_rounded, _OwnerPalette.blue, isDark,
-                onTap: () => _navigateTo(const OwnerPropertyManagementPage())),
-            _actionTile(context, '📅 Booking Requests', Icons.book_online_rounded, Colors.orange, isDark,
-                onTap: () => _navigateTo(const OwnerBookingManagementPage())),
-            _actionTile(context, '💬 Chat with Users', Icons.chat_bubble_rounded, _OwnerPalette.success, isDark,
-                onTap: () => _navigateTo(const ChatListScreen())),
-            _actionTile(context, '🔔 Notifications', Icons.notifications_rounded, _OwnerPalette.purple, isDark,
-                onTap: () => _navigateTo(const NotificationScreen())),
-            if (verification == null || verification.isRejected)
-              _actionTile(context, '📝 Apply / Re-apply as Owner', Icons.assignment_ind_rounded,
-                  _OwnerPalette.success, isDark,
-                  onTap: () => _navigateTo(const OwnerApplyPage())),
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  color: isActive ? Colors.green : Colors.red,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 12,
+              color: Colors.grey,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _actionTile(BuildContext context, String title, IconData icon, Color color, bool isDark,
-      {required VoidCallback onTap}) {
+  // ============== QUICK ACTIONS ==============
+  Widget _buildQuickActions(BuildContext context, bool isDark, dynamic verification) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey[50],
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, color: color, size: 20),
+        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+          width: 1,
         ),
-        title: Text(title,
-            style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w500, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _OwnerPalette.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.flash_on_rounded,
+                  color: _OwnerPalette.primary,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Quick Actions',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildQuickActionItem(context, '🏢 Properties', Icons.apartment_rounded, Colors.blue, isDark,
+                  onTap: () => _navigateTo(const OwnerPropertyManagementPage())),
+              const SizedBox(width: 8),
+              _buildQuickActionItem(context, '📅 Bookings', Icons.book_online_rounded, Colors.orange, isDark,
+                  onTap: () => _navigateTo(const OwnerBookingManagementPage())),
+              const SizedBox(width: 8),
+              _buildQuickActionItem(context, '💬 Chat', Icons.chat_bubble_rounded, Colors.green, isDark,
+                  onTap: () => _navigateTo(const ChatListScreen())),
+              const SizedBox(width: 8),
+              _buildQuickActionItem(context, '🔔 Notifications', Icons.notifications_rounded, Colors.purple, isDark,
+                  onTap: () => _navigateTo(const NotificationScreen())),
+            ],
+          ),
+          if (verification == null || verification.isRejected) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _buildQuickActionItem(context, '📝 Apply', Icons.assignment_ind_rounded, _OwnerPalette.success, isDark,
+                    onTap: () => _navigateTo(const OwnerApplyPage())),
+                const SizedBox(width: 8),
+                _buildQuickActionItem(context, '⭐ Profile', Icons.person_rounded, _OwnerPalette.primary, isDark,
+                    onTap: () => _navigateTo(const OwnerProfileScreen())),
+                const SizedBox(width: 8),
+                _buildQuickActionItem(context, '📊 Stats', Icons.analytics_rounded, _OwnerPalette.teal, isDark,
+                    onTap: () {}),
+                const SizedBox(width: 8),
+                _buildQuickActionItem(context, '❓ Help', Icons.help_center_rounded, Colors.grey, isDark,
+                    onTap: () {}),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionItem(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color color,
+    bool isDark, {
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
         onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(0.12),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  height: 1.1,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============== PENDING ITEMS ==============
+  Widget _buildPendingItems(BuildContext context, bool isDark, OwnerProvider provider) {
+    final bookings = provider.bookingRequests;
+    final pendingBookings = bookings.where((b) => b.status == 'PENDING').toList();
+    final acceptedBookings = bookings.where((b) => b.status == 'ACCEPTED').toList();
+    final rejectedBookings = bookings.where((b) => b.status == 'REJECTED').toList();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.pending_actions_rounded,
+                  color: Color(0xFFF59E0B),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Booking Overview',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildPendingItem(context, '📌 Pending', pendingBookings.length.toString(), const Color(0xFFF59E0B), isDark,
+                  onTap: () => _navigateTo(const OwnerBookingManagementPage())),
+              const SizedBox(width: 8),
+              _buildPendingItem(context, '✅ Accepted', acceptedBookings.length.toString(), const Color(0xFF22C55E), isDark,
+                  onTap: () => _navigateTo(const OwnerBookingManagementPage())),
+              const SizedBox(width: 8),
+              _buildPendingItem(context, '❌ Rejected', rejectedBookings.length.toString(), const Color(0xFFEF4444), isDark,
+                  onTap: () => _navigateTo(const OwnerBookingManagementPage())),
+              const SizedBox(width: 8),
+              _buildPendingItem(context, '🏠 Properties', provider.myProperties.length.toString(), const Color(0xFF3B82F6), isDark,
+                  onTap: () => _navigateTo(const OwnerPropertyManagementPage())),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingItem(
+    BuildContext context,
+    String label,
+    String count,
+    Color color,
+    bool isDark, {
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(0.12),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                count,
+                style: GoogleFonts.poppins(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 8,
+                  color: isDark ? Colors.grey[400] : Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

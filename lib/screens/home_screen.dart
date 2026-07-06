@@ -195,14 +195,13 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const OwnerPropertyManagementPage(),
           const OwnerBookingManagementPage(),
           const ChatListScreen(),
-          const OwnerProfileScreen(),
         ];
-      default: // STUDENT
+      default:
         return [
-          const HomePage(), // Student Home
-          const PropertiesScreen(), // Search/Explore
-          const FavoritesScreen(), // Saved
-          const ChatListScreen(), // Chat
+          const HomePage(),
+          const PropertiesScreen(),
+          const FavoritesScreen(),
+          const ChatListScreen(),
         ];
     }
   }
@@ -211,8 +210,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     switch (role) {
       case 'ADMIN':
         return ['Dashboard', 'Users', 'Properties', 'Profile'];
-     case 'OWNER':
-        return ['Dashboard', 'Properties', 'Bookings', 'Chat', 'Profile'];
+      case 'OWNER':
+        return ['Dashboard', 'Properties', 'Bookings', 'Chat'];
       default:
         return ['Home', 'Explore', 'Saved', 'Chat'];
     }
@@ -233,7 +232,6 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Icons.apartment_outlined,
           Icons.book_online_outlined,
           Icons.chat_bubble_outline_outlined,
-          Icons.person_outlined,
         ];
       default:
         return [
@@ -271,7 +269,6 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ✅ STUDENT NAV ITEM (unchanged design)
   Widget _buildNavItem({
     required IconData icon,
     required IconData activeIcon,
@@ -329,7 +326,6 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ==================== ✅ STUDENT BOTTOM NAV (unchanged) ====================
   Widget _buildStudentBottomNav(
     bool isDark,
     List<Widget> pages,
@@ -368,145 +364,124 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
-    Widget _buildOwnerBottomNav(
-    bool isDark,
-    List<Widget> pages,
-    List<String> labels,
-    List<IconData> icons,
-    List<IconData> activeIcons,
-  ) {
-    final barColor = isDark ? _HomePalette.darkSurface : Colors.white;
-    final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    Widget ownerItem(int index) {
-      final isSelected = _selectedIndex == index;
-      return Expanded(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            setState(() => _selectedIndex = index);
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isSelected ? activeIcons[index] : icons[index],
-                color: isSelected
-                    ? _HomePalette.ownerPrimary
-                    : (isDark ? Colors.grey[500] : Colors.grey[400]),
-                size: isSelected ? 26 : 23,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                labels[index],
-                style: GoogleFonts.poppins(
-                  fontSize: isSelected ? 10.5 : 9.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected
-                      ? _HomePalette.ownerPrimary
-                      : (isDark ? Colors.grey[500] : Colors.grey[400]),
-                ),
-              ),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.only(top: 3),
-                width: isSelected ? 16 : 0,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: _HomePalette.ownerPrimary,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+Widget _buildOwnerBottomNav(
+  bool isDark,
+  List<Widget> pages,
+  List<String> labels,
+  List<IconData> icons,
+  List<IconData> activeIcons,
+) {
+  final bottomInset = MediaQuery.of(context).padding.bottom;
+
+  return Padding(
+    padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomInset),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          height: 68,
+          decoration: BoxDecoration(
+            color: (isDark ? _HomePalette.darkSurfaceElevated : Colors.white)
+                .withOpacity(isDark ? 0.78 : 0.92),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: _HomePalette.ownerPrimary.withOpacity(0.18),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _HomePalette.ownerPrimary.withOpacity(0.2),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    const double barHeight = 72;
-    const double buttonPoke = 22;
-
-    final total = pages.length;
-    final leftCount = (total / 2).floor();
-    final leftIndices = List.generate(leftCount, (i) => i);
-    final rightIndices = List.generate(total - leftCount, (i) => i + leftCount);
-
-    return SizedBox(
-      height: barHeight + buttonPoke + bottomInset,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomCenter,
-        children: [
-          Container(
-            height: barHeight + bottomInset,
-            padding: EdgeInsets.only(bottom: bottomInset),
-            decoration: BoxDecoration(
-              color: barColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              boxShadow: [
-                BoxShadow(
-                  color: _HomePalette.ownerPrimary.withOpacity(0.15),
-                  blurRadius: 24,
-                  offset: const Offset(0, -6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                ...leftIndices.map(ownerItem),
-                const SizedBox(width: 68),
-                ...rightIndices.map(ownerItem),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 0,
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                changeTab(1);
-              },
-              child: AnimatedBuilder(
-                animation: _addPulseAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _addPulseAnimation.value,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth / pages.length;
+              return Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    left: itemWidth * _selectedIndex + 8,
+                    top: 8,
+                    width: itemWidth - 16,
+                    height: 52,
                     child: Container(
-                      width: 62,
-                      height: 62,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
                         gradient: const LinearGradient(
-                          colors: [_HomePalette.ownerPrimaryLight, _HomePalette.ownerGold],
+                          colors: [
+                            _HomePalette.ownerPrimary,
+                            _HomePalette.ownerGold,
+                          ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        border: Border.all(color: barColor, width: 4),
+                        borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: _HomePalette.ownerPrimary.withOpacity(0.45),
-                            blurRadius: 18,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 6),
+                            color: _HomePalette.ownerPrimary.withOpacity(0.4),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.add_home_work_rounded,
-                        color: Colors.white,
-                        size: 28,
-                      ),
                     ),
-                  );
-                },
-              ),
-            ),
+                  ),
+                  Row(
+                    children: List.generate(pages.length, (index) {
+                      final isSelected = _selectedIndex == index;
+                      return Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _selectedIndex = index);
+                          },
+                          child: SizedBox(
+                            height: 68,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  isSelected ? activeIcons[index] : icons[index],
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isDark ? Colors.grey[400] : Colors.grey[500]),
+                                  size: 22,
+                                ),
+                                const SizedBox(height: 3),
+                                AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 200),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 9.5,
+                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDark ? Colors.grey[400] : Colors.grey[500]),
+                                  ),
+                                  child: Text(labels[index]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              );
+            },
           ),
-        ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   Widget _buildAdminBottomNav(
     bool isDark,
@@ -515,7 +490,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<IconData> icons,
     List<IconData> activeIcons,
   ) {
-    final bottomInset = MediaQuery.of(context).padding.bottom; // ✅ system nav bar height
+    final bottomInset =
+        MediaQuery.of(context).padding.bottom; // ✅ system nav bar height
 
     return Padding(
       // ✅ bottom margin now includes system inset so the floating bar clears it
@@ -557,7 +533,10 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Container(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [_HomePalette.adminPrimary, _HomePalette.adminPrimaryLight],
+                            colors: [
+                              _HomePalette.adminPrimary,
+                              _HomePalette.adminPrimaryLight
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -588,10 +567,14 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    isSelected ? activeIcons[index] : icons[index],
+                                    isSelected
+                                        ? activeIcons[index]
+                                        : icons[index],
                                     color: isSelected
                                         ? Colors.white
-                                        : (isDark ? Colors.grey[400] : Colors.grey[500]),
+                                        : (isDark
+                                            ? Colors.grey[400]
+                                            : Colors.grey[500]),
                                     size: 22,
                                   ),
                                   const SizedBox(height: 3),
@@ -599,10 +582,14 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     duration: const Duration(milliseconds: 200),
                                     style: GoogleFonts.poppins(
                                       fontSize: 9.5,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
                                       color: isSelected
                                           ? Colors.white
-                                          : (isDark ? Colors.grey[400] : Colors.grey[500]),
+                                          : (isDark
+                                              ? Colors.grey[400]
+                                              : Colors.grey[500]),
                                     ),
                                     child: Text(labels[index]),
                                   ),

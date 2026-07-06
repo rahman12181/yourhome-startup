@@ -82,31 +82,55 @@ class OwnerProfile {
   }
 }
 
-// ============== VERIFICATION STATUS ==============
+// lib/models/owner_model.dart
+
 class VerificationStatus {
-  final String verificationStatus;
+  final bool isVerified;
+  final bool isRejected;
   final String? rejectionReason;
-  final DateTime? verifiedAt;
+  final String? verifiedAt;
+  final String? submittedAt;  // ✅ ADD THIS
+  final String? businessName;
+  final String? aadharNumber;
+  final String? panNumber;
+  final String? aadharDocUrl;
+  final String? panDocUrl;
+  final String? addressProofUrl;
 
   VerificationStatus({
-    required this.verificationStatus,
+    required this.isVerified,
+    required this.isRejected,
     this.rejectionReason,
     this.verifiedAt,
+    this.submittedAt,  // ✅ ADD THIS
+    this.businessName,
+    this.aadharNumber,
+    this.panNumber,
+    this.aadharDocUrl,
+    this.panDocUrl,
+    this.addressProofUrl,
   });
 
   factory VerificationStatus.fromJson(Map<String, dynamic> json) {
+    // Check both possible field names
+    final status = json['verificationStatus'] ?? json['status'] ?? '';
+    final isVerified = status == 'VERIFIED' || json['isVerified'] == true;
+    final isRejected = status == 'REJECTED' || json['isRejected'] == true;
+
     return VerificationStatus(
-      verificationStatus: json['verificationStatus'] ?? 'PENDING',
+      isVerified: isVerified,
+      isRejected: isRejected,
       rejectionReason: json['rejectionReason'],
-      verifiedAt: json['verifiedAt'] != null 
-          ? DateTime.parse(json['verifiedAt']) 
-          : null,
+      verifiedAt: json['verifiedAt'],
+      submittedAt: json['submittedAt'] ?? json['createdAt'],
+      businessName: json['businessName'],
+      aadharNumber: json['aadharNumber'],
+      panNumber: json['panNumber'],
+      aadharDocUrl: json['aadharDocUrl'],
+      panDocUrl: json['panDocUrl'],
+      addressProofUrl: json['addressProofUrl'],
     );
   }
-
-  bool get isPending => verificationStatus == 'PENDING';
-  bool get isVerified => verificationStatus == 'VERIFIED';
-  bool get isRejected => verificationStatus == 'REJECTED';
 }
 
 // ============== SUBSCRIPTION ORDER ==============
@@ -141,7 +165,6 @@ class SubscriptionOrder {
   String get amountInRupees => '₹${(amount / 100).toStringAsFixed(2)}';
 }
 
-// ============== SUBSCRIPTION DETAILS ==============
 class SubscriptionDetails {
   final String plan;
   final String subscriptionStatus;
