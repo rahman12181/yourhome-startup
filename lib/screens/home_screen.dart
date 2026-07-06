@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:yourhome/models/property_model.dart';
 import 'package:yourhome/screens/admin/admin_profile_screen.dart';
+import 'package:yourhome/screens/owner/owner_profile_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/property_provider.dart';
@@ -193,7 +194,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const OwnerDashboardPage(),
           const OwnerPropertyManagementPage(),
           const OwnerBookingManagementPage(),
-          const ProfileScreen(),
+          const ChatListScreen(),
+          const OwnerProfileScreen(),
         ];
       default: // STUDENT
         return [
@@ -209,8 +211,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     switch (role) {
       case 'ADMIN':
         return ['Dashboard', 'Users', 'Properties', 'Profile'];
-      case 'OWNER':
-        return ['Dashboard', 'Properties', 'Bookings', 'Profile'];
+     case 'OWNER':
+        return ['Dashboard', 'Properties', 'Bookings', 'Chat', 'Profile'];
       default:
         return ['Home', 'Explore', 'Saved', 'Chat'];
     }
@@ -230,6 +232,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Icons.dashboard_outlined,
           Icons.apartment_outlined,
           Icons.book_online_outlined,
+          Icons.chat_bubble_outline_outlined,
           Icons.person_outlined,
         ];
       default:
@@ -365,7 +368,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
-     Widget _buildOwnerBottomNav(
+    Widget _buildOwnerBottomNav(
     bool isDark,
     List<Widget> pages,
     List<String> labels,
@@ -373,7 +376,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<IconData> activeIcons,
   ) {
     final barColor = isDark ? _HomePalette.darkSurface : Colors.white;
-    final bottomInset = MediaQuery.of(context).padding.bottom; // ✅ system nav bar height
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
     Widget ownerItem(int index) {
       final isSelected = _selectedIndex == index;
@@ -422,19 +425,22 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     const double barHeight = 72;
-    const double buttonPoke = 22; // how much the FAB pokes above the bar
+    const double buttonPoke = 22;
+
+    final total = pages.length;
+    final leftCount = (total / 2).floor();
+    final leftIndices = List.generate(leftCount, (i) => i);
+    final rightIndices = List.generate(total - leftCount, (i) => i + leftCount);
 
     return SizedBox(
-      // ✅ total height now includes bottomInset so nothing sits under the system bar
       height: barHeight + buttonPoke + bottomInset,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.bottomCenter,
         children: [
-          // Base curved bar
           Container(
             height: barHeight + bottomInset,
-            padding: EdgeInsets.only(bottom: bottomInset), // ✅ push content above system bar
+            padding: EdgeInsets.only(bottom: bottomInset),
             decoration: BoxDecoration(
               color: barColor,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -448,22 +454,17 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             child: Row(
               children: [
-                ownerItem(0),
-                ownerItem(1),
-                const SizedBox(width: 68), // notch gap for center FAB
-                ownerItem(2),
-                ownerItem(3),
+                ...leftIndices.map(ownerItem),
+                const SizedBox(width: 68),
+                ...rightIndices.map(ownerItem),
               ],
             ),
           ),
-
-          // ✅ Raised, pulsing "Add Property" button — sits above the bar & system bar
           Positioned(
             top: 0,
             child: GestureDetector(
               onTap: () {
                 HapticFeedback.mediumImpact();
-                // TODO: Hook this up to your actual Add Property screen/dialog.
                 changeTab(1);
               },
               child: AnimatedBuilder(

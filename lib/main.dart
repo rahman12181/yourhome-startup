@@ -9,6 +9,7 @@ import 'providers/admin_provider.dart';
 import 'screens/splash_screen.dart';
 import 'services/api_service.dart';
 import 'utils/theme.dart';
+import 'providers/owner_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +63,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<AdminProvider>(
           create: (_) => AdminProvider(),
         ),
+        ChangeNotifierProvider(create: (_) => OwnerProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
