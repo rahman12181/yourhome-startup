@@ -6,9 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:yourhome/screens/home_screen.dart';
-import '../../services/chat_service.dart';
 import '../../models/chat_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../providers/theme_provider.dart';
 import 'chat_screen.dart';
 import '../profile_screen.dart';
@@ -22,15 +22,11 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen>
     with TickerProviderStateMixin {
-  final ChatService _chatService = ChatService();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  
-  List<Conversation> _conversations = [];
+
   List<Conversation> _filteredConversations = [];
-  bool _isLoading = true;
   bool _isSearching = false;
-  String? _error;
 
   late AnimationController _animationController;
   late Animation<double> _fadeIn;
@@ -43,8 +39,15 @@ class _ChatListScreenState extends State<ChatListScreen>
   void initState() {
     super.initState();
     _setupAnimations();
-    _loadConversations();
+
+    // ✅ CHANGED — load via provider, no local ChatService/local WS listener anymore
+    Provider.of<ChatProvider>(context, listen: false).loadConversations();
+
     _searchController.addListener(_filterConversations);
+
+    // ❌ REMOVED — _setupWebSocketListener() is gone.
+    // ChatProvider owns onConversationUpdated globally now, so this screen
+    // just watches provider.conversations and rebuilds automatically.
   }
 
   void _setupAnimations() {
@@ -90,14 +93,18 @@ class _ChatListScreenState extends State<ChatListScreen>
     _staggerController.forward();
   }
 
+  // ✅ CHANGED — filters straight from provider.conversations instead of local _conversations
   void _filterConversations() {
     final query = _searchController.text.toLowerCase().trim();
+    final allConversations =
+        Provider.of<ChatProvider>(context, listen: false).conversations;
+
     setState(() {
       _isSearching = query.isNotEmpty;
       if (query.isEmpty) {
-        _filteredConversations = _conversations;
+        _filteredConversations = allConversations;
       } else {
-        _filteredConversations = _conversations.where((conv) {
+        _filteredConversations = allConversations.where((conv) {
           return conv.otherUserName.toLowerCase().contains(query) ||
               (conv.propertyTitle?.toLowerCase().contains(query) ?? false) ||
               (conv.lastMessage?.toLowerCase().contains(query) ?? false);
@@ -116,31 +123,19 @@ class _ChatListScreenState extends State<ChatListScreen>
     super.dispose();
   }
 
-  Future<void> _loadConversations() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    final response = await _chatService.getConversations();
-
-    if (response.success && response.data != null) {
-      setState(() {
-        _conversations = response.data!;
-        _filteredConversations = response.data!;
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
-        _error = response.message;
-        _isLoading = false;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // ✅ CHANGED — watch provider so any real-time conversation-update rebuilds this screen
+    final chatProvider = context.watch<ChatProvider>();
+    final conversations = chatProvider.conversations;
+    final isLoading = chatProvider.isLoading;
+    final error = chatProvider.error;
+
+    // keep the filtered list in sync with provider unless actively searching
+    final displayedConversations =
+        _isSearching ? _filteredConversations : conversations;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -153,21 +148,16 @@ class _ChatListScreenState extends State<ChatListScreen>
         body: SafeArea(
           child: Column(
             children: [
-              // Premium App Bar
-              _buildPremiumAppBar(context, isDark),
-              
-              // Search Bar
+              _buildPremiumAppBar(context, isDark, conversations.length),
               _buildPremiumSearchBar(context, isDark),
-              
-              // Content
               Expanded(
-                child: _isLoading
+                child: isLoading && conversations.isEmpty
                     ? _buildLoadingState(isDark)
-                    : _error != null
-                        ? _buildErrorState(isDark)
-                        : _conversations.isEmpty
+                    : error != null && conversations.isEmpty
+                        ? _buildErrorState(isDark, error)
+                        : conversations.isEmpty
                             ? _buildEmptyState(isDark)
-                            : _filteredConversations.isEmpty
+                            : displayedConversations.isEmpty
                                 ? _buildNoResultsState(isDark)
                                 : FadeTransition(
                                     opacity: _fadeIn,
@@ -176,14 +166,17 @@ class _ChatListScreenState extends State<ChatListScreen>
                                       child: ScaleTransition(
                                         scale: _scaleIn,
                                         child: RefreshIndicator(
-                                          onRefresh: _loadConversations,
+                                          onRefresh: () => Provider.of<ChatProvider>(
+                                                  context,
+                                                  listen: false)
+                                              .loadConversations(), // ✅ CHANGED
                                           color: const Color(0xFF2563EB),
                                           child: ListView.builder(
                                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                             physics: const BouncingScrollPhysics(),
-                                            itemCount: _filteredConversations.length,
+                                            itemCount: displayedConversations.length,
                                             itemBuilder: (context, index) {
-                                              final conversation = _filteredConversations[index];
+                                              final conversation = displayedConversations[index];
                                               final animation = _staggerAnimations[index % _staggerAnimations.length];
                                               
                                               return FadeTransition(
@@ -216,14 +209,12 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   // ========== PREMIUM APP BAR ==========
-  Widget _buildPremiumAppBar(BuildContext context, bool isDark) {
-    final totalChats = _conversations.length;
-    
+  // ✅ CHANGED — takes totalChats as parameter instead of using this._conversations
+  Widget _buildPremiumAppBar(BuildContext context, bool isDark, int totalChats) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          // Back Button
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
@@ -284,7 +275,6 @@ class _ChatListScreenState extends State<ChatListScreen>
               ],
             ),
           ),
-          // Theme Toggle
           Container(
             decoration: BoxDecoration(
               color: isDark
@@ -320,7 +310,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-// ========== PREMIUM SEARCH BAR ==========
+  // ========== PREMIUM SEARCH BAR ==========
   Widget _buildPremiumSearchBar(BuildContext context, bool isDark) {
     final hasFocus = _searchFocusNode.hasFocus;
     final hasText = _searchController.text.isNotEmpty;
@@ -437,7 +427,10 @@ class _ChatListScreenState extends State<ChatListScreen>
             },
             transitionDuration: const Duration(milliseconds: 350),
           ),
-        ).then((_) => _loadConversations());
+        ).then((_) {
+          // ✅ CHANGED — refresh via provider when coming back from a chat
+          Provider.of<ChatProvider>(context, listen: false).loadConversations();
+        });
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -557,17 +550,38 @@ class _ChatListScreenState extends State<ChatListScreen>
                         const SizedBox(width: 6),
                       ],
                       Expanded(
-                        child: Text(
-                          conversation.lastMessage ?? 'No messages yet',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            color: isUnread
-                                ? (isDark ? Colors.white : const Color(0xFF1A1A2E))
-                                : (isDark ? Colors.grey[400] : Colors.grey[500]),
-                            fontWeight: isUnread ? FontWeight.w600 : FontWeight.w400,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        // ✅ CHANGED — shows "typing..." live if the other user is typing
+                        // in this conversation, otherwise the last message
+                        child: Consumer<ChatProvider>(
+                          builder: (context, provider, _) {
+                            final isTyping = provider
+                                .isOtherUserTyping(conversation.conversationId);
+                            if (isTyping) {
+                              return Text(
+                                'typing...',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontStyle: FontStyle.italic,
+                                  color: const Color(0xFF2563EB),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }
+                            return Text(
+                              conversation.lastMessage ?? 'No messages yet',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: isUnread
+                                    ? (isDark ? Colors.white : const Color(0xFF1A1A2E))
+                                    : (isDark ? Colors.grey[400] : Colors.grey[500]),
+                                fontWeight: isUnread ? FontWeight.w600 : FontWeight.w400,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -669,7 +683,8 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   // ========== ERROR STATE ==========
-  Widget _buildErrorState(bool isDark) {
+  // ✅ CHANGED — takes error string, retries via provider
+  Widget _buildErrorState(bool isDark, String errorMessage) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -682,7 +697,6 @@ class _ChatListScreenState extends State<ChatListScreen>
                 color: const Color(0xFFEF4444).withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              // ignore: prefer_const_constructors
               child: Icon(
                 Icons.error_outline_rounded,
                 size: 48,
@@ -700,7 +714,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             const SizedBox(height: 6),
             Text(
-              _error ?? 'Failed to load conversations',
+              errorMessage,
               style: GoogleFonts.poppins(
                 fontSize: 13,
                 color: isDark ? Colors.grey[400] : Colors.grey[500],
@@ -709,7 +723,10 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
-              onPressed: _loadConversations,
+              onPressed: () {
+                Provider.of<ChatProvider>(context, listen: false)
+                    .loadConversations(); // ✅ CHANGED
+              },
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: Text(
                 'Retry',

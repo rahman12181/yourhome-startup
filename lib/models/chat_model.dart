@@ -27,8 +27,8 @@ class Conversation {
       otherUserPic: json['otherUserPic'],
       propertyTitle: json['propertyTitle'],
       lastMessage: json['lastMessage'],
-      lastMessageAt: json['lastMessageAt'] != null 
-          ? DateTime.parse(json['lastMessageAt']) 
+      lastMessageAt: json['lastMessageAt'] != null
+          ? DateTime.parse(json['lastMessageAt'])
           : null,
       unreadCount: json['unreadCount'] ?? 0,
     );
@@ -38,7 +38,7 @@ class Conversation {
     if (lastMessageAt == null) return '';
     final now = DateTime.now();
     final diff = now.difference(lastMessageAt!);
-    
+
     if (diff.inDays > 0) {
       return '${diff.inDays}d ago';
     } else if (diff.inHours > 0) {
@@ -90,13 +90,13 @@ class Message {
       senderPic: json['senderPic'],
       content: json['content'],
       isRead: json['isRead'] ?? false,
-      sentAt: DateTime.parse(json['sentAt'] ?? DateTime.now().toIso8601String()),
+      sentAt:
+          DateTime.parse(json['sentAt'] ?? DateTime.now().toIso8601String()),
       isMine: json['isMine'] ?? false,
       isDeletedForEveryone: json['isDeletedForEveryone'] ?? false,
       isEdited: json['isEdited'] ?? false,
-      editedAt: json['editedAt'] != null 
-          ? DateTime.parse(json['editedAt']) 
-          : null,
+      editedAt:
+          json['editedAt'] != null ? DateTime.parse(json['editedAt']) : null,
     );
   }
 
@@ -109,16 +109,16 @@ class Message {
 
   // ✅ Getter for isEditedNow (for backward compatibility)
   bool get isEditedNow => isEdited;
-  
+
   // ✅ Getter for isDeleted
   bool get isDeleted => isDeletedForEveryone;
-  
+
   // ✅ Getter for hasContent
   bool get hasContent => content != null && content!.isNotEmpty;
-  
+
   // ✅ Getter for isFromMe
   bool get isFromMe => isMine;
-  
+
   // ✅ Getter for isMessageRead
   bool get isMessageRead => isRead;
 
@@ -132,19 +132,19 @@ class Message {
 
   // ✅ Convert to JSON for API
   Map<String, dynamic> toJson() => {
-    'messageId': messageId,
-    'conversationId': conversationId,
-    'senderId': senderId,
-    'senderName': senderName,
-    'senderPic': senderPic,
-    'content': content,
-    'isRead': isRead,
-    'sentAt': sentAt.toIso8601String(),
-    'isMine': isMine,
-    'isDeletedForEveryone': isDeletedForEveryone,
-    'isEdited': isEdited,
-    'editedAt': editedAt?.toIso8601String(),
-  };
+        'messageId': messageId,
+        'conversationId': conversationId,
+        'senderId': senderId,
+        'senderName': senderName,
+        'senderPic': senderPic,
+        'content': content,
+        'isRead': isRead,
+        'sentAt': sentAt.toIso8601String(),
+        'isMine': isMine,
+        'isDeletedForEveryone': isDeletedForEveryone,
+        'isEdited': isEdited,
+        'editedAt': editedAt?.toIso8601String(),
+      };
 
   // ✅ CopyWith method for updates
   Message copyWith({
@@ -185,8 +185,8 @@ class SendMessageRequest {
   SendMessageRequest({required this.content});
 
   Map<String, dynamic> toJson() => {
-    'content': content,
-  };
+        'content': content,
+      };
 }
 
 // ✅ Edit Message Request
@@ -196,8 +196,8 @@ class EditMessageRequest {
   EditMessageRequest({required this.content});
 
   Map<String, dynamic> toJson() => {
-    'content': content,
-  };
+        'content': content,
+      };
 }
 
 // ✅ Delete Message Response
@@ -217,6 +217,26 @@ class DeleteMessageResponse {
       success: json['success'] ?? false,
       message: json['message'] ?? '',
       messageId: json['messageId'],
+    );
+  }
+}
+
+class TypingEvent {
+  final int conversationId;
+  final int senderId;
+  final bool isTyping;
+
+  TypingEvent({
+    required this.conversationId,
+    required this.senderId,
+    required this.isTyping,
+  });
+
+  factory TypingEvent.fromJson(Map<String, dynamic> json) {
+    return TypingEvent(
+      conversationId: json['conversationId'] ?? 0,
+      senderId: json['senderId'] ?? 0,
+      isTyping: json['isTyping'] ?? false,
     );
   }
 }

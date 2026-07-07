@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yourhome/services/websocket_manager.dart';
 import '../models/auth_model.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
+import '../providers/chat_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -43,6 +45,10 @@ class AuthProvider extends ChangeNotifier {
   String getUserEmail() {
     return _user?.email ?? '';
   }
+
+  String? get accessToken => _user?.accessToken;
+// OR
+ String? get token => _user?.accessToken;
 
   // ✅ GET ACCESS TOKEN - ADD THIS
   Future<String?> getAccessToken() async {
@@ -109,6 +115,18 @@ class AuthProvider extends ChangeNotifier {
     if (response.success && response.data != null) {
       _user = response.data;
       await _saveUserData(_user!);
+
+      // ✅ ADDED — connect WebSocket right after OTP verification (register flow)
+      try {
+        WebSocketManager().connect(
+          token: _user!.accessToken,
+          userId: _user!.userId,
+        );
+        print('✅ WebSocket connect triggered after OTP verify');
+      } catch (e) {
+        print('❌ Error connecting WebSocket after OTP verify: $e');
+      }
+
       _setLoading(false);
       return true;
     } else {
@@ -129,6 +147,18 @@ class AuthProvider extends ChangeNotifier {
       _user = response.data;
       await _saveUserData(_user!);
       await loadLocalProfileImage();
+
+      // ✅ ADDED — connect WebSocket right after login, don't wait for chat screen to open
+      try {
+        WebSocketManager().connect(
+          token: _user!.accessToken,
+          userId: _user!.userId,
+        );
+        print('✅ WebSocket connect triggered after login');
+      } catch (e) {
+        print('❌ Error connecting WebSocket after login: $e');
+      }
+
       _setLoading(false);
       return true;
     } else {
@@ -277,8 +307,9 @@ class AuthProvider extends ChangeNotifier {
       final profileImage = await _storage.getProfileImage();
       
       if (userId != null && userRole != null && userEmail != null) {
+        final accessToken = await _storage.getAccessToken() ?? '';
         _user = AuthData(
-          accessToken: await _storage.getAccessToken() ?? '',
+          accessToken: accessToken,
           refreshToken: await _storage.getRefreshToken() ?? '',
           tokenType: 'Bearer',
           role: userRole,
@@ -290,20 +321,44 @@ class AuthProvider extends ChangeNotifier {
           profileImage: profileImage,
         );
         await loadLocalProfileImage();
+
+        // ✅ ADDED — reconnect WebSocket on cold start (app reopened, user already logged in)
+        if (accessToken.isNotEmpty) {
+          try {
+            WebSocketManager().connect(
+              token: accessToken,
+              userId: userId,
+            );
+            print('✅ WebSocket connect triggered on cold start (checkAuthStatus)');
+          } catch (e) {
+            print('❌ Error connecting WebSocket on cold start: $e');
+          }
+        }
+
         notifyListeners();
       }
     }
   }
 
-  Future<void> logout() async {
-    _setLoading(true);
-    await _authService.logout();
-    await clearProfileImage();
-    _user = null;
-    _localProfileImagePath = null;
-    _setLoading(false);
-    notifyListeners();
+ Future<void> logout() async {
+  _setLoading(true);
+  await _authService.logout();
+  await clearProfileImage();
+  
+  //  Disconnect WebSocket on logout
+  try {
+    final wsManager = WebSocketManager();
+    wsManager.disconnect();
+    print('✅ WebSocket disconnected on logout');
+  } catch (e) {
+    print('❌ Error disconnecting WebSocket: $e');
   }
+  
+  _user = null;
+  _localProfileImagePath = null;
+  _setLoading(false);
+  notifyListeners();
+}
 
   void _setLoading(bool loading) {
     _isLoading = loading;

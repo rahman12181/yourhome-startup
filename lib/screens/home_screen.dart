@@ -14,6 +14,7 @@ import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/property_provider.dart';
 import '../providers/profile_provider.dart';
+import '../providers/chat_provider.dart';
 
 // ==================== STUDENT PANEL (USER) ====================
 import 'properties_screen.dart';
@@ -89,6 +90,25 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _setupAnimations();
+    _initWebSocket();
+  }
+
+  void _initWebSocket() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      final token = await authProvider.getAccessToken();
+      final userId = authProvider.user?.userId ?? 0;
+
+      if (token != null && userId > 0) {
+        print('🔌 Initializing WebSocket for user: $userId');
+        chatProvider.initWebSocket(token: token, userId: userId);
+      } else {
+        print('⚠️ Cannot initialize WebSocket: token or userId missing');
+      }
+    } catch (e) {
+      print('❌ Error initializing WebSocket: $e');
+    }
   }
 
   void _setupAnimations() {
@@ -365,123 +385,130 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-Widget _buildOwnerBottomNav(
-  bool isDark,
-  List<Widget> pages,
-  List<String> labels,
-  List<IconData> icons,
-  List<IconData> activeIcons,
-) {
-  final bottomInset = MediaQuery.of(context).padding.bottom;
+  Widget _buildOwnerBottomNav(
+    bool isDark,
+    List<Widget> pages,
+    List<String> labels,
+    List<IconData> icons,
+    List<IconData> activeIcons,
+  ) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
-  return Padding(
-    padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomInset),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(26),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          height: 68,
-          decoration: BoxDecoration(
-            color: (isDark ? _HomePalette.darkSurfaceElevated : Colors.white)
-                .withOpacity(isDark ? 0.78 : 0.92),
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: _HomePalette.ownerPrimary.withOpacity(0.18),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: _HomePalette.ownerPrimary.withOpacity(0.2),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomInset),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            height: 68,
+            decoration: BoxDecoration(
+              color: (isDark ? _HomePalette.darkSurfaceElevated : Colors.white)
+                  .withOpacity(isDark ? 0.78 : 0.92),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: _HomePalette.ownerPrimary.withOpacity(0.18),
+                width: 1,
               ),
-            ],
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = constraints.maxWidth / pages.length;
-              return Stack(
-                children: [
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOutCubic,
-                    left: itemWidth * _selectedIndex + 8,
-                    top: 8,
-                    width: itemWidth - 16,
-                    height: 52,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            _HomePalette.ownerPrimary,
-                            _HomePalette.ownerGold,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _HomePalette.ownerPrimary.withOpacity(0.4),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
+              boxShadow: [
+                BoxShadow(
+                  color: _HomePalette.ownerPrimary.withOpacity(0.2),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth / pages.length;
+                return Stack(
+                  children: [
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      left: itemWidth * _selectedIndex + 8,
+                      top: 8,
+                      width: itemWidth - 16,
+                      height: 52,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              _HomePalette.ownerPrimary,
+                              _HomePalette.ownerGold,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _HomePalette.ownerPrimary.withOpacity(0.4),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  Row(
-                    children: List.generate(pages.length, (index) {
-                      final isSelected = _selectedIndex == index;
-                      return Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _selectedIndex = index);
-                          },
-                          child: SizedBox(
-                            height: 68,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  isSelected ? activeIcons[index] : icons[index],
-                                  color: isSelected
-                                      ? Colors.white
-                                      : (isDark ? Colors.grey[400] : Colors.grey[500]),
-                                  size: 22,
-                                ),
-                                const SizedBox(height: 3),
-                                AnimatedDefaultTextStyle(
-                                  duration: const Duration(milliseconds: 200),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 9.5,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    Row(
+                      children: List.generate(pages.length, (index) {
+                        final isSelected = _selectedIndex == index;
+                        return Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _selectedIndex = index);
+                            },
+                            child: SizedBox(
+                              height: 68,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isSelected
+                                        ? activeIcons[index]
+                                        : icons[index],
                                     color: isSelected
                                         ? Colors.white
-                                        : (isDark ? Colors.grey[400] : Colors.grey[500]),
+                                        : (isDark
+                                            ? Colors.grey[400]
+                                            : Colors.grey[500]),
+                                    size: 22,
                                   ),
-                                  child: Text(labels[index]),
-                                ),
-                              ],
+                                  const SizedBox(height: 3),
+                                  AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 200),
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 9.5,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : (isDark
+                                              ? Colors.grey[400]
+                                              : Colors.grey[500]),
+                                    ),
+                                    child: Text(labels[index]),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              );
-            },
+                        );
+                      }),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   Widget _buildAdminBottomNav(
     bool isDark,
