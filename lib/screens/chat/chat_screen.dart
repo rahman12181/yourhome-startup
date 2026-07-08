@@ -40,9 +40,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   bool _isSending = false;
   Timer? _typingStopTimer;
   bool _lastTypingState = false;
-  bool _webSocketSetup = false; // ✅ ADDED
+  bool _webSocketSetup = false;
 
-  late ChatProvider _chatProvider;
+  ChatProvider? _chatProvider;
   bool _providerReady = false;
 
   @override
@@ -51,6 +51,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (!_providerReady) {
       _chatProvider = Provider.of<ChatProvider>(context, listen: false);
       _providerReady = true;
+      if (_chatProvider != null && !_webSocketSetup) {
+        _setupWebSocketListener();
+      }
     }
   }
 
@@ -58,13 +61,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
-    // ✅ ADDED - Setup WebSocket listener
-    _setupWebSocketListener();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _chatProvider.setActiveConversation(widget.conversationId);
-        _chatProvider.loadMessages(widget.conversationId);
+        if (_chatProvider != null) {
+          _chatProvider!.setActiveConversation(widget.conversationId);
+          _chatProvider!.loadMessages(widget.conversationId);
+        }
       }
     });
 
@@ -72,49 +74,44 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _messageController.addListener(_handleTypingChange);
   }
 
-  // ✅ ADDED - WebSocket listener setup
   void _setupWebSocketListener() {
-    if (_webSocketSetup) return;
+    if (_webSocketSetup || _chatProvider == null) return;
     _webSocketSetup = true;
 
     print('🔌 Setting up WebSocket listeners for ChatScreen');
 
-    // 🔥 Message receive
-    _chatProvider.wsManager.onMessageReceived = (message) {
+    _chatProvider!.wsManager.onMessageReceived = (message) {
       print('📩 [WS] Message received in ChatScreen: ${message.content}');
       
       if (message.conversationId == widget.conversationId) {
-        final exists = _chatProvider.messages.any(
+        final exists = _chatProvider!.messages.any(
           (m) => m.messageId == message.messageId
         );
         if (!exists) {
-          _chatProvider.addOptimisticMessage(message);
+          _chatProvider!.addOptimisticMessage(message);
           _scrollToBottom();
         }
       }
     };
     
-    // 🔥 Typing indicator receive
-    _chatProvider.wsManager.onTypingReceived = (event) {
+    _chatProvider!.wsManager.onTypingReceived = (event) {
       if (event.senderId == widget.otherUserId) {
-        _chatProvider.setTypingStatus(event.conversationId, event.isTyping);
+        _chatProvider!.setTypingStatus(event.conversationId, event.isTyping);
       }
     };
     
-    // 🔥 Message edited
-    _chatProvider.wsManager.onMessageEdited = (message) {
+    _chatProvider!.wsManager.onMessageEdited = (message) {
       if (message.conversationId == widget.conversationId) {
-        _chatProvider.updateMessage(message);
+        _chatProvider!.updateMessage(message);
       }
     };
     
-    // 🔥 Message deleted
-    _chatProvider.wsManager.onMessageDeleted = (message) {
+    _chatProvider!.wsManager.onMessageDeleted = (message) {
       if (message.conversationId == widget.conversationId) {
         if (message.isDeletedForEveryone) {
-          _chatProvider.updateMessage(message);
+          _chatProvider!.updateMessage(message);
         } else {
-          _chatProvider.removeMessage(message.messageId);
+          _chatProvider!.removeMessage(message.messageId);
         }
       }
     };
@@ -127,12 +124,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   void _handleTypingChange() {
-    if (!_providerReady) return;
+    if (_chatProvider == null) return;
     final hasText = _messageController.text.trim().isNotEmpty;
 
     if (hasText && !_lastTypingState) {
       _lastTypingState = true;
-      _chatProvider.sendTypingIndicator(
+      _chatProvider!.sendTypingIndicator(
         conversationId: widget.conversationId,
         receiverId: widget.otherUserId,
         isTyping: true,
@@ -142,7 +139,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _typingStopTimer?.cancel();
     _typingStopTimer = Timer(const Duration(seconds: 2), () {
       _lastTypingState = false;
-      _chatProvider.sendTypingIndicator(
+      _chatProvider!.sendTypingIndicator(
         conversationId: widget.conversationId,
         receiverId: widget.otherUserId,
         isTyping: false,
@@ -152,15 +149,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    if (_providerReady) {
+    if (_chatProvider != null) {
       if (_lastTypingState) {
-        _chatProvider.sendTypingIndicator(
+        _chatProvider!.sendTypingIndicator(
           conversationId: widget.conversationId,
           receiverId: widget.otherUserId,
           isTyping: false,
         );
       }
-      _chatProvider.setActiveConversation(null);
+      _chatProvider!.setActiveConversation(null);
     }
 
     _typingStopTimer?.cancel();
@@ -174,11 +171,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   Future<void> _sendMessage() async {
     final content = _messageController.text.trim();
-    if (content.isEmpty || _isSending) return;
+    if (content.isEmpty || _isSending || _chatProvider == null) return;
 
     _messageController.clear();
     _lastTypingState = false;
-    _chatProvider.sendTypingIndicator(
+    _chatProvider!.sendTypingIndicator(
       conversationId: widget.conversationId,
       receiverId: widget.otherUserId,
       isTyping: false,
@@ -201,7 +198,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       editedAt: null,
     );
 
-    _chatProvider.addOptimisticMessage(tempMessage);
+    _chatProvider!.addOptimisticMessage(tempMessage);
     _scrollToBottom();
 
     final response = await _chatService.sendMessage(
@@ -213,16 +210,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     setState(() => _isSending = false);
 
     if (response.success && response.data != null) {
-      _chatProvider.replaceOptimisticMessage(tempId, response.data!);
+      _chatProvider!.replaceOptimisticMessage(tempId, response.data!);
       _scrollToBottom();
     } else {
-      _chatProvider.removeOptimisticMessage(tempId);
+      _chatProvider!.removeOptimisticMessage(tempId);
       _showSnackBar(response.message, isError: true);
     }
   }
 
   void _navigateToOwnerProfile() {
-    print('📤 Opening profile for user: ${widget.otherUserId}');
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -236,6 +232,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   // ============== EDIT MESSAGE ==============
   Future<void> _editMessage(Message message) async {
+    if (_chatProvider == null) return;
+    
     final controller = TextEditingController(text: message.content);
 
     final result = await showDialog<bool>(
@@ -305,7 +303,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
 
     if (result == true && controller.text.trim().isNotEmpty) {
-      final success = await _chatProvider.editMessage(
+      final success = await _chatProvider!.editMessage(
         messageId: message.messageId,
         content: controller.text.trim(),
       );
@@ -314,7 +312,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       if (success) {
         _showSnackBar('Message edited ✏️');
       } else {
-        _showSnackBar(_chatProvider.error ?? 'Failed to edit message',
+        _showSnackBar(_chatProvider!.error ?? 'Failed to edit message',
             isError: true);
       }
     }
@@ -322,6 +320,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   // ============== DELETE FOR EVERYONE ==============
   Future<void> _deleteForEveryone(Message message) async {
+    if (_chatProvider == null) return;
+    
     final confirm = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -380,14 +380,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
 
     if (confirm == true) {
-      final success =
-          await _chatProvider.deleteForEveryone(message.messageId);
+      final success = await _chatProvider!.deleteForEveryone(message.messageId);
 
       if (!mounted) return;
       if (success) {
         _showSnackBar('Message deleted for everyone');
       } else {
-        _showSnackBar(_chatProvider.error ?? 'Failed to delete message',
+        _showSnackBar(_chatProvider!.error ?? 'Failed to delete message',
             isError: true);
       }
     }
@@ -395,6 +394,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   // ============== DELETE FOR ME ==============
   Future<void> _deleteForMe(Message message) async {
+    if (_chatProvider == null) return;
+    
     final confirm = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -453,14 +454,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
 
     if (confirm == true) {
-      final success =
-          await _chatProvider.deleteForMe(message.messageId);
+      final success = await _chatProvider!.deleteForMe(message.messageId);
 
       if (!mounted) return;
       if (success) {
         _showSnackBar('Message deleted for you');
       } else {
-        _showSnackBar(_chatProvider.error ?? 'Failed to delete message',
+        _showSnackBar(_chatProvider!.error ?? 'Failed to delete message',
             isError: true);
       }
     }
@@ -639,8 +639,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       leading: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color:
-              isDanger ? Colors.red.withOpacity(0.1) : color.withOpacity(0.1),
+          color: isDanger ? Colors.red.withOpacity(0.1) : color.withOpacity(0.1),
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -654,8 +653,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         style: GoogleFonts.poppins(
           fontSize: 15,
           fontWeight: FontWeight.w500,
-          color:
-              isDanger ? Colors.red : (isDark ? Colors.white : Colors.black87),
+          color: isDanger ? Colors.red : (isDark ? Colors.white : Colors.black87),
         ),
       ),
       trailing: Icon(
@@ -687,8 +685,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ),
           ],
         ),
-        backgroundColor:
-            isError ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
+        backgroundColor: isError ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -730,8 +727,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor:
-            isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+        backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
         appBar: _buildPremiumAppBar(context, isDark),
         body: Column(
           children: [
@@ -755,8 +751,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     BuildContext context,
     bool isDark,
   ) {
-    final hasImage =
-        widget.otherUserPic != null && widget.otherUserPic!.isNotEmpty;
+    final hasImage = widget.otherUserPic != null && widget.otherUserPic!.isNotEmpty;
 
     return AppBar(
       backgroundColor: isDark ? const Color(0xFF1A1F33) : Colors.white,
@@ -777,18 +772,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: hasImage
-                    ? null
-                    : const LinearGradient(
-                        colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                gradient: hasImage ? null : const LinearGradient(
+                  colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               child: CircleAvatar(
                 radius: 20,
-                backgroundColor:
-                    hasImage ? Colors.transparent : Colors.transparent,
+                backgroundColor: hasImage ? Colors.transparent : Colors.transparent,
                 backgroundImage: hasImage
                     ? CachedNetworkImageProvider(widget.otherUserPic!)
                     : null,
@@ -819,11 +811,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                     ),
                   ),
-                  // ✅ TYPING INDICATOR IN APP BAR
                   Consumer<ChatProvider>(
                     builder: (context, provider, _) {
-                      final isTyping =
-                          provider.isOtherUserTyping(widget.conversationId);
+                      final isTyping = provider.isOtherUserTyping(widget.conversationId);
                       if (isTyping) {
                         return Text(
                           'typing...',
@@ -899,7 +889,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             },
           ),
         ),
-        // ✅ TYPING INDICATOR AT BOTTOM
         if (isTyping)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -966,18 +955,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   String _getMonth(int month) {
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return months[month - 1];
   }
@@ -989,8 +968,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       child: GestureDetector(
         onLongPress: () => _showMessageOptions(message),
         child: Column(
-          crossAxisAlignment:
-              isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Container(
               constraints: BoxConstraints(
@@ -1074,9 +1052,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             fontStyle: FontStyle.italic,
                             color: isMine
                                 ? Colors.white60
-                                : (isDark
-                                    ? Colors.grey[500]
-                                    : Colors.grey[500]),
+                                : (isDark ? Colors.grey[500] : Colors.grey[500]),
                           ),
                         ),
                       ],
@@ -1276,7 +1252,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              _chatProvider.loadMessages(widget.conversationId);
+              if (_chatProvider != null) {
+                _chatProvider!.loadMessages(widget.conversationId);
+              }
             },
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: Text(
