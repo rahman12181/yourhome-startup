@@ -12,21 +12,33 @@ class WebSocketManager {
 
   StompClient? _client;
   bool _isConnected = false;
+  bool _isConnecting = false;
   int? _currentUserId;
 
   Function(Message)? onMessageReceived;
   Function(Message)? onMessageEdited;
   Function(Message)? onMessageDeleted;
   Function(Conversation)? onConversationUpdated;
-  Function(TypingEvent)? onTypingReceived; // ✅ ADDED
+  Function(TypingEvent)? onTypingReceived;
   Function()? onConnected;
   Function(String)? onError;
 
   bool get isConnected => _isConnected;
-  int? get currentUserId => _currentUserId; // ✅ ADDED - needed for sendTyping
+  int? get currentUserId => _currentUserId;
 
   void connect({required String token, required int userId}) {
-    if (_isConnected && _currentUserId == userId) return;
+    print('🔌 [WS] connect() called for userId=$userId, wsUrl=${AppConstants.wsUrl}'); // ✅ ADDED
+
+    if (_isConnected && _currentUserId == userId) {
+      print('🔌 [WS] Already connected for user $userId, skipping');
+      return;
+    }
+    if (_isConnecting) {
+      print('🔌 [WS] Connect already in progress, skipping duplicate call');
+      return;
+    }
+
+    _isConnecting = true;
 
     if (_client != null) {
       _client!.deactivate();
@@ -44,38 +56,53 @@ class WebSocketManager {
         },
         onConnect: (frame) {
           _isConnected = true;
+          _isConnecting = false;
+          print('✅ [WS] CONNECTED successfully for user $userId'); // ✅
           _subscribeToTopics(userId);
           if (onConnected != null) onConnected!();
         },
         onDisconnect: (frame) {
           _isConnected = false;
+          _isConnecting = false;
+          print('❌ [WS] DISCONNECTED for user $userId'); // ✅ ADDED
         },
         onWebSocketError: (error) {
           _isConnected = false;
+          _isConnecting = false;
+          print('❌ [WS] WEBSOCKET ERROR: $error'); // ✅ ADDED — this will show the real cause
           if (onError != null) onError!(error.toString());
         },
         onStompError: (frame) {
+          print('❌ [WS] STOMP ERROR: ${frame.body}'); // ✅ ADDED
           if (onError != null) onError!(frame.body ?? 'STOMP Error');
+        },
+        beforeConnect: () async {
+          print('🔌 [WS] beforeConnect - attempting to reach $wsUrl'); // ✅ ADDED
         },
         reconnectDelay: const Duration(seconds: 5),
       ),
     );
 
     _client!.activate();
+    print('🔌 [WS] client.activate() called'); // ✅ ADDED
   }
 
   void _subscribeToTopics(int userId) {
     if (_client == null) return;
+    print('📡 [WS] Subscribing to topics for user $userId'); // ✅ ADDED
 
     _client!.subscribe(
       destination: '/user/$userId/queue/messages',
       callback: (frame) {
+        print('📩 [WS] Message received on /queue/messages'); // ✅ ADDED
         if (frame.body != null) {
           try {
             final json = jsonDecode(frame.body!);
             final message = Message.fromJson(json);
             if (onMessageReceived != null) onMessageReceived!(message);
-          } catch (e) {}
+          } catch (e) {
+            print('❌ [WS] Error parsing message: $e'); // ✅ ADDED
+          }
         }
       },
     );
@@ -109,52 +136,47 @@ class WebSocketManager {
     _client!.subscribe(
       destination: '/user/$userId/queue/conversation-update',
       callback: (frame) {
+        print('📩 [WS] Conversation update received'); // ✅ ADDED
         if (frame.body != null) {
           try {
             final json = jsonDecode(frame.body!);
             final conv = Conversation.fromJson(json);
             if (onConversationUpdated != null) onConversationUpdated!(conv);
-          } catch (e) {}
+          } catch (e) {
+            print('❌ [WS] Error parsing conversation update: $e'); // ✅ ADDED
+          }
         }
       },
     );
 
-    // ✅ ADDED — typing indicator subscription
     _client!.subscribe(
       destination: '/user/$userId/queue/typing',
       callback: (frame) {
+        print('📩 [WS] Typing event received'); // ✅ ADDED
         if (frame.body != null) {
           try {
             final json = jsonDecode(frame.body!);
             final event = TypingEvent.fromJson(json);
             if (onTypingReceived != null) onTypingReceived!(event);
-          } catch (e) {}
+          } catch (e) {
+            print('❌ [WS] Error parsing typing event: $e'); // ✅ ADDED
+          }
         }
       },
     );
+
+    print('📡 [WS] All subscriptions set up for user $userId'); // ✅ ADDED
   }
 
-  // ✅ ADDED — send typing status to the other user
-  // NOTE: Backend mein ye STOMP @MessageMapping add karni hogi:
-  //
-  // @MessageMapping("/chat.typing")
-  // public void handleTyping(@Payload TypingEventDto event) {
-  //     messagingTemplate.convertAndSendToUser(
-  //         String.valueOf(event.getReceiverId()),
-  //         "/queue/typing",
-  //         Map.of(
-  //             "conversationId", event.getConversationId(),
-  //             "senderId", event.getSenderId(),
-  //             "isTyping", event.isTyping()
-  //         )
-  //     );
-  // }
   void sendTyping({
     required int conversationId,
     required int receiverId,
     required bool isTyping,
   }) {
-    if (_client == null || !_isConnected) return;
+    if (_client == null || !_isConnected) {
+      print('⚠️ [WS] Cannot send typing — client null or not connected (isConnected=$_isConnected)'); // ✅ ADDED
+      return;
+    }
     try {
       _client!.send(
         destination: '/app/chat.typing',
@@ -165,7 +187,10 @@ class WebSocketManager {
           'isTyping': isTyping,
         }),
       );
-    } catch (e) {}
+      print('📤 [WS] Typing sent: conv=$conversationId, isTyping=$isTyping'); // ✅ ADDED
+    } catch (e) {
+      print('❌ [WS] Error sending typing: $e'); // ✅ ADDED
+    }
   }
 
   void disconnect() {
@@ -174,7 +199,9 @@ class WebSocketManager {
       _client = null;
     }
     _isConnected = false;
+    _isConnecting = false;
     _currentUserId = null;
+    print('🔌 [WS] Manually disconnected'); // ✅ ADDED
   }
 }
 

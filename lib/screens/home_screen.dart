@@ -90,25 +90,6 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _setupAnimations();
-    _initWebSocket();
-  }
-
-  void _initWebSocket() async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      final token = await authProvider.getAccessToken();
-      final userId = authProvider.user?.userId ?? 0;
-
-      if (token != null && userId > 0) {
-        print('🔌 Initializing WebSocket for user: $userId');
-        chatProvider.initWebSocket(token: token, userId: userId);
-      } else {
-        print('⚠️ Cannot initialize WebSocket: token or userId missing');
-      }
-    } catch (e) {
-      print('❌ Error initializing WebSocket: $e');
-    }
   }
 
   void _setupAnimations() {

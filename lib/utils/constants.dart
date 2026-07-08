@@ -16,17 +16,17 @@ class AppConstants {
   }
 
   //  WEBSOCKET URL 
-  static String get wsUrl {
+   static String get wsUrl {
     if (kIsWeb) {
-      return 'http://localhost:8080/ws';
+      return 'ws://localhost:8080/ws';
     }
     if (Platform.isAndroid) {
-      return 'http://192.168.0.109:8080/ws';  // ✅ APNA IP DAALO
+      return 'ws://192.168.0.109:8080/ws';  // ✅ CHANGED
     }
     if (Platform.isIOS) {
-      return 'http://192.168.0.101:8080/ws';
+      return 'ws://192.168.0.101:8080/ws';  // ✅ CHANGED
     }
-    return 'http://10.0.2.2:8080/ws';
+    return 'ws://10.0.2.2:8080/ws';  // ✅ CHANGED
   }
 
   static const String appName = 'YourHome';

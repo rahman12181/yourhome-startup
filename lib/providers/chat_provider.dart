@@ -14,12 +14,7 @@ class ChatProvider extends ChangeNotifier {
   List<Message> _messages = [];
   bool _isLoading = false;
   String? _error;
-
-  // ✅ ADDED — tracks which conversation screen is currently open,
-  // so incoming WS messages only get appended to the right list.
   int? _activeConversationId;
-
-  // ✅ ADDED — typing state: conversationId -> is other user typing
   final Map<int, bool> _typingByConversation = {};
   final Map<int, Timer> _typingTimers = {};
 
@@ -32,6 +27,27 @@ class ChatProvider extends ChangeNotifier {
 
   bool isOtherUserTyping(int conversationId) =>
       _typingByConversation[conversationId] ?? false;
+
+  // ✅ ADD THESE 3 METHODS HERE
+  void setTypingStatus(int conversationId, bool isTyping) {
+    if (_typingByConversation[conversationId] != isTyping) {
+      _typingByConversation[conversationId] = isTyping;
+      notifyListeners();
+    }
+  }
+
+  void updateMessage(Message message) {
+    final index = _messages.indexWhere((m) => m.messageId == message.messageId);
+    if (index != -1) {
+      _messages[index] = message;
+      notifyListeners();
+    }
+  }
+
+  void removeMessage(int messageId) {
+    _messages.removeWhere((m) => m.messageId == messageId);
+    notifyListeners();
+  }
 
   void initWebSocket({required String token, required int userId}) {
     _wsManager.onMessageReceived = (message) {
@@ -50,7 +66,6 @@ class ChatProvider extends ChangeNotifier {
       _updateConversation(conversation);
     };
 
-    // ✅ ADDED — typing events
     _wsManager.onTypingReceived = (event) {
       _handleTypingEvent(event);
     };
@@ -67,7 +82,6 @@ class ChatProvider extends ChangeNotifier {
     _wsManager.connect(token: token, userId: userId);
   }
 
-  // ✅ ADDED — call this in ChatScreen.initState / dispose
   void setActiveConversation(int? conversationId) {
     _activeConversationId = conversationId;
   }
@@ -98,7 +112,6 @@ class ChatProvider extends ChangeNotifier {
     _setLoading(false);
   }
 
-  // ✅ ADDED — optimistic message helpers for instant "sent" feel
   void addOptimisticMessage(Message message) {
     _messages.add(message);
     notifyListeners();
@@ -126,7 +139,6 @@ class ChatProvider extends ChangeNotifier {
     try {
       final response = await _chatService.sendMessage(conversationId, content);
       if (response.success && response.data != null) {
-        // handled by caller via replaceOptimisticMessage in most cases
         return true;
       }
       return false;
@@ -188,7 +200,6 @@ class ChatProvider extends ChangeNotifier {
     } catch (e) {}
   }
 
-  // ✅ ADDED — send typing indicator (call from ChatScreen on text change)
   void sendTypingIndicator({
     required int conversationId,
     required int receiverId,
@@ -205,8 +216,6 @@ class ChatProvider extends ChangeNotifier {
     _typingByConversation[event.conversationId] = event.isTyping;
     notifyListeners();
 
-    // auto-clear typing after 3s of no update (safety net if "stopped typing"
-    // event is missed)
     _typingTimers[event.conversationId]?.cancel();
     if (event.isTyping) {
       _typingTimers[event.conversationId] = Timer(
@@ -222,10 +231,8 @@ class ChatProvider extends ChangeNotifier {
   void _addMessage(Message message) {
     final exists = _messages.any((m) => m.messageId == message.messageId);
     if (!exists && message.conversationId == _activeConversationId) {
-      // only append if this message belongs to the conversation currently open
       _messages.add(message);
     }
-    // ✅ this message stopped typing once it actually arrived
     _typingByConversation[message.conversationId] = false;
     notifyListeners();
   }
@@ -256,7 +263,6 @@ class ChatProvider extends ChangeNotifier {
     } else {
       _conversations.insert(0, conversation);
     }
-    // bring updated conversation to top
     _conversations.sort((a, b) {
       final aTime = a.lastMessageAt;
       final bTime = b.lastMessageAt;

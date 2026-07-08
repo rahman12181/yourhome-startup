@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:async'; // ✅ ADDED - for Timer
+import 'dart:async';
 import '../../services/chat_service.dart';
 import '../../models/chat_model.dart';
 import '../../providers/auth_provider.dart';
@@ -31,55 +31,108 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen>
-    with TickerProviderStateMixin {
+class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ChatService _chatService = ChatService();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
 
   bool _isSending = false;
-
-  // ✅ ADDED — typing indicator state
   Timer? _typingStopTimer;
   bool _lastTypingState = false;
+  bool _webSocketSetup = false; // ✅ ADDED
+
+  late ChatProvider _chatProvider;
+  bool _providerReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_providerReady) {
+      _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      _providerReady = true;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
 
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    chatProvider.setActiveConversation(widget.conversationId); // ✅ ADDED
-    chatProvider.loadMessages(widget.conversationId); // ✅ CHANGED — uses provider now
+    // ✅ ADDED - Setup WebSocket listener
+    _setupWebSocketListener();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _chatProvider.setActiveConversation(widget.conversationId);
+        _chatProvider.loadMessages(widget.conversationId);
+      }
+    });
 
     _messageController.addListener(_updateSendButton);
-    _messageController.addListener(_handleTypingChange); // ✅ ADDED
+    _messageController.addListener(_handleTypingChange);
+  }
 
-    // ❌ REMOVED — _setupWebSocketListener() is gone.
-    // ChatProvider now owns all WebSocket callbacks globally,
-    // so this screen no longer overwrites the singleton listeners.
+  // ✅ ADDED - WebSocket listener setup
+  void _setupWebSocketListener() {
+    if (_webSocketSetup) return;
+    _webSocketSetup = true;
 
-    print('📤 ChatScreen received - UserId: ${widget.otherUserId}');
-    print('📤 ChatScreen received - UserName: ${widget.otherUserName}');
-    print('📤 ChatScreen received - UserPic: ${widget.otherUserPic}');
+    print('🔌 Setting up WebSocket listeners for ChatScreen');
 
-    // scroll to bottom once initial messages are painted
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    // 🔥 Message receive
+    _chatProvider.wsManager.onMessageReceived = (message) {
+      print('📩 [WS] Message received in ChatScreen: ${message.content}');
+      
+      if (message.conversationId == widget.conversationId) {
+        final exists = _chatProvider.messages.any(
+          (m) => m.messageId == message.messageId
+        );
+        if (!exists) {
+          _chatProvider.addOptimisticMessage(message);
+          _scrollToBottom();
+        }
+      }
+    };
+    
+    // 🔥 Typing indicator receive
+    _chatProvider.wsManager.onTypingReceived = (event) {
+      if (event.senderId == widget.otherUserId) {
+        _chatProvider.setTypingStatus(event.conversationId, event.isTyping);
+      }
+    };
+    
+    // 🔥 Message edited
+    _chatProvider.wsManager.onMessageEdited = (message) {
+      if (message.conversationId == widget.conversationId) {
+        _chatProvider.updateMessage(message);
+      }
+    };
+    
+    // 🔥 Message deleted
+    _chatProvider.wsManager.onMessageDeleted = (message) {
+      if (message.conversationId == widget.conversationId) {
+        if (message.isDeletedForEveryone) {
+          _chatProvider.updateMessage(message);
+        } else {
+          _chatProvider.removeMessage(message.messageId);
+        }
+      }
+    };
+
+    print('✅ WebSocket listeners set up successfully');
   }
 
   void _updateSendButton() {
     setState(() {});
   }
 
-  // ✅ ADDED — sends typing=true immediately on first keystroke,
-  // then auto-sends typing=false after 2s of no typing
   void _handleTypingChange() {
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    if (!_providerReady) return;
     final hasText = _messageController.text.trim().isNotEmpty;
 
     if (hasText && !_lastTypingState) {
       _lastTypingState = true;
-      chatProvider.sendTypingIndicator(
+      _chatProvider.sendTypingIndicator(
         conversationId: widget.conversationId,
         receiverId: widget.otherUserId,
         isTyping: true,
@@ -89,7 +142,7 @@ class _ChatScreenState extends State<ChatScreen>
     _typingStopTimer?.cancel();
     _typingStopTimer = Timer(const Duration(seconds: 2), () {
       _lastTypingState = false;
-      chatProvider.sendTypingIndicator(
+      _chatProvider.sendTypingIndicator(
         conversationId: widget.conversationId,
         receiverId: widget.otherUserId,
         isTyping: false,
@@ -99,16 +152,16 @@ class _ChatScreenState extends State<ChatScreen>
 
   @override
   void dispose() {
-    // ✅ ADDED — clear active conversation + stop typing before leaving
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    if (_lastTypingState) {
-      chatProvider.sendTypingIndicator(
-        conversationId: widget.conversationId,
-        receiverId: widget.otherUserId,
-        isTyping: false,
-      );
+    if (_providerReady) {
+      if (_lastTypingState) {
+        _chatProvider.sendTypingIndicator(
+          conversationId: widget.conversationId,
+          receiverId: widget.otherUserId,
+          isTyping: false,
+        );
+      }
+      _chatProvider.setActiveConversation(null);
     }
-    chatProvider.setActiveConversation(null);
 
     _typingStopTimer?.cancel();
     _messageController.removeListener(_updateSendButton);
@@ -123,11 +176,9 @@ class _ChatScreenState extends State<ChatScreen>
     final content = _messageController.text.trim();
     if (content.isEmpty || _isSending) return;
 
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
     _messageController.clear();
     _lastTypingState = false;
-    chatProvider.sendTypingIndicator(
+    _chatProvider.sendTypingIndicator(
       conversationId: widget.conversationId,
       receiverId: widget.otherUserId,
       isTyping: false,
@@ -150,8 +201,7 @@ class _ChatScreenState extends State<ChatScreen>
       editedAt: null,
     );
 
-    // ✅ CHANGED — optimistic message goes into the provider, not local state
-    chatProvider.addOptimisticMessage(tempMessage);
+    _chatProvider.addOptimisticMessage(tempMessage);
     _scrollToBottom();
 
     final response = await _chatService.sendMessage(
@@ -159,13 +209,14 @@ class _ChatScreenState extends State<ChatScreen>
       content,
     );
 
+    if (!mounted) return;
     setState(() => _isSending = false);
 
     if (response.success && response.data != null) {
-      chatProvider.replaceOptimisticMessage(tempId, response.data!); // ✅ CHANGED
+      _chatProvider.replaceOptimisticMessage(tempId, response.data!);
       _scrollToBottom();
     } else {
-      chatProvider.removeOptimisticMessage(tempId); // ✅ CHANGED
+      _chatProvider.removeOptimisticMessage(tempId);
       _showSnackBar(response.message, isError: true);
     }
   }
@@ -186,7 +237,7 @@ class _ChatScreenState extends State<ChatScreen>
   // ============== EDIT MESSAGE ==============
   Future<void> _editMessage(Message message) async {
     final controller = TextEditingController(text: message.content);
-    
+
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -254,16 +305,17 @@ class _ChatScreenState extends State<ChatScreen>
     );
 
     if (result == true && controller.text.trim().isNotEmpty) {
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      final success = await chatProvider.editMessage(
+      final success = await _chatProvider.editMessage(
         messageId: message.messageId,
         content: controller.text.trim(),
-      ); // ✅ CHANGED — via provider, provider updates its own list + notifies
+      );
 
+      if (!mounted) return;
       if (success) {
         _showSnackBar('Message edited ✏️');
       } else {
-        _showSnackBar(chatProvider.error ?? 'Failed to edit message', isError: true);
+        _showSnackBar(_chatProvider.error ?? 'Failed to edit message',
+            isError: true);
       }
     }
   }
@@ -328,13 +380,15 @@ class _ChatScreenState extends State<ChatScreen>
     );
 
     if (confirm == true) {
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      final success = await chatProvider.deleteForEveryone(message.messageId); // ✅ CHANGED
+      final success =
+          await _chatProvider.deleteForEveryone(message.messageId);
 
+      if (!mounted) return;
       if (success) {
         _showSnackBar('Message deleted for everyone');
       } else {
-        _showSnackBar(chatProvider.error ?? 'Failed to delete message', isError: true);
+        _showSnackBar(_chatProvider.error ?? 'Failed to delete message',
+            isError: true);
       }
     }
   }
@@ -399,13 +453,15 @@ class _ChatScreenState extends State<ChatScreen>
     );
 
     if (confirm == true) {
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      final success = await chatProvider.deleteForMe(message.messageId); // ✅ CHANGED
+      final success =
+          await _chatProvider.deleteForMe(message.messageId);
 
+      if (!mounted) return;
       if (success) {
         _showSnackBar('Message deleted for you');
       } else {
-        _showSnackBar(chatProvider.error ?? 'Failed to delete message', isError: true);
+        _showSnackBar(_chatProvider.error ?? 'Failed to delete message',
+            isError: true);
       }
     }
   }
@@ -419,11 +475,11 @@ class _ChatScreenState extends State<ChatScreen>
 
   void _showMessageOptions(Message message) {
     HapticFeedback.mediumImpact();
-    
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isMine = message.isMine;
     final isDeleted = message.isDeletedForEveryone;
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -474,13 +530,13 @@ class _ChatScreenState extends State<ChatScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isDeleted 
-                            ? 'This message was deleted' 
+                        isDeleted
+                            ? 'This message was deleted'
                             : (message.content ?? ''),
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: isDeleted 
+                          color: isDeleted
                               ? (isDark ? Colors.grey[500] : Colors.grey[400])
                               : (isDark ? Colors.white : Colors.black87),
                         ),
@@ -495,7 +551,9 @@ class _ChatScreenState extends State<ChatScreen>
                               message.sentTime,
                               style: GoogleFonts.poppins(
                                 fontSize: 10,
-                                color: isDark ? Colors.grey[500] : Colors.grey[400],
+                                color: isDark
+                                    ? Colors.grey[500]
+                                    : Colors.grey[400],
                               ),
                             ),
                             if (message.isEditedNow) ...[
@@ -505,7 +563,9 @@ class _ChatScreenState extends State<ChatScreen>
                                 style: GoogleFonts.poppins(
                                   fontSize: 10,
                                   fontStyle: FontStyle.italic,
-                                  color: isDark ? Colors.grey[500] : Colors.grey[400],
+                                  color: isDark
+                                      ? Colors.grey[500]
+                                      : Colors.grey[400],
                                 ),
                               ),
                             ],
@@ -579,9 +639,8 @@ class _ChatScreenState extends State<ChatScreen>
       leading: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: isDanger 
-              ? Colors.red.withOpacity(0.1) 
-              : color.withOpacity(0.1),
+          color:
+              isDanger ? Colors.red.withOpacity(0.1) : color.withOpacity(0.1),
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -595,9 +654,8 @@ class _ChatScreenState extends State<ChatScreen>
         style: GoogleFonts.poppins(
           fontSize: 15,
           fontWeight: FontWeight.w500,
-          color: isDanger 
-              ? Colors.red 
-              : (isDark ? Colors.white : Colors.black87),
+          color:
+              isDanger ? Colors.red : (isDark ? Colors.white : Colors.black87),
         ),
       ),
       trailing: Icon(
@@ -610,6 +668,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -628,7 +687,8 @@ class _ChatScreenState extends State<ChatScreen>
             ),
           ],
         ),
-        backgroundColor: isError ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
+        backgroundColor:
+            isError ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -656,13 +716,11 @@ class _ChatScreenState extends State<ChatScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isTextNotEmpty = _messageController.text.trim().isNotEmpty;
 
-    // ✅ CHANGED — pull everything from ChatProvider instead of local fields
     final chatProvider = context.watch<ChatProvider>();
     final messages = chatProvider.messages;
     final isLoadingMsgs = chatProvider.isLoading;
     final loadError = chatProvider.error;
 
-    // auto-scroll whenever a new message lands via WS/optimistic add
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -672,7 +730,8 @@ class _ChatScreenState extends State<ChatScreen>
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+        backgroundColor:
+            isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
         appBar: _buildPremiumAppBar(context, isDark),
         body: Column(
           children: [
@@ -692,13 +751,12 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ✅ APP BAR - Correctly displays profile pic and opens correct profile
   PreferredSizeWidget _buildPremiumAppBar(
     BuildContext context,
     bool isDark,
   ) {
-    final hasImage = widget.otherUserPic != null && 
-                      widget.otherUserPic!.isNotEmpty;
+    final hasImage =
+        widget.otherUserPic != null && widget.otherUserPic!.isNotEmpty;
 
     return AppBar(
       backgroundColor: isDark ? const Color(0xFF1A1F33) : Colors.white,
@@ -719,15 +777,18 @@ class _ChatScreenState extends State<ChatScreen>
               height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: hasImage ? null : const LinearGradient(
-                  colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                gradient: hasImage
+                    ? null
+                    : const LinearGradient(
+                        colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
               ),
               child: CircleAvatar(
                 radius: 20,
-                backgroundColor: hasImage ? Colors.transparent : Colors.transparent,
+                backgroundColor:
+                    hasImage ? Colors.transparent : Colors.transparent,
                 backgroundImage: hasImage
                     ? CachedNetworkImageProvider(widget.otherUserPic!)
                     : null,
@@ -758,7 +819,7 @@ class _ChatScreenState extends State<ChatScreen>
                       color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                     ),
                   ),
-                  // ✅ CHANGED — shows "typing..." in real time, otherwise property title
+                  // ✅ TYPING INDICATOR IN APP BAR
                   Consumer<ChatProvider>(
                     builder: (context, provider, _) {
                       final isTyping =
@@ -811,42 +872,80 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ========== MESSAGES LIST ==========
-  // ✅ CHANGED — now takes messages as a parameter instead of using this._messages
   Widget _buildMessagesList(bool isDark, List<Message> messages) {
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      physics: const BouncingScrollPhysics(),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final message = messages[index];
-        final isMine = message.isMine;
-        final showDate = index == 0 || 
-            messages[index - 1].sentAt.day != message.sentAt.day;
-        
-        return Column(
-          children: [
-            if (showDate) _buildDateHeader(message.sentAt, isDark),
-            _buildMessageBubble(message, isMine, isDark),
-          ],
-        );
-      },
+    final chatProvider = context.watch<ChatProvider>();
+    final isTyping = chatProvider.isOtherUserTyping(widget.conversationId);
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            physics: const BouncingScrollPhysics(),
+            itemCount: messages.length,
+            itemBuilder: (context, index) {
+              final message = messages[index];
+              final isMine = message.isMine;
+              final showDate = index == 0 ||
+                  messages[index - 1].sentAt.day != message.sentAt.day;
+
+              return Column(
+                children: [
+                  if (showDate) _buildDateHeader(message.sentAt, isDark),
+                  _buildMessageBubble(message, isMine, isDark),
+                ],
+              );
+            },
+          ),
+        ),
+        // ✅ TYPING INDICATOR AT BOTTOM
+        if (isTyping)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: const Color(0xFF2563EB),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${widget.otherUserName} is typing...',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: const Color(0xFF2563EB),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
   Widget _buildDateHeader(DateTime date, bool isDark) {
     final now = DateTime.now();
     String dateText;
-    
-    if (date.day == now.day && date.month == now.month && date.year == now.year) {
+
+    if (date.day == now.day &&
+        date.month == now.month &&
+        date.year == now.year) {
       dateText = 'Today';
-    } else if (date.day == now.day - 1 && date.month == now.month && date.year == now.year) {
+    } else if (date.day == now.day - 1 &&
+        date.month == now.month &&
+        date.year == now.year) {
       dateText = 'Yesterday';
     } else {
       dateText = '${date.day} ${_getMonth(date.month)} ${date.year}';
     }
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -866,7 +965,20 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   String _getMonth(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return months[month - 1];
   }
 
@@ -877,7 +989,8 @@ class _ChatScreenState extends State<ChatScreen>
       child: GestureDetector(
         onLongPress: () => _showMessageOptions(message),
         child: Column(
-          crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Container(
               constraints: BoxConstraints(
@@ -911,8 +1024,8 @@ class _ChatScreenState extends State<ChatScreen>
                       style: GoogleFonts.poppins(
                         fontStyle: FontStyle.italic,
                         fontSize: 13,
-                        color: isMine 
-                            ? Colors.white70 
+                        color: isMine
+                            ? Colors.white70
                             : (isDark ? Colors.grey[400] : Colors.grey[500]),
                       ),
                     )
@@ -921,8 +1034,8 @@ class _ChatScreenState extends State<ChatScreen>
                       message.content!,
                       style: GoogleFonts.poppins(
                         fontSize: 14,
-                        color: isMine 
-                            ? Colors.white 
+                        color: isMine
+                            ? Colors.white
                             : (isDark ? Colors.white : Colors.black87),
                         height: 1.4,
                       ),
@@ -935,18 +1048,20 @@ class _ChatScreenState extends State<ChatScreen>
                         message.sentTime,
                         style: GoogleFonts.poppins(
                           fontSize: 9,
-                          color: isMine 
-                              ? Colors.white70 
+                          color: isMine
+                              ? Colors.white70
                               : (isDark ? Colors.grey[400] : Colors.grey[500]),
                         ),
                       ),
                       if (isMine) ...[
                         const SizedBox(width: 3),
                         Icon(
-                          message.isRead ? Icons.done_all_rounded : Icons.done_rounded,
+                          message.isRead
+                              ? Icons.done_all_rounded
+                              : Icons.done_rounded,
                           size: 14,
-                          color: message.isRead 
-                              ? const Color(0xFF34B7F1) 
+                          color: message.isRead
+                              ? const Color(0xFF34B7F1)
                               : (isDark ? Colors.grey[500] : Colors.grey[500]),
                         ),
                       ],
@@ -957,9 +1072,11 @@ class _ChatScreenState extends State<ChatScreen>
                           style: GoogleFonts.poppins(
                             fontSize: 8,
                             fontStyle: FontStyle.italic,
-                            color: isMine 
-                                ? Colors.white60 
-                                : (isDark ? Colors.grey[500] : Colors.grey[500]),
+                            color: isMine
+                                ? Colors.white60
+                                : (isDark
+                                    ? Colors.grey[500]
+                                    : Colors.grey[500]),
                           ),
                         ),
                       ],
@@ -1075,9 +1192,7 @@ class _ChatScreenState extends State<ChatScreen>
                         ),
                       )
                     : Icon(
-                        isTextNotEmpty
-                            ? Icons.send_rounded
-                            : Icons.mic_rounded,
+                        isTextNotEmpty ? Icons.send_rounded : Icons.mic_rounded,
                         color: isTextNotEmpty
                             ? Colors.white
                             : (isDark ? Colors.grey[500] : Colors.grey[400]),
@@ -1091,7 +1206,6 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ========== LOADING STATE ==========
   Widget _buildLoadingState(bool isDark) {
     return Center(
       child: Column(
@@ -1140,8 +1254,6 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ========== ERROR STATE ==========
-  // ✅ CHANGED — takes error message as parameter, retries via provider
   Widget _buildErrorState(bool isDark, String errorMessage) {
     return Center(
       child: Column(
@@ -1164,8 +1276,7 @@ class _ChatScreenState extends State<ChatScreen>
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              Provider.of<ChatProvider>(context, listen: false)
-                  .loadMessages(widget.conversationId); // ✅ CHANGED
+              _chatProvider.loadMessages(widget.conversationId);
             },
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: Text(
@@ -1185,7 +1296,6 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ========== EMPTY STATE ==========
   Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Column(

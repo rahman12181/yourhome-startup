@@ -40,14 +40,13 @@ class _ChatListScreenState extends State<ChatListScreen>
     super.initState();
     _setupAnimations();
 
-    // ✅ CHANGED — load via provider, no local ChatService/local WS listener anymore
-    Provider.of<ChatProvider>(context, listen: false).loadConversations();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<ChatProvider>(context, listen: false).loadConversations();
+      }
+    });
 
     _searchController.addListener(_filterConversations);
-
-    // ❌ REMOVED — _setupWebSocketListener() is gone.
-    // ChatProvider owns onConversationUpdated globally now, so this screen
-    // just watches provider.conversations and rebuilds automatically.
   }
 
   void _setupAnimations() {
@@ -57,7 +56,8 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
 
     _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOutCubic),
+      CurvedAnimation(
+          parent: _animationController, curve: Curves.easeInOutCubic),
     );
 
     _slideUp = Tween<Offset>(
@@ -93,7 +93,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     _staggerController.forward();
   }
 
-  // ✅ CHANGED — filters straight from provider.conversations instead of local _conversations
   void _filterConversations() {
     final query = _searchController.text.toLowerCase().trim();
     final allConversations =
@@ -127,13 +126,11 @@ class _ChatListScreenState extends State<ChatListScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // ✅ CHANGED — watch provider so any real-time conversation-update rebuilds this screen
     final chatProvider = context.watch<ChatProvider>();
     final conversations = chatProvider.conversations;
     final isLoading = chatProvider.isLoading;
     final error = chatProvider.error;
 
-    // keep the filtered list in sync with provider unless actively searching
     final displayedConversations =
         _isSearching ? _filteredConversations : conversations;
 
@@ -144,7 +141,8 @@ class _ChatListScreenState extends State<ChatListScreen>
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+        backgroundColor:
+            isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
         body: SafeArea(
           child: Column(
             children: [
@@ -166,24 +164,32 @@ class _ChatListScreenState extends State<ChatListScreen>
                                       child: ScaleTransition(
                                         scale: _scaleIn,
                                         child: RefreshIndicator(
-                                          onRefresh: () => Provider.of<ChatProvider>(
-                                                  context,
+                                          onRefresh: () => Provider.of<
+                                                      ChatProvider>(context,
                                                   listen: false)
-                                              .loadConversations(), // ✅ CHANGED
+                                              .loadConversations(),
                                           color: const Color(0xFF2563EB),
                                           child: ListView.builder(
-                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                            physics: const BouncingScrollPhysics(),
-                                            itemCount: displayedConversations.length,
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 8),
+                                            physics:
+                                                const BouncingScrollPhysics(),
+                                            itemCount:
+                                                displayedConversations.length,
                                             itemBuilder: (context, index) {
-                                              final conversation = displayedConversations[index];
-                                              final animation = _staggerAnimations[index % _staggerAnimations.length];
-                                              
+                                              final conversation =
+                                                  displayedConversations[index];
+                                              final animation =
+                                                  _staggerAnimations[index %
+                                                      _staggerAnimations
+                                                          .length];
+
                                               return FadeTransition(
                                                 opacity: animation,
                                                 child: SlideTransition(
                                                   position: Tween<Offset>(
-                                                    begin: const Offset(0, 0.04),
+                                                    begin:
+                                                        const Offset(0, 0.04),
                                                     end: Offset.zero,
                                                   ).animate(animation),
                                                   child: _buildPremiumChatItem(
@@ -208,9 +214,8 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  // ========== PREMIUM APP BAR ==========
-  // ✅ CHANGED — takes totalChats as parameter instead of using this._conversations
-  Widget _buildPremiumAppBar(BuildContext context, bool isDark, int totalChats) {
+  Widget _buildPremiumAppBar(
+      BuildContext context, bool isDark, int totalChats) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
@@ -264,8 +269,8 @@ class _ChatListScreenState extends State<ChatListScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  totalChats > 0 
-                      ? '$totalChats conversations' 
+                  totalChats > 0
+                      ? '$totalChats conversations'
                       : 'No conversations yet',
                   style: GoogleFonts.poppins(
                     fontSize: 11,
@@ -290,8 +295,11 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             child: IconButton(
               icon: Icon(
-                isDark ? Icons.wb_sunny_outlined : Icons.nightlight_round_outlined,
-                color: isDark ? const Color(0xFF2563EB) : const Color(0xFF4B5563),
+                isDark
+                    ? Icons.wb_sunny_outlined
+                    : Icons.nightlight_round_outlined,
+                color:
+                    isDark ? const Color(0xFF2563EB) : const Color(0xFF4B5563),
                 size: 20,
               ),
               onPressed: () {
@@ -310,7 +318,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  // ========== PREMIUM SEARCH BAR ==========
   Widget _buildPremiumSearchBar(BuildContext context, bool isDark) {
     final hasFocus = _searchFocusNode.hasFocus;
     final hasText = _searchController.text.isNotEmpty;
@@ -391,7 +398,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  // ========== PREMIUM CHAT ITEM ==========
   Widget _buildPremiumChatItem(
     BuildContext context,
     Conversation conversation,
@@ -419,7 +425,8 @@ class _ChatListScreenState extends State<ChatListScreen>
                 opacity: animation,
                 child: ScaleTransition(
                   scale: Tween<double>(begin: 0.95, end: 1.0).animate(
-                    CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                    CurvedAnimation(
+                        parent: animation, curve: Curves.easeOutCubic),
                   ),
                   child: child,
                 ),
@@ -428,7 +435,6 @@ class _ChatListScreenState extends State<ChatListScreen>
             transitionDuration: const Duration(milliseconds: 350),
           ),
         ).then((_) {
-          // ✅ CHANGED — refresh via provider when coming back from a chat
           Provider.of<ChatProvider>(context, listen: false).loadConversations();
         });
       },
@@ -496,7 +502,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               ],
             ),
             const SizedBox(width: 14),
-            
+
             // Content
             Expanded(
               child: Column(
@@ -509,9 +515,11 @@ class _ChatListScreenState extends State<ChatListScreen>
                         child: Text(
                           conversation.otherUserName,
                           style: GoogleFonts.poppins(
-                            fontWeight: isUnread ? FontWeight.w700 : FontWeight.w600,
+                            fontWeight:
+                                isUnread ? FontWeight.w700 : FontWeight.w600,
                             fontSize: 15,
-                            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                            color:
+                                isDark ? Colors.white : const Color(0xFF1A1A2E),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -531,7 +539,8 @@ class _ChatListScreenState extends State<ChatListScreen>
                     children: [
                       if (conversation.propertyTitle != null) ...[
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFF2563EB).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -550,8 +559,6 @@ class _ChatListScreenState extends State<ChatListScreen>
                         const SizedBox(width: 6),
                       ],
                       Expanded(
-                        // ✅ CHANGED — shows "typing..." live if the other user is typing
-                        // in this conversation, otherwise the last message
                         child: Consumer<ChatProvider>(
                           builder: (context, provider, _) {
                             final isTyping = provider
@@ -574,9 +581,15 @@ class _ChatListScreenState extends State<ChatListScreen>
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 color: isUnread
-                                    ? (isDark ? Colors.white : const Color(0xFF1A1A2E))
-                                    : (isDark ? Colors.grey[400] : Colors.grey[500]),
-                                fontWeight: isUnread ? FontWeight.w600 : FontWeight.w400,
+                                    ? (isDark
+                                        ? Colors.white
+                                        : const Color(0xFF1A1A2E))
+                                    : (isDark
+                                        ? Colors.grey[400]
+                                        : Colors.grey[500]),
+                                fontWeight: isUnread
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -589,7 +602,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 ],
               ),
             ),
-            
+
             // Unread Badge
             if (isUnread) ...[
               const SizedBox(width: 8),
@@ -633,7 +646,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  // ========== LOADING STATE ==========
   Widget _buildLoadingState(bool isDark) {
     return Center(
       child: Column(
@@ -682,8 +694,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  // ========== ERROR STATE ==========
-  // ✅ CHANGED — takes error string, retries via provider
   Widget _buildErrorState(bool isDark, String errorMessage) {
     return Center(
       child: Padding(
@@ -725,7 +735,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             ElevatedButton.icon(
               onPressed: () {
                 Provider.of<ChatProvider>(context, listen: false)
-                    .loadConversations(); // ✅ CHANGED
+                    .loadConversations();
               },
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: Text(
@@ -738,7 +748,8 @@ class _ChatListScreenState extends State<ChatListScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -750,7 +761,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  // ========== EMPTY STATE ==========
   Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Padding(
@@ -761,7 +771,8 @@ class _ChatListScreenState extends State<ChatListScreen>
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey[100],
+                color:
+                    isDark ? Colors.white.withOpacity(0.04) : Colors.grey[100],
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -822,7 +833,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  // ========== NO RESULTS STATE ==========
   Widget _buildNoResultsState(bool isDark) {
     return Center(
       child: Padding(
@@ -833,7 +843,8 @@ class _ChatListScreenState extends State<ChatListScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey[100],
+                color:
+                    isDark ? Colors.white.withOpacity(0.04) : Colors.grey[100],
                 shape: BoxShape.circle,
               ),
               child: Icon(
