@@ -1,3 +1,5 @@
+// lib/constants/app_constants.dart
+
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
@@ -15,18 +17,18 @@ class AppConstants {
     return 'http://10.0.2.2:8080';
   }
 
-  //  WEBSOCKET URL 
-   static String get wsUrl {
+  // ✅ WEBSOCKET URL - FIXED: http:// → ws://
+  static String get wsUrl {
     if (kIsWeb) {
       return 'ws://localhost:8080/ws';
     }
     if (Platform.isAndroid) {
-      return 'ws://192.168.0.109:8080/ws';  // ✅ CHANGED
+      return 'ws://192.168.0.109:8080/ws';
     }
     if (Platform.isIOS) {
-      return 'ws://192.168.0.101:8080/ws';  // ✅ CHANGED
+      return 'ws://192.168.0.101:8080/ws';
     }
-    return 'ws://10.0.2.2:8080/ws';  // ✅ CHANGED
+    return 'ws://10.0.2.2:8080/ws';
   }
 
   static const String appName = 'YourHome';

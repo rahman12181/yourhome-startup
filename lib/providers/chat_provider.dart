@@ -28,7 +28,6 @@ class ChatProvider extends ChangeNotifier {
   bool isOtherUserTyping(int conversationId) =>
       _typingByConversation[conversationId] ?? false;
 
-  // ✅ ADD THESE 3 METHODS HERE
   void setTypingStatus(int conversationId, bool isTyping) {
     if (_typingByConversation[conversationId] != isTyping) {
       _typingByConversation[conversationId] = isTyping;
@@ -228,10 +227,12 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  // ✅ FIXED: Directly add message without checking activeConversationId
   void _addMessage(Message message) {
     final exists = _messages.any((m) => m.messageId == message.messageId);
-    if (!exists && message.conversationId == _activeConversationId) {
+    if (!exists) {
       _messages.add(message);
+      print('✅ Provider: Message added: ${message.content}');
     }
     _typingByConversation[message.conversationId] = false;
     notifyListeners();
