@@ -10,6 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:yourhome/models/property_model.dart';
 import 'package:yourhome/screens/admin/admin_profile_screen.dart';
 import 'package:yourhome/screens/owner/owner_profile_screen.dart';
+import 'package:yourhome/screens/reels/reels_feed_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/property_provider.dart';
@@ -201,6 +202,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return [
           const HomePage(),
           const PropertiesScreen(),
+          const ReelsFeedScreen(),
           const FavoritesScreen(),
           const ChatListScreen(),
         ];
@@ -214,7 +216,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case 'OWNER':
         return ['Dashboard', 'Properties', 'Bookings', 'Chat'];
       default:
-        return ['Home', 'Explore', 'Saved', 'Chat'];
+        return ['Home', 'Explore', 'Reels', 'Saved', 'Chat'];
     }
   }
 
@@ -238,6 +240,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return [
           Icons.home_outlined,
           Icons.search_outlined,
+          Icons.movie_creation_outlined,
           Icons.favorite_border_outlined,
           Icons.chat_bubble_outline_outlined,
         ];
@@ -264,107 +267,152 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return [
           Icons.home_rounded,
           Icons.search_rounded,
+          Icons.movie_creation_rounded,
           Icons.favorite_rounded,
           Icons.chat_bubble_rounded,
         ];
     }
   }
 
-  Widget _buildNavItem({
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required int index,
-    required bool isDark,
-    required String userRole,
-  }) {
-    final isSelected = _selectedIndex == index;
-    final primaryColor = _getPrimaryColor(userRole);
+ Widget _buildNavItem({
+  required IconData icon,
+  required IconData activeIcon,
+  required String label,
+  required int index,
+  required bool isDark,
+  required String userRole,
+}) {
+  final isSelected = _selectedIndex == index;
+  final primaryColor = _getPrimaryColor(userRole);
+  
+  // ✅ For Reels tab (index 2), use special colors
+  final bool isReelsTab = index == 2;
+  final Color selectedColor = isReelsTab ? const Color(0xFFF59E0B) : primaryColor;
+  final Color? unselectedColor = isReelsTab 
+      ? (isDark ? Colors.grey[400]! : Colors.grey[400]!) 
+      : (isDark ? Colors.grey[500] : Colors.grey[400]);
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() => _selectedIndex = index);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color:
-              isSelected ? primaryColor.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(30),
-          border: isSelected
-              ? Border.all(
-                  color: primaryColor.withOpacity(0.2),
-                  width: 1,
-                )
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? activeIcon : icon,
-              color: isSelected
-                  ? primaryColor
-                  : (isDark ? Colors.grey[500] : Colors.grey[400]),
-              size: isSelected ? 28 : 24,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: isSelected ? 11 : 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected
-                    ? primaryColor
-                    : (isDark ? Colors.grey[500] : Colors.grey[400]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStudentBottomNav(
-    bool isDark,
-    List<Widget> pages,
-    List<String> labels,
-    List<IconData> icons,
-    List<IconData> activeIcons,
-  ) {
-    return Container(
+  return GestureDetector(
+    onTap: () {
+      HapticFeedback.lightImpact();
+      setState(() => _selectedIndex = index);
+    },
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isDark ? _HomePalette.darkSurface : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -8),
+        color: isSelected 
+            ? selectedColor.withOpacity(0.12) 
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(30),
+        border: isSelected
+            ? Border.all(
+                color: selectedColor.withOpacity(0.2),
+                width: 1,
+              )
+            : null,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isSelected ? activeIcon : icon,
+            color: isSelected
+                ? selectedColor
+                : unselectedColor,
+            size: isSelected ? 24 : 22,
+          ),
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: isSelected ? 9 : 8,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+              color: isSelected
+                  ? selectedColor
+                  : (isDark ? Colors.grey[500] : Colors.grey[400]),
+            ),
           ),
         ],
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(pages.length, (index) {
-              return _buildNavItem(
-                icon: icons[index],
-                activeIcon: activeIcons[index],
-                label: labels[index],
-                index: index,
-                isDark: isDark,
-                userRole: 'STUDENT',
-              );
-            }),
-          ),
+    ),
+  );
+}
+
+Widget _buildStudentBottomNav(
+  bool isDark,
+  List<Widget> pages,
+  List<String> labels,
+  List<IconData> icons,
+  List<IconData> activeIcons,
+) {
+  // ✅ Check if current tab is Reels (index 2)
+  final bool isReelsTab = _selectedIndex == 2;
+  
+  // ✅ If Reels tab, force dark mode regardless of theme
+  final bool useDark = isReelsTab ? true : isDark;
+
+  // ✅ CHANGE SYSTEM NAVIGATION BAR COLOR
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (isReelsTab) {
+      // Reels tab - Dark system navigation bar
+      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        systemNavigationBarColor: Color(0xFF1A1F33), // Dark color
+        systemNavigationBarIconBrightness: Brightness.light, // White icons
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ));
+    } else {
+      // Other tabs - Normal based on theme
+      if (isDark) {
+        SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+          systemNavigationBarColor: Color(0xFF0A0E1A),
+          systemNavigationBarIconBrightness: Brightness.light,
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ));
+      } else {
+        SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+          systemNavigationBarColor: Colors.white,
+          systemNavigationBarIconBrightness: Brightness.dark,
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+        ));
+      }
+    }
+  });
+
+  return Container(
+    decoration: BoxDecoration(
+      color: useDark ? const Color(0xFF1A1F33) : (isDark ? _HomePalette.darkSurface : Colors.white),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(useDark ? 0.3 : 0.05),
+          blurRadius: 20,
+          offset: const Offset(0, -8),
+        ),
+      ],
+    ),
+    child: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(pages.length, (index) {
+            return _buildNavItem(
+              icon: icons[index],
+              activeIcon: activeIcons[index],
+              label: labels[index],
+              index: index,
+              isDark: useDark,
+              userRole: 'STUDENT',
+            );
+          }),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildOwnerBottomNav(
     bool isDark,

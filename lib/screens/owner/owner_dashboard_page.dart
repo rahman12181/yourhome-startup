@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:yourhome/screens/owner/owner_profile_screen.dart';
+import 'package:yourhome/screens/owner/owner_my_reels_screen.dart'; // 👈 ADD THIS IMPORT
+import 'package:yourhome/screens/owner/owner_reels_upload_screen.dart'; // 👈 ADD THIS IMPORT
 import '../../providers/auth_provider.dart';
 import '../../providers/owner_provider.dart';
 import '../../providers/profile_provider.dart';
@@ -33,6 +35,7 @@ class _OwnerPalette {
   static const lightBg = Color(0xFFF7F8FC);
   static const teal = Color(0xFF14B8A6);
   static const pink = Color(0xFFEC4899);
+  static const reelColor = Color(0xFFF59E0B); // 👈 ADD THIS
 }
 
 class OwnerDashboardPage extends StatefulWidget {
@@ -61,7 +64,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOutCubic),
+      CurvedAnimation(
+          parent: _animationController, curve: Curves.easeInOutCubic),
     );
     _animationController.forward();
 
@@ -100,7 +104,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     try {
       final res = await ApiService().get('/notifications/unread-count');
       if (mounted && res.data['success'] == true) {
-        setState(() => _unreadNotifications = res.data['data']['unreadCount'] ?? 0);
+        setState(
+            () => _unreadNotifications = res.data['data']['unreadCount'] ?? 0);
       }
     } catch (_) {}
   }
@@ -186,7 +191,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
           : RefreshIndicator(
               onRefresh: _loadAll,
               color: _OwnerPalette.primary,
-              backgroundColor: isDark ? _OwnerPalette.darkSurface : Colors.white,
+              backgroundColor:
+                  isDark ? _OwnerPalette.darkSurface : Colors.white,
               child: FadeTransition(
                 opacity: _fadeAnimation,
                 child: SingleChildScrollView(
@@ -195,7 +201,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     left: 16,
                     right: 16,
                     top: 16,
-                    bottom: 16 + bottomPadding, // 🔥 FIX: Bottom nav overlap
+                    bottom: 16 + bottomPadding,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,6 +223,9 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                       // Stats Grid
                       if (stats != null) _buildStatsGrid(isDark, stats),
                       const SizedBox(height: 18),
+                      // ========== 🎬 REELS SECTION ==========
+                      _buildReelsSection(context, isDark), // 👈 ADD THIS
+                      const SizedBox(height: 18),
                       // Subscription Section
                       _buildSubscriptionSection(
                         context,
@@ -236,6 +245,291 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 ),
               ),
             ),
+    );
+  }
+
+  // ========== 🎬 REELS SECTION (NEW) ==========
+  Widget _buildReelsSection(BuildContext context, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF59E0B), Color(0xFFD4AF37)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.movie_creation_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '🎬 Reels',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'Promote properties',
+                  style: GoogleFonts.poppins(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFFF59E0B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              // Upload Reel Card
+              _buildReelsCard(
+                context: context, // 👈 FIXED: Added named parameter
+                icon: Icons.upload_rounded,
+                label: 'Upload\nReel',
+                subtitle: '20-30s video',
+                color: const Color(0xFFF59E0B),
+                isDark: isDark,
+                onTap: () => _navigateTo(const OwnerReelsUploadScreen()),
+              ),
+              const SizedBox(width: 8),
+              // My Reels Card
+              _buildReelsCard(
+                context: context, // 👈 FIXED: Added named parameter
+                icon: Icons.video_library_rounded,
+                label: 'My\nReels',
+                subtitle: 'Manage all',
+                color: const Color(0xFFD4AF37),
+                isDark: isDark,
+                onTap: () => _navigateTo(const OwnerMyReelsScreen()),
+              ),
+              const SizedBox(width: 8),
+              // Stats Card
+              _buildReelsCard(
+                context: context, // 👈 FIXED: Added named parameter
+                icon: Icons.analytics_rounded,
+                label: 'Reel\nStats',
+                subtitle: 'Performance',
+                color: const Color(0xFF8B5CF6),
+                isDark: isDark,
+                onTap: () {
+                  _navigateTo(const OwnerMyReelsScreen());
+                },
+              ),
+              const SizedBox(width: 8),
+              // Tips Card
+              _buildReelsCard(
+                context: context, // 👈 FIXED: Added named parameter
+                icon: Icons.tips_and_updates_rounded,
+                label: 'Tips\n& Tricks',
+                subtitle: 'Grow more',
+                color: const Color(0xFF14B8A6),
+                isDark: isDark,
+                onTap: () {
+                  _showReelsTipsDialog(context, isDark);
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReelsCard({
+    required BuildContext context, // 👈 Make sure this is here
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(0.12),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color, color.withOpacity(0.7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  height: 1.1,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                subtitle,
+                style: GoogleFonts.poppins(
+                  fontSize: 7,
+                  color: isDark ? Colors.grey[400] : Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showReelsTipsDialog(BuildContext context, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: isDark ? const Color(0xFF141A2C) : Colors.white,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF59E0B), Color(0xFFD4AF37)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lightbulb_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '🎬 Reels Tips',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildTipItem('🎥', 'Keep videos 20-30 seconds', isDark),
+              _buildTipItem('🏠', 'Showcase best property features', isDark),
+              _buildTipItem('📝', 'Add engaging captions', isDark),
+              _buildTipItem('📈', 'Post regularly for more views', isDark),
+              _buildTipItem('⭐', 'Verified owners get more reach', isDark),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF59E0B), Color(0xFFD4AF37)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Got it! ✨',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTipItem(String emoji, String text, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: isDark ? Colors.grey[300] : const Color(0xFF1A1A2E),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -372,7 +666,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 gradient: hasImage
                     ? null
                     : const LinearGradient(
-                        colors: [_OwnerPalette.primary, _OwnerPalette.primaryLight],
+                        colors: [
+                          _OwnerPalette.primary,
+                          _OwnerPalette.primaryLight
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -405,7 +702,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             ),
           ),
           const SizedBox(width: 12),
-          // User Info - 🔥 FIXED: Smaller text
+          // User Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,11 +738,13 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     overflow: TextOverflow.ellipsis,
                   ),
                 const SizedBox(height: 2),
-                // Verification Badge - 🔥 FIXED: Smaller
+                // Verification Badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: (isVerified ? Colors.green : Colors.orange).withOpacity(0.12),
+                    color: (isVerified ? Colors.green : Colors.orange)
+                        .withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -477,14 +776,13 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               ],
             ),
           ),
-          // 🔥 FIXED: Only Notification icon, removed chat
+          // Notification Button
           _buildNotificationButton(isDark),
         ],
       ),
     );
   }
 
-  // 🔥 FIXED: Only Notification button (removed chat)
   Widget _buildNotificationButton(bool isDark) {
     return Container(
       decoration: BoxDecoration(
@@ -510,9 +808,12 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     color: _OwnerPalette.danger,
                     shape: BoxShape.circle,
                   ),
-                  constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                  constraints:
+                      const BoxConstraints(minWidth: 14, minHeight: 14),
                   child: Text(
-                    _unreadNotifications > 9 ? '9+' : _unreadNotifications.toString(),
+                    _unreadNotifications > 9
+                        ? '9+'
+                        : _unreadNotifications.toString(),
                     style: GoogleFonts.poppins(
                       fontSize: 8,
                       color: Colors.white,
@@ -545,7 +846,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               ? [Colors.green.withOpacity(0.10), Colors.teal.withOpacity(0.04)]
               : isRejected
                   ? [Colors.red.withOpacity(0.10), Colors.red.withOpacity(0.04)]
-                  : [Colors.orange.withOpacity(0.10), Colors.orange.withOpacity(0.04)],
+                  : [
+                      Colors.orange.withOpacity(0.10),
+                      Colors.orange.withOpacity(0.04)
+                    ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -576,7 +880,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                   : isRejected
                       ? Icons.error_outline_rounded
                       : Icons.hourglass_top_rounded,
-              color: isVerified ? Colors.green : isRejected ? Colors.red : Colors.orange,
+              color: isVerified
+                  ? Colors.green
+                  : isRejected
+                      ? Colors.red
+                      : Colors.orange,
               size: 16,
             ),
           ),
@@ -622,12 +930,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(color: _OwnerPalette.primary.withOpacity(0.3)),
+                  side:
+                      BorderSide(color: _OwnerPalette.primary.withOpacity(0.3)),
                 ),
               ),
               child: Text(
                 'Re-apply',
-                style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(
+                    fontSize: 10, fontWeight: FontWeight.w600),
               ),
             ),
         ],
@@ -641,32 +951,45 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       children: [
         Row(
           children: [
-            _buildStatCard('Properties', stats.totalProperties.toString(), Icons.apartment_rounded, const Color(0xFF3B82F6), isDark),
+            _buildStatCard('Properties', stats.totalProperties.toString(),
+                Icons.apartment_rounded, const Color(0xFF3B82F6), isDark),
             const SizedBox(width: 8),
-            _buildStatCard('Published', stats.publishedProperties.toString(), Icons.check_circle_rounded, const Color(0xFF22C55E), isDark),
+            _buildStatCard('Published', stats.publishedProperties.toString(),
+                Icons.check_circle_rounded, const Color(0xFF22C55E), isDark),
             const SizedBox(width: 8),
-            _buildStatCard('Rooms', stats.totalRooms.toString(), Icons.bed_rounded, const Color(0xFF8B5CF6), isDark),
+            _buildStatCard('Rooms', stats.totalRooms.toString(),
+                Icons.bed_rounded, const Color(0xFF8B5CF6), isDark),
             const SizedBox(width: 8),
-            _buildStatCard('Available', stats.availableRooms.toString(), Icons.meeting_room_rounded, const Color(0xFF06B6D4), isDark),
+            _buildStatCard('Available', stats.availableRooms.toString(),
+                Icons.meeting_room_rounded, const Color(0xFF06B6D4), isDark),
           ],
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            _buildStatCard('Bookings', stats.pendingRequests.toString(), Icons.book_online_rounded, const Color(0xFFF59E0B), isDark),
+            _buildStatCard('Bookings', stats.pendingRequests.toString(),
+                Icons.book_online_rounded, const Color(0xFFF59E0B), isDark),
             const SizedBox(width: 8),
-            _buildStatCard('Accepted', stats.acceptedRequests?.toString() ?? '0', Icons.check_rounded, const Color(0xFF22C55E), isDark),
+            _buildStatCard(
+                'Accepted',
+                stats.acceptedRequests?.toString() ?? '0',
+                Icons.check_rounded,
+                const Color(0xFF22C55E),
+                isDark),
             const SizedBox(width: 8),
-            _buildStatCard('Rating', stats.averageRating.toStringAsFixed(1), Icons.star_rounded, const Color(0xFFF59E0B), isDark),
+            _buildStatCard('Rating', stats.averageRating.toStringAsFixed(1),
+                Icons.star_rounded, const Color(0xFFF59E0B), isDark),
             const SizedBox(width: 8),
-            _buildStatCard('Views', stats.totalViews?.toString() ?? '0', Icons.visibility_rounded, const Color(0xFF8B5CF6), isDark),
+            _buildStatCard('Views', stats.totalViews?.toString() ?? '0',
+                Icons.visibility_rounded, const Color(0xFF8B5CF6), isDark),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isDark) {
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color, bool isDark) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -864,7 +1187,9 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: isActive ? Colors.green.withOpacity(0.12) : Colors.red.withOpacity(0.12),
+                color: isActive
+                    ? Colors.green.withOpacity(0.12)
+                    : Colors.red.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -889,7 +1214,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   // ============== QUICK ACTIONS ==============
-  Widget _buildQuickActions(BuildContext context, bool isDark, dynamic verification) {
+  Widget _buildQuickActions(
+      BuildContext context, bool isDark, dynamic verification) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -938,16 +1264,21 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
           const SizedBox(height: 10),
           Row(
             children: [
-              _buildQuickActionItem(context, '🏢 Properties', Icons.apartment_rounded, Colors.blue, isDark,
-                  onTap: () => _navigateTo(const OwnerPropertyManagementPage())),
+              _buildQuickActionItem(context, '🏢 Properties',
+                  Icons.apartment_rounded, Colors.blue, isDark,
+                  onTap: () =>
+                      _navigateTo(const OwnerPropertyManagementPage())),
               const SizedBox(width: 8),
-              _buildQuickActionItem(context, '📅 Bookings', Icons.book_online_rounded, Colors.orange, isDark,
+              _buildQuickActionItem(context, '📅 Bookings',
+                  Icons.book_online_rounded, Colors.orange, isDark,
                   onTap: () => _navigateTo(const OwnerBookingManagementPage())),
               const SizedBox(width: 8),
-              _buildQuickActionItem(context, '💬 Chat', Icons.chat_bubble_rounded, Colors.green, isDark,
+              _buildQuickActionItem(context, '💬 Chat',
+                  Icons.chat_bubble_rounded, Colors.green, isDark,
                   onTap: () => _navigateTo(const ChatListScreen())),
               const SizedBox(width: 8),
-              _buildQuickActionItem(context, '🔔 Notifications', Icons.notifications_rounded, Colors.purple, isDark,
+              _buildQuickActionItem(context, '🔔 Notifications',
+                  Icons.notifications_rounded, Colors.purple, isDark,
                   onTap: () => _navigateTo(const NotificationScreen())),
             ],
           ),
@@ -955,16 +1286,20 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             const SizedBox(height: 8),
             Row(
               children: [
-                _buildQuickActionItem(context, '📝 Apply', Icons.assignment_ind_rounded, _OwnerPalette.success, isDark,
+                _buildQuickActionItem(context, '📝 Apply',
+                    Icons.assignment_ind_rounded, _OwnerPalette.success, isDark,
                     onTap: () => _navigateTo(const OwnerApplyPage())),
                 const SizedBox(width: 8),
-                _buildQuickActionItem(context, '⭐ Profile', Icons.person_rounded, _OwnerPalette.primary, isDark,
+                _buildQuickActionItem(context, '⭐ Profile',
+                    Icons.person_rounded, _OwnerPalette.primary, isDark,
                     onTap: () => _navigateTo(const OwnerProfileScreen())),
                 const SizedBox(width: 8),
-                _buildQuickActionItem(context, '📊 Stats', Icons.analytics_rounded, _OwnerPalette.teal, isDark,
+                _buildQuickActionItem(context, '📊 Stats',
+                    Icons.analytics_rounded, _OwnerPalette.teal, isDark,
                     onTap: () {}),
                 const SizedBox(width: 8),
-                _buildQuickActionItem(context, '❓ Help', Icons.help_center_rounded, Colors.grey, isDark,
+                _buildQuickActionItem(context, '❓ Help',
+                    Icons.help_center_rounded, Colors.grey, isDark,
                     onTap: () {}),
               ],
             ),
@@ -1026,11 +1361,15 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   // ============== PENDING ITEMS ==============
-  Widget _buildPendingItems(BuildContext context, bool isDark, OwnerProvider provider) {
+  Widget _buildPendingItems(
+      BuildContext context, bool isDark, OwnerProvider provider) {
     final bookings = provider.bookingRequests;
-    final pendingBookings = bookings.where((b) => b.status == 'PENDING').toList();
-    final acceptedBookings = bookings.where((b) => b.status == 'ACCEPTED').toList();
-    final rejectedBookings = bookings.where((b) => b.status == 'REJECTED').toList();
+    final pendingBookings =
+        bookings.where((b) => b.status == 'PENDING').toList();
+    final acceptedBookings =
+        bookings.where((b) => b.status == 'ACCEPTED').toList();
+    final rejectedBookings =
+        bookings.where((b) => b.status == 'REJECTED').toList();
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1080,17 +1419,38 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
           const SizedBox(height: 10),
           Row(
             children: [
-              _buildPendingItem(context, '📌 Pending', pendingBookings.length.toString(), const Color(0xFFF59E0B), isDark,
+              _buildPendingItem(
+                  context,
+                  '📌 Pending',
+                  pendingBookings.length.toString(),
+                  const Color(0xFFF59E0B),
+                  isDark,
                   onTap: () => _navigateTo(const OwnerBookingManagementPage())),
               const SizedBox(width: 8),
-              _buildPendingItem(context, '✅ Accepted', acceptedBookings.length.toString(), const Color(0xFF22C55E), isDark,
+              _buildPendingItem(
+                  context,
+                  '✅ Accepted',
+                  acceptedBookings.length.toString(),
+                  const Color(0xFF22C55E),
+                  isDark,
                   onTap: () => _navigateTo(const OwnerBookingManagementPage())),
               const SizedBox(width: 8),
-              _buildPendingItem(context, '❌ Rejected', rejectedBookings.length.toString(), const Color(0xFFEF4444), isDark,
+              _buildPendingItem(
+                  context,
+                  '❌ Rejected',
+                  rejectedBookings.length.toString(),
+                  const Color(0xFFEF4444),
+                  isDark,
                   onTap: () => _navigateTo(const OwnerBookingManagementPage())),
               const SizedBox(width: 8),
-              _buildPendingItem(context, '🏠 Properties', provider.myProperties.length.toString(), const Color(0xFF3B82F6), isDark,
-                  onTap: () => _navigateTo(const OwnerPropertyManagementPage())),
+              _buildPendingItem(
+                  context,
+                  '🏠 Properties',
+                  provider.myProperties.length.toString(),
+                  const Color(0xFF3B82F6),
+                  isDark,
+                  onTap: () =>
+                      _navigateTo(const OwnerPropertyManagementPage())),
             ],
           ),
         ],
