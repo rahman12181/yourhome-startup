@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:yourhome/providers/owner_provider.dart';
 import 'package:yourhome/utils/constants.dart';
 import '../../widgets/custom_loading_widget.dart';
+import '../../models/owner_model.dart';
 
 class ListingSubscriptionPage extends StatefulWidget {
-  final int listingId;
-  final String listingTitle;
+  final int propertyId;
+  final String propertyTitle;
 
   const ListingSubscriptionPage({
     super.key,
-    required this.listingId,
-    required this.listingTitle,
+    required this.propertyId,
+    required this.propertyTitle,
   });
 
   @override
@@ -22,42 +25,57 @@ class ListingSubscriptionPage extends StatefulWidget {
 class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
   late Razorpay _razorpay;
   bool _isLoading = false;
-  String _selectedPlan = 'basic';
-
-  final Map<String, Map<String, dynamic>> _plans = {
-    'basic': {
-      'label': 'Basic',
-      'price': 199,
-      'duration': '30 days',
-      'listings': 1,
-      'color': const Color(0xFF7C3AED),
-      'icon': Icons.assignment_rounded,
-      'savings': 0,
-    },
-    'standard': {
-      'label': 'Standard',
-      'price': 499,
-      'duration': '30 days',
-      'listings': 5,
-      'color': const Color(0xFF2563EB),
-      'icon': Icons.assignment_turned_in_rounded,
-      'savings': 496,
-    },
-    'premium': {
-      'label': 'Premium',
-      'price': 999,
-      'duration': '30 days',
-      'listings': 20,
-      'color': const Color(0xFF16A34A),
-      'icon': Icons.star_rounded, // FIXED: Changed from assignment_special_rounded
-      'savings': 2981,
-    },
-  };
+  String? _selectedPlanCode;
+  List<ListingPlan> _plans = [];
+  bool _isFetching = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _initRazorpay();
+    _fetchPlans();
+  }
+
+  Future<void> _fetchPlans() async {
+    setState(() {
+      _isFetching = true;
+      _error = null;
+    });
+
+    try {
+      final provider = Provider.of<OwnerProvider>(context, listen: false);
+
+      if (provider.listingPlans.isNotEmpty) {
+        setState(() {
+          _plans = provider.listingPlans;
+          if (_plans.isNotEmpty) {
+            _selectedPlanCode = _plans.first.code;
+          }
+          _isFetching = false;
+        });
+        return;
+      }
+
+      await provider.getListingPlans();
+
+      if (mounted) {
+        setState(() {
+          _plans = provider.listingPlans;
+          if (_plans.isNotEmpty) {
+            _selectedPlanCode = _plans.first.code;
+          }
+          _isFetching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load plans. Please try again.';
+          _isFetching = false;
+        });
+      }
+    }
   }
 
   void _initRazorpay() {
@@ -73,37 +91,101 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
     super.dispose();
   }
 
-  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     setState(() => _isLoading = false);
-    _showSnackBar('✅ Payment Successful!', 'Your listing subscription is now active.', Colors.green);
-    Navigator.pop(context, true);
+
+    try {
+      final provider = Provider.of<OwnerProvider>(context, listen: false);
+
+      final success = await provider.confirmListingSubscription(
+        razorpayOrderId: response.orderId ?? '',
+        razorpayPaymentId: response.paymentId ?? '',
+        razorpaySignature: response.signature ?? '',
+        plan: _selectedPlanCode!,
+      );
+
+      if (success && mounted) {
+        _showSnackBar(
+          'Subscription Activated!',
+          'Your listing subscription is now active.',
+          Colors.green,
+        );
+        Navigator.pop(context, true);
+      } else if (mounted) {
+        _showSnackBar(
+          'Payment Confirmation Failed',
+          provider.error ?? 'Please contact support.',
+          Colors.orange,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar(
+          'Error',
+          'Failed to confirm payment. Please contact support.',
+          Colors.red,
+        );
+      }
+    }
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
     setState(() => _isLoading = false);
-    _showSnackBar('❌ Payment Failed', 'Please try again later.', Colors.red);
+    _showSnackBar(
+      'Payment Failed',
+      response.message ?? 'Please try again later.',
+      Colors.red,
+    );
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
     setState(() => _isLoading = false);
-    _showSnackBar('💳 External Wallet', 'Payment through external wallet selected.', Colors.blue);
+    _showSnackBar(
+      'External Wallet',
+      'Payment through external wallet selected.',
+      Colors.blue,
+    );
   }
 
   void _startPayment() async {
+    if (_selectedPlanCode == null) {
+      _showSnackBar('Error', 'Please select a plan first.', Colors.orange);
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final plan = _plans[_selectedPlan]!;
-      final amount = (plan['price'] as int) * 100;
+      final provider = Provider.of<OwnerProvider>(context, listen: false);
+
+      final selectedPlan = _plans.firstWhere(
+        (plan) => plan.code == _selectedPlanCode,
+      );
+
+      final order = await provider.buyListingSubscription(
+        selectedPlan.code,
+      );
+
+      if (order == null) {
+        setState(() => _isLoading = false);
+        _showSnackBar(
+          'Failed',
+          provider.error ?? 'Could not create order. Please try again.',
+          Colors.red,
+        );
+        return;
+      }
 
       final options = {
         'key': AppConstants.razorpayKeyId,
-        'amount': amount,
-        'name': 'YourHome',
-        'description': 'Listing Subscription - ${widget.listingTitle}',
+        'amount': order.amount,
+        'currency': order.currency,
+        'order_id': order.razorpayOrderId,
+        'name': AppConstants.appName,
+        'description': 'Listing Subscription - ${widget.propertyTitle}',
         'prefill': {
-          'contact': '9876543210',
-          'email': 'user@example.com',
+          'contact': provider.ownerProfile?.phone ?? '9876543210',
+          'email': provider.ownerProfile?.email ?? 'user@example.com',
         },
         'theme': {
           'color': '#7C3AED',
@@ -113,7 +195,11 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
       _razorpay.open(options);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('⚠️ Error', 'Something went wrong. Please try again.', Colors.red);
+      _showSnackBar(
+        'Error',
+        'Something went wrong. Please try again.',
+        Colors.red,
+      );
     }
   }
 
@@ -143,42 +229,125 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildListingInfo(isDark),
-                const SizedBox(height: 20),
-                Text(
-                  'Choose Subscription Plan',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ..._plans.entries.map((entry) {
-                  return _buildPlanCard(entry.key, entry.value, isDark);
-                }).toList(),
-                const SizedBox(height: 20),
-                _buildFeatures(isDark),
-                const SizedBox(height: 24),
-                _buildPaymentButton(isDark),
-                const SizedBox(height: 16),
-              ],
+      body: SafeArea(
+      child: _isFetching
+          ? const Center(child: CustomLoadingWidget(message: 'Loading plans...'))
+          : _error != null
+              ? _buildErrorWidget(isDark)
+              : _plans.isEmpty
+                  ? _buildEmptyWidget(isDark)
+            
+                  : _buildBody(isDark),
+    ),
+    );
+  }
+
+  Widget _buildErrorWidget(bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 64, color: Colors.orange[400]),
+            const SizedBox(height: 16),
+            Text(
+              _error!,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          if (_isLoading) const CustomLoadingWidget(message: 'Processing payment...'),
-        ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _fetchPlans,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7C3AED),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Retry',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildListingInfo(bool isDark) {
+  Widget _buildEmptyWidget(bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No Plans Available',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please try again later.',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(bool isDark) {
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildPropertyInfo(isDark),
+              const SizedBox(height: 20),
+              Text(
+                'Choose Subscription Plan',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ..._plans.map((plan) => _buildPlanCard(plan, isDark)),
+              const SizedBox(height: 20),
+              _buildFeatures(isDark),
+              const SizedBox(height: 24),
+              _buildPaymentButton(isDark),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+        if (_isLoading) const CustomLoadingWidget(message: 'Processing payment...'),
+      ],
+    );
+  }
+
+  Widget _buildPropertyInfo(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -213,7 +382,7 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.listingTitle,
+                  widget.propertyTitle,
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
@@ -223,7 +392,7 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Listing ID: #${widget.listingId}',
+                  'Property ID: #${widget.propertyId}',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -253,53 +422,50 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
     );
   }
 
-  Widget _buildPlanCard(String key, Map<String, dynamic> plan, bool isDark) {
-    final isSelected = _selectedPlan == key;
-    final price = plan['price'] as int;
-    final savings = plan['savings'] as int;
-    final listings = plan['listings'] as int;
+  Widget _buildPlanCard(ListingPlan plan, bool isDark) {
+    final isSelected = _selectedPlanCode == plan.code;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: isSelected
-            ? const Color(0xFF7C3AED).withOpacity(0.05)
+            ? plan.color.withOpacity(0.05)
             : (isDark ? const Color(0xFF141A2C) : Colors.white),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isSelected
-              ? const Color(0xFF7C3AED)
+              ? plan.color
               : (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)),
           width: isSelected ? 2 : 1,
         ),
         boxShadow: [
           if (isSelected)
             BoxShadow(
-              color: const Color(0xFF7C3AED).withOpacity(0.15),
+              color: plan.color.withOpacity(0.15),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
         ],
       ),
       child: RadioListTile<String>(
-        value: key,
-        groupValue: _selectedPlan,
+        value: plan.code,
+        groupValue: _selectedPlanCode,
         onChanged: (value) {
           setState(() {
-            _selectedPlan = value!;
+            _selectedPlanCode = value!;
           });
         },
-        activeColor: const Color(0xFF7C3AED),
+        activeColor: plan.color,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: (plan['color'] as Color).withOpacity(0.1),
+                color: plan.color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(plan['icon'] as IconData, color: plan['color'] as Color, size: 18),
+              child: Icon(plan.icon, color: plan.color, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -307,7 +473,7 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    plan['label'] as String,
+                    plan.name,
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -315,7 +481,7 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
                     ),
                   ),
                   Text(
-                    '$listings listing${listings > 1 ? 's' : ''} • ${plan['duration']}',
+                    '${plan.maxRooms} Room${plan.maxRooms > 1 ? 's' : ''} • ${plan.displayDuration}',
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -328,14 +494,14 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '₹$price',
+                  plan.displayPrice,
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                     color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                   ),
                 ),
-                if (savings > 0)
+                if (plan.rank >= 3)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
@@ -343,7 +509,7 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'Save ₹$savings',
+                      'Popular',
                       style: GoogleFonts.poppins(
                         fontSize: 9,
                         fontWeight: FontWeight.w600,
@@ -360,13 +526,13 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, color: const Color(0xFF7C3AED), size: 12),
+                    Icon(Icons.check_circle_rounded, color: plan.color, size: 12),
                     const SizedBox(width: 4),
                     Text(
                       'Selected plan',
                       style: GoogleFonts.poppins(
                         fontSize: 10,
-                        color: const Color(0xFF7C3AED),
+                        color: plan.color,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -432,7 +598,10 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
   }
 
   Widget _buildPaymentButton(bool isDark) {
-    final price = _plans[_selectedPlan]!['price'] as int;
+    final selectedPlan = _plans.firstWhere(
+      (plan) => plan.code == _selectedPlanCode,
+      orElse: () => _plans.first,
+    );
 
     return Container(
       width: double.infinity,
@@ -463,7 +632,7 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
             const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
             const SizedBox(width: 10),
             Text(
-              'Pay ₹$price & Subscribe',
+              'Pay ${selectedPlan.displayPrice} & Subscribe',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,

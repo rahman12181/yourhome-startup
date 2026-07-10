@@ -34,7 +34,7 @@ class AppConstants {
   static const String appName = 'YourHome';
   static const String appVersion = '1.0.0';
 
-  static const String razorpayKeyId = 'rzp_test_TADkxkSOWt1ERB';
+  static const String razorpayKeyId = 'rzp_test_TBkYuLyP4aZkwk';
 
   static const List<String> propertyTypes = ['PG', 'HOSTEL', 'HOTEL', 'FLAT', 'ROOM'];
   static const List<String> genderOptions = ['BOYS', 'GIRLS', 'BOTH'];

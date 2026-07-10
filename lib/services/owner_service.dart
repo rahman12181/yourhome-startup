@@ -642,4 +642,25 @@ class OwnerService {
       return ApiResponse<SubscriptionOrder>.error(e.toString());
     }
   }
+
+  // ==================== STATIC PLANS (NO API CALL) ====================
+
+  List<PropertyAccessPlan> getPropertyAccessPlans() {
+    return [
+      PropertyAccessPlan(code: 'MONTHLY_1', name: '1 Month', price: 599, durationMonths: 1),
+      PropertyAccessPlan(code: 'MONTHLY_2', name: '2 Months', price: 899, durationMonths: 2),
+      PropertyAccessPlan(code: 'MONTHLY_3', name: '3 Months', price: 1299, durationMonths: 3),
+      PropertyAccessPlan(code: 'MONTHLY_4', name: '4 Months', price: 1599, durationMonths: 4),
+      PropertyAccessPlan(code: 'MONTHLY_5', name: '5 Months', price: 1899, durationMonths: 5),
+    ];
+  }
+
+  List<ListingPlan> getListingPlans() {
+    return [
+      ListingPlan(code: 'BASIC', name: 'Basic', price: 399, maxRooms: 5, rank: 1, durationDays: 30),
+      ListingPlan(code: 'STANDARD', name: 'Standard', price: 599, maxRooms: 10, rank: 2, durationDays: 30),
+      ListingPlan(code: 'PREMIUM', name: 'Premium', price: 799, maxRooms: 20, rank: 3, durationDays: 30),
+      ListingPlan(code: 'ENTERPRISE', name: 'Enterprise', price: 999, maxRooms: 999, rank: 4, durationDays: 30),
+    ];
+  }
 }

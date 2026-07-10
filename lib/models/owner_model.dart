@@ -267,6 +267,62 @@ class DashboardStats {
   }
 }
 
+// ============== LISTING PLAN (ADD THIS) ==============
+class ListingPlan {
+  final String code;
+  final String name;
+  final double price;
+  final int maxRooms;
+  final int rank;
+  final int durationDays;
+  final String? description;
+
+  ListingPlan({
+    required this.code,
+    required this.name,
+    required this.price,
+    required this.maxRooms,
+    required this.rank,
+    required this.durationDays,
+    this.description,
+  });
+
+  factory ListingPlan.fromJson(Map<String, dynamic> json) {
+    return ListingPlan(
+      code: json['planCode'] ?? json['plan'] ?? json['code'] ?? '',
+      name: json['displayName'] ?? json['name'] ?? json['label'] ?? '',
+      price: (json['price'] ?? json['planPrice'] ?? 0).toDouble(),
+      maxRooms: json['maxRooms'] ?? json['maxListings'] ?? 0,
+      rank: json['rank'] ?? 0,
+      durationDays: json['durationDays'] ?? json['duration'] ?? 30,
+      description: json['description'],
+    );
+  }
+
+  String get displayPrice => '₹${price.toStringAsFixed(0)}';
+  String get displayDuration => '$durationDays Days';
+  
+  Color get color {
+    switch (code) {
+      case 'BASIC': return const Color(0xFF7C3AED);
+      case 'STANDARD': return const Color(0xFF2563EB);
+      case 'PREMIUM': return const Color(0xFF16A34A);
+      case 'ENTERPRISE': return const Color(0xFFF59E0B);
+      default: return const Color(0xFF7C3AED);
+    }
+  }
+
+  IconData get icon {
+    switch (code) {
+      case 'BASIC': return Icons.assignment_rounded;
+      case 'STANDARD': return Icons.assignment_turned_in_rounded;
+      case 'PREMIUM': return Icons.star_rounded;
+      case 'ENTERPRISE': return Icons.workspace_premium_rounded;
+      default: return Icons.assignment_rounded;
+    }
+  }
+}
+
 // ============== PROPERTY ACCESS SUBSCRIPTION ==============
 class PropertyAccessSubscription {
   final int subscriptionId;
@@ -511,7 +567,7 @@ class SubscriptionPlan {
   ];
 }
 
-// ============== PROPERTY ACCESS PLAN ==============
+// ============== PROPERTY ACCESS PLAN (WITH fromJson) ==============
 class PropertyAccessPlan {
   final String code;
   final String name;
@@ -525,7 +581,51 @@ class PropertyAccessPlan {
     required this.durationMonths,
   });
 
+  // ✅ ADD THIS — fromJson factory constructor
+  factory PropertyAccessPlan.fromJson(Map<String, dynamic> json) {
+    return PropertyAccessPlan(
+      code: json['code'] ?? json['planCode'] ?? json['plan'] ?? '',
+      name: json['name'] ?? json['displayName'] ?? json['label'] ?? '',
+      price: (json['price'] ?? json['planPrice'] ?? 0).toDouble(),
+      durationMonths: json['durationMonths'] ?? 0,
+    );
+  }
+
+  // ✅ ADD THIS — toJson method (optional but good to have)
+  Map<String, dynamic> toJson() {
+    return {
+      'code': code,
+      'name': name,
+      'price': price,
+      'durationMonths': durationMonths,
+    };
+  }
+
   String get displayPrice => '₹${price.toStringAsFixed(0)}';
   String get displayDuration => '$durationMonths Month${durationMonths > 1 ? 's' : ''}';
   String get displayPerMonth => '₹${(price / durationMonths).toStringAsFixed(0)}/month';
+  
+  Color get color {
+    switch (code) {
+      case 'MONTHLY_1': return const Color(0xFF7C3AED);
+      case 'MONTHLY_2': return const Color(0xFF2563EB);
+      case 'MONTHLY_3': return const Color(0xFF16A34A);
+      case 'MONTHLY_4': return const Color(0xFFDC2626);
+      case 'MONTHLY_5': return const Color(0xFFF59E0B);
+      default: return const Color(0xFF7C3AED);
+    }
+  }
+
+  IconData get icon {
+    switch (code) {
+      case 'MONTHLY_1': return Icons.calendar_month_rounded;
+      case 'MONTHLY_2': return Icons.calendar_view_month_rounded;
+      case 'MONTHLY_3': return Icons.calendar_today_rounded;
+      case 'MONTHLY_4': return Icons.calendar_view_week_rounded;
+      case 'MONTHLY_5': return Icons.calendar_month_rounded;
+      default: return Icons.calendar_month_rounded;
+    }
+  }
+
+  bool get isBestValue => durationMonths >= 3;
 }

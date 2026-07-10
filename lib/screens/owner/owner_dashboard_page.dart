@@ -148,22 +148,22 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
-  void _navigateToListingSubscription() {
-    final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
-    String listingTitle = 'Listing Subscription';
-    int listingId = 0;
-    if (ownerProvider.myProperties.isNotEmpty) {
-      final firstProperty = ownerProvider.myProperties.first;
-      listingId = firstProperty.propertyId ?? 0;
-      listingTitle = firstProperty.title ?? 'Listing';
-    }
-    _navigateTo(
-      ListingSubscriptionPage(
-        listingId: listingId,
-        listingTitle: listingTitle,
-      ),
-    );
+ void _navigateToListingSubscription() {
+  final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
+  String propertyTitle = 'Listing Subscription';
+  int propertyId = 0;
+  if (ownerProvider.myProperties.isNotEmpty) {
+    final firstProperty = ownerProvider.myProperties.first;
+    propertyId = firstProperty.propertyId ?? 0;
+    propertyTitle = firstProperty.title ?? 'Listing';
   }
+  _navigateTo(
+    ListingSubscriptionPage(
+      propertyId: propertyId,
+      propertyTitle: propertyTitle,
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

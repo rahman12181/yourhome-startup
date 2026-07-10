@@ -25,6 +25,10 @@ class OwnerProvider extends ChangeNotifier {
   PropertyAccessStatus? _propertyAccessStatus;
   List<PropertyAccessSubscription> _propertyAccessHistory = [];
 
+  // Plans
+  List<PropertyAccessPlan> _propertyAccessPlans = [];
+  List<ListingPlan> _listingPlans = [];
+
   // Properties
   List<Property> _myProperties = [];
   Property? _selectedProperty;
@@ -46,6 +50,8 @@ class OwnerProvider extends ChangeNotifier {
   SubscriptionDetails? get listingSubscription => _listingSubscription;
   PropertyAccessStatus? get propertyAccessStatus => _propertyAccessStatus;
   List<PropertyAccessSubscription> get propertyAccessHistory => _propertyAccessHistory;
+  List<PropertyAccessPlan> get propertyAccessPlans => _propertyAccessPlans;
+  List<ListingPlan> get listingPlans => _listingPlans;
   List<Property> get myProperties => _myProperties;
   Property? get selectedProperty => _selectedProperty;
   List<Room> get rooms => _rooms;
@@ -100,6 +106,8 @@ class OwnerProvider extends ChangeNotifier {
       getVerificationStatus(),
       getDashboardStats(),
       getPropertyAccessStatus(),
+      getPropertyAccessPlans(),
+      getListingPlans(),
       getListingSubscriptionDetails(),
       getMyProperties(),
       getIncomingBookingRequests(),
@@ -167,6 +175,19 @@ class OwnerProvider extends ChangeNotifier {
       _dashboardStats = res.data;
       notifyListeners();
     }
+  }
+
+  // ============ PLANS (STATIC — NO API CALL) ============
+  Future<void> getPropertyAccessPlans() async {
+    if (_isDisposed) return;
+    _propertyAccessPlans = _service.getPropertyAccessPlans();
+    notifyListeners();
+  }
+
+  Future<void> getListingPlans() async {
+    if (_isDisposed) return;
+    _listingPlans = _service.getListingPlans();
+    notifyListeners();
   }
 
   // ============ LISTING SUBSCRIPTION ============
@@ -510,6 +531,8 @@ class OwnerProvider extends ChangeNotifier {
     _listingSubscription = null;
     _propertyAccessStatus = null;
     _propertyAccessHistory = [];
+    _propertyAccessPlans = [];
+    _listingPlans = [];
     _myProperties = [];
     _selectedProperty = null;
     _rooms = [];
