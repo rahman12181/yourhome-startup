@@ -738,24 +738,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final List<Map<String, dynamic>> _categories = [
     {
       'name': 'PG',
-      'icon': Icons.apartment_rounded,
+      'image': 'assets/images/pg.jpg',
       'color': _HomePalette.studentPrimary
     },
-    {'name': 'Hostel', 'icon': Icons.bed_rounded, 'color': _HomePalette.purple},
+    {
+      'name': 'Hostel',
+      'image': 'assets/images/hostel.jpg',
+      'color': _HomePalette.purple
+    },
     {
       'name': 'Hotel',
-      'icon': Icons.hotel_rounded,
+      'image': 'assets/images/hotel.jpg',
       'color': _HomePalette.orange
     },
-    {'name': 'Flat', 'icon': Icons.home_rounded, 'color': _HomePalette.success},
+    {
+      'name': 'Flat',
+      'image': 'assets/images/flats.png',
+      'color': _HomePalette.success
+    },
     {
       'name': 'Villa',
-      'icon': Icons.villa_rounded,
+      'image': 'assets/images/villa.png',
       'color': const Color(0xFF06B6D4)
     },
     {
       'name': 'Resort',
-      'icon': Icons.beach_access_rounded,
+      'image': 'assets/images/restourent.png',
       'color': _HomePalette.pink
     },
   ];
@@ -1515,7 +1523,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
+         SizedBox(
             height: 90,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -1526,7 +1534,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 return _buildCategoryItem(
                   context,
                   category['name'],
-                  category['icon'],
+                  category['image'],
                   category['color'],
                   isDark,
                 );
@@ -1541,7 +1549,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget _buildCategoryItem(
     BuildContext context,
     String name,
-    IconData icon,
+    String imagePath,
     Color color,
     bool isDark,
   ) {
@@ -1565,19 +1573,37 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(14),
+              width: 58,
+              height: 58,
+              padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: color.withOpacity(0.2),
+                  color: color.withOpacity(0.25),
                   width: 1.5,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 26,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(29),
+                child: Image.asset(
+                  imagePath,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: color.withOpacity(0.1),
+                    child: Icon(
+                      Icons.home_rounded,
+                      color: color,
+                      size: 24,
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 6),
