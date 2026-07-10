@@ -9,7 +9,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:yourhome/models/user_model.dart';
+import 'package:yourhome/screens/help_support_screen.dart';
 import 'package:yourhome/screens/login_screen.dart';
+import 'package:yourhome/screens/privacy_policy_screen.dart';
+import 'package:yourhome/screens/terms_conditions_screen.dart';
 import 'package:yourhome/utils/constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/owner_provider.dart';
@@ -29,7 +32,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
   late Animation<double> _scaleIn;
-  
+
   late AnimationController _staggerController;
   late List<Animation<double>> _staggerAnimations;
 
@@ -104,9 +107,10 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
   }
 
   Future<void> _loadData() async {
-    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+    final profileProvider =
+        Provider.of<ProfileProvider>(context, listen: false);
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
-    
+
     await Future.wait([
       profileProvider.getProfile(),
       ownerProvider.getOwnerProfile(),
@@ -133,10 +137,11 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
 
       final File file = File(image.path);
       final formData = FormData.fromMap({
-        'profilePic': await MultipartFile.fromFile(file.path),
+        'file': await MultipartFile.fromFile(file.path),
       });
 
-      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+      final profileProvider =
+          Provider.of<ProfileProvider>(context, listen: false);
       final success = await profileProvider.uploadProfilePicture(formData);
 
       setState(() => _isUploading = false);
@@ -145,7 +150,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
         _showSnackBar('Profile picture updated successfully!', Colors.green);
         _loadData();
       } else {
-        _showSnackBar(profileProvider.error ?? 'Failed to update picture', Colors.red);
+        _showSnackBar(
+            profileProvider.error ?? 'Failed to update picture', Colors.red);
       }
     } catch (e) {
       setState(() => _isUploading = false);
@@ -157,8 +163,9 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
     setState(() => _isLoading = true);
 
     try {
-      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
-      
+      final profileProvider =
+          Provider.of<ProfileProvider>(context, listen: false);
+
       final request = UpdateProfileRequest(
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
@@ -181,7 +188,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
         _showSnackBar('Profile updated successfully!', Colors.green);
         _loadData();
       } else {
-        _showSnackBar(profileProvider.error ?? 'Failed to update profile', Colors.red);
+        _showSnackBar(
+            profileProvider.error ?? 'Failed to update profile', Colors.red);
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -339,7 +347,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+        backgroundColor:
+            isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
         body: profileProvider.isLoading && profile == null
             ? _buildLoadingState(isDark)
             : Stack(
@@ -375,36 +384,48 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
                                   const SizedBox(height: 16),
                                   if (verification != null)
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      child: _buildPremiumVerificationCard(isDark, verification),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16),
+                                      child: _buildPremiumVerificationCard(
+                                          isDark, verification),
                                     ),
                                   const SizedBox(height: 16),
                                   if (stats != null)
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      child: _buildPremiumStatsCard(isDark, stats),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16),
+                                      child:
+                                          _buildPremiumStatsCard(isDark, stats),
                                     ),
                                   const SizedBox(height: 16),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    child: _buildPremiumSubscriptionCard(isDark, accessStatus, listingSub),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    child: _buildPremiumSubscriptionCard(
+                                        isDark, accessStatus, listingSub),
                                   ),
                                   const SizedBox(height: 16),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    child: _buildPremiumProfileDetails(isDark, profile, ownerProfile),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    child: _buildPremiumProfileDetails(
+                                        isDark, profile, ownerProfile),
                                   ),
                                   const SizedBox(height: 16),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    child: _buildPremiumActionButtons(context, isDark),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    child: _buildPremiumActionButtons(
+                                        context, isDark),
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
                                     'Version 1.0.0',
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
-                                      color: isDark ? Colors.grey[600] : Colors.grey[400],
+                                      color: isDark
+                                          ? Colors.grey[600]
+                                          : Colors.grey[400],
                                     ),
                                   ),
                                 ],
@@ -820,7 +841,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
             children: [
               // Verification Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -829,7 +851,9 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isVerified ? Icons.verified_rounded : Icons.hourglass_top_rounded,
+                      isVerified
+                          ? Icons.verified_rounded
+                          : Icons.hourglass_top_rounded,
                       size: 14,
                       color: isVerified ? Colors.green : Colors.orange,
                     ),
@@ -848,7 +872,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
               // Email Verification Badge
               if (profile != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -857,13 +882,17 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        profile.isEmailVerified ? Icons.email_rounded : Icons.email_outlined,
+                        profile.isEmailVerified
+                            ? Icons.email_rounded
+                            : Icons.email_outlined,
                         size: 14,
                         color: Colors.white,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        profile.isEmailVerified ? 'Email Verified' : 'Email Not Verified',
+                        profile.isEmailVerified
+                            ? 'Email Verified'
+                            : 'Email Not Verified',
                         style: GoogleFonts.poppins(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -876,7 +905,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
               // Plan Badge
               if (plan != 'No Plan')
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -952,7 +982,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
               const Spacer(),
               if (verification.isVerified)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -1010,12 +1041,42 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
   // ========== PREMIUM STATS CARD ==========
   Widget _buildPremiumStatsCard(bool isDark, dynamic stats) {
     final statsData = [
-      {'label': 'Properties', 'value': stats.totalProperties.toString(), 'icon': Icons.apartment_rounded, 'color': const Color(0xFF2563EB)},
-      {'label': 'Rooms', 'value': stats.totalRooms.toString(), 'icon': Icons.bed_rounded, 'color': const Color(0xFF8B5CF6)},
-      {'label': 'Bookings', 'value': stats.pendingRequests.toString(), 'icon': Icons.book_online_rounded, 'color': const Color(0xFFF59E0B)},
-      {'label': 'Published', 'value': stats.publishedProperties.toString(), 'icon': Icons.check_circle_rounded, 'color': const Color(0xFF22C55E)},
-      {'label': 'Available', 'value': stats.availableRooms.toString(), 'icon': Icons.meeting_room_rounded, 'color': const Color(0xFF06B6D4)},
-      {'label': 'Rating', 'value': stats.averageRating.toStringAsFixed(1), 'icon': Icons.star_rounded, 'color': const Color(0xFFFFD700)},
+      {
+        'label': 'Properties',
+        'value': stats.totalProperties.toString(),
+        'icon': Icons.apartment_rounded,
+        'color': const Color(0xFF2563EB)
+      },
+      {
+        'label': 'Rooms',
+        'value': stats.totalRooms.toString(),
+        'icon': Icons.bed_rounded,
+        'color': const Color(0xFF8B5CF6)
+      },
+      {
+        'label': 'Bookings',
+        'value': stats.pendingRequests.toString(),
+        'icon': Icons.book_online_rounded,
+        'color': const Color(0xFFF59E0B)
+      },
+      {
+        'label': 'Published',
+        'value': stats.publishedProperties.toString(),
+        'icon': Icons.check_circle_rounded,
+        'color': const Color(0xFF22C55E)
+      },
+      {
+        'label': 'Available',
+        'value': stats.availableRooms.toString(),
+        'icon': Icons.meeting_room_rounded,
+        'color': const Color(0xFF06B6D4)
+      },
+      {
+        'label': 'Rating',
+        'value': stats.averageRating.toStringAsFixed(1),
+        'icon': Icons.star_rounded,
+        'color': const Color(0xFFFFD700)
+      },
     ];
 
     return Container(
@@ -1134,7 +1195,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
   }
 
   // ========== PREMIUM SUBSCRIPTION CARD ==========
-  Widget _buildPremiumSubscriptionCard(bool isDark, dynamic accessStatus, dynamic listingSub) {
+  Widget _buildPremiumSubscriptionCard(
+      bool isDark, dynamic accessStatus, dynamic listingSub) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1233,7 +1295,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
                   : Colors.red.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: status ? Colors.green : Colors.red, size: 16),
+            child:
+                Icon(icon, color: status ? Colors.green : Colors.red, size: 16),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1281,7 +1344,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
   }
 
   // ========== PREMIUM PROFILE DETAILS ==========
-  Widget _buildPremiumProfileDetails(bool isDark, dynamic profile, dynamic ownerProfile) {
+  Widget _buildPremiumProfileDetails(
+      bool isDark, dynamic profile, dynamic ownerProfile) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1326,7 +1390,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
                 GestureDetector(
                   onTap: _isLoading ? null : _saveProfile,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
@@ -1458,9 +1523,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
             color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.1)
-                  : Colors.grey.shade200,
+              color:
+                  isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
               width: 1,
             ),
           ),
@@ -1475,7 +1539,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
             decoration: InputDecoration(
               prefixIcon: Icon(icon, size: 18, color: Colors.grey),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
           ),
         ),
@@ -1514,7 +1579,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: color ?? (isDark ? Colors.white : const Color(0xFF1A1A2E)),
+                color:
+                    color ?? (isDark ? Colors.white : const Color(0xFF1A1A2E)),
               ),
               maxLines: isLong ? 3 : 1,
               overflow: isLong ? TextOverflow.ellipsis : TextOverflow.ellipsis,
@@ -1649,19 +1715,28 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen>
                 'Privacy Policy',
                 Icons.privacy_tip_rounded,
                 isDark,
-                onTap: () {},
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                ),
               ),
               _buildSettingsTile(
                 'Terms & Conditions',
                 Icons.description_rounded,
                 isDark,
-                onTap: () {},
+               onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+                ),
               ),
               _buildSettingsTile(
                 'Help & Support',
                 Icons.help_center_rounded,
                 isDark,
-                onTap: () {},
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                ),
               ),
               _buildSettingsTile(
                 'App Version',

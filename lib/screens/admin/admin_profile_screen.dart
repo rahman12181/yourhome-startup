@@ -8,6 +8,9 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
+import 'package:yourhome/screens/help_support_screen.dart';
+import 'package:yourhome/screens/privacy_policy_screen.dart';
+import 'package:yourhome/screens/terms_conditions_screen.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/admin_provider.dart';
@@ -157,7 +160,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+      backgroundColor:
+          isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
       appBar: _buildAppBar(context, isDark),
       body: FadeTransition(
         opacity: _fadeAnimation,
@@ -176,7 +180,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
                   child: Column(
                     children: [
                       // Profile Header
-                      _buildProfileHeader(context, user, profileProvider, isDark),
+                      _buildProfileHeader(
+                          context, user, profileProvider, isDark),
                       const SizedBox(height: 20),
 
                       // Stats Cards
@@ -370,7 +375,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
                       ),
                     ),
                     Text(
-                      provider.profile?.email ?? authUser?.email ?? 'admin@email.com',
+                      provider.profile?.email ??
+                          authUser?.email ??
+                          'admin@email.com',
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         color: Colors.white70,
@@ -761,7 +768,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
             title: 'Privacy & Security',
             subtitle: 'Manage your privacy settings',
             isDark: isDark,
-            onTap: () {},
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+            ),
           ),
           _buildMenuItem(
             context,
@@ -769,7 +779,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
             title: 'Help & Support',
             subtitle: 'Get help and support',
             isDark: isDark,
-            onTap: () {},
+             onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+            ),
           ),
           _buildMenuItem(
             context,
@@ -825,11 +838,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
                 ),
               )
             : null,
-        trailing: trailing ?? Icon(
-            Icons.arrow_forward_ios_rounded,
-            size: 16,
-            color: isDark ? Colors.grey[500] : Colors.grey[400],
-          ),
+        trailing: trailing ??
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: isDark ? Colors.grey[500] : Colors.grey[400],
+            ),
         onTap: onTap,
       ),
     );
@@ -843,7 +857,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen>
         width: double.infinity,
         height: 50,
         child: OutlinedButton(
-          onPressed: authProvider.isLoading ? null : () => _showLogoutDialog(context),
+          onPressed:
+              authProvider.isLoading ? null : () => _showLogoutDialog(context),
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Colors.red),
             shape: RoundedRectangleBorder(

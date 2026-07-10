@@ -9,6 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:yourhome/screens/help_support_screen.dart';
+import 'package:yourhome/screens/privacy_policy_screen.dart';
 import '../providers/profile_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
@@ -966,14 +968,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         'icon': Icons.security_rounded,
         'title': 'Privacy & Security',
         'subtitle': 'Manage your privacy settings',
-        'screen': null,
+        'screen': const PrivacyPolicyScreen(),
         'color': const Color(0xFF10B981),
       },
       {
         'icon': Icons.help_outline_rounded,
         'title': 'Help & Support',
         'subtitle': 'Get help and support',
-        'screen': null,
+        'screen': const HelpSupportScreen(),
         'color': const Color(0xFF8B5CF6),
       },
     ];
