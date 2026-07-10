@@ -269,7 +269,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
       {
         'emoji': '📞',
         'title': 'Contact Us',
-        'content': 'Email: support@yourhome.in\nPhone: +91-XXXXXXXXXX\nAddress: YourHome HQ, India\nResponse Time: Within 24-48 hours',
+        'content': 'Email: lutfur1218@gmail.com\nPhone: +91-7643845067\nCompany Address: Noida Sector-17\nResponse Time: Within 24-48 hours',
         'color': const Color(0xFF2563EB),
       },
       {
