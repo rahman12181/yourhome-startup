@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:yourhome/main.dart' show navigatorKey;
+import 'package:yourhome/screens/bookings/booking_list_screen.dart';
 import 'package:yourhome/screens/notifications/notification_screen.dart';
 import 'package:yourhome/screens/owner/owner_booking_management_page.dart';
 import 'package:yourhome/services/api_service.dart';
@@ -36,6 +39,8 @@ class FcmService {
 
     await _notifications.initialize(
       settings,
+      // ✅ Fires when the LOCAL notification (shown while app is foreground)
+      // is tapped. We now route this through the same navigation logic.
       onDidReceiveNotificationResponse: (response) {
         _handleNotificationTap(response.payload);
       },
@@ -60,25 +65,27 @@ class FcmService {
         }
       });
 
+      // App is OPEN (foreground) when the push arrives — show a local
+      // notification. Tapping it is handled by onDidReceiveNotificationResponse above.
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         _showNotification(message);
       });
 
       FirebaseMessaging.onBackgroundMessage(_backgroundHandler);
 
-      // ✅ App was in background and user tapped the notification
+      // App was in BACKGROUND (not killed) and user tapped the system notification.
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        _handleNavigation(message);
+        _navigateForType(message.data['type'], message.data['refId']);
       });
 
       _listenersAttached = true;
     }
 
-    // ✅ App was fully killed and opened via notification tap
+    // App was fully KILLED and opened via notification tap.
     RemoteMessage? initialMessage =
         await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
-      _handleNavigation(initialMessage);
+      _navigateForType(initialMessage.data['type'], initialMessage.data['refId']);
     }
   }
 
@@ -122,10 +129,20 @@ class FcmService {
     }
   }
 
+  // =============================================
+  // Show system notification while app is in foreground.
+  // Payload is now a JSON string carrying BOTH type + refId, so tapping
+  // it (handled in _handleNotificationTap) can navigate exactly like the
+  // background/killed cases do.
+  // =============================================
   static void _showNotification(RemoteMessage message) {
-    String title = message.notification?.title ?? 'Nestora';
+    String title = message.notification?.title ?? 'YourHome';
     String body = message.notification?.body ?? '';
-    String? payload = message.data['type'];
+
+    final payload = jsonEncode({
+      'type': message.data['type'],
+      'refId': message.data['refId'],
+    });
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
@@ -197,20 +214,38 @@ class FcmService {
 
     await _notifications.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      message.notification?.title ?? 'Nestora',
+      message.notification?.title ?? 'YourHome',
       message.notification?.body ?? '',
       details,
-      payload: message.data['type'],
+      payload: jsonEncode({
+        'type': message.data['type'],
+        'refId': message.data['refId'],
+      }),
     );
   }
 
   // =============================================
-  // ✅ UPDATED — Navigate based on notification type + user role
+  // Fired when the user taps the LOCAL notification we showed ourselves
+  // (i.e. the app was OPEN/foreground when the push arrived).
   // =============================================
-  static void _handleNavigation(RemoteMessage message) async {
-    final type = message.data['type'];
-    final refId = message.data['refId'];
-    print('🔔 Notification tapped: type=$type, refId=$refId');
+  static void _handleNotificationTap(String? payload) {
+    if (payload == null) return;
+    print('🔔 Local notification tapped: $payload');
+
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      _navigateForType(data['type'] as String?, data['refId'] as String?);
+    } catch (e) {
+      print('❌ Failed to parse notification payload: $e');
+    }
+  }
+
+  // =============================================
+  // ✅ SINGLE SOURCE OF TRUTH for navigation — used by all 3 states:
+  // foreground tap, background tap, killed-app tap.
+  // =============================================
+  static Future<void> _navigateForType(String? type, String? refId) async {
+    print('🔔 Navigating for type=$type, refId=$refId');
 
     final navState = navigatorKey.currentState;
     if (navState == null) {
@@ -219,30 +254,24 @@ class FcmService {
     }
 
     if (type == 'BOOKING') {
-      // Owner ko booking management page, User ko notification screen
       final role = await _storage.getUserRole();
 
       if (role == 'OWNER') {
+        // Owner ko naya booking request aaya — booking management page
         navState.push(MaterialPageRoute(
           builder: (_) => const OwnerBookingManagementPage(),
         ));
       } else {
+        // Student ko uske booking ka accept/reject status mila — booking list
         navState.push(MaterialPageRoute(
-          builder: (_) => const NotificationScreen(),
+          builder: (_) => const BookingListScreen(),
         ));
       }
       return;
     }
 
-    // VERIFICATION, PAYMENT, SYSTEM, CHAT, aur baaki sab types —
-    // NotificationScreen role-wise sab khud handle kar leta hai
     navState.push(MaterialPageRoute(
       builder: (_) => const NotificationScreen(),
     ));
-  }
-
-  static void _handleNotificationTap(String? payload) {
-    if (payload == null) return;
-    print('🔔 Local notification tapped: $payload');
   }
 }
