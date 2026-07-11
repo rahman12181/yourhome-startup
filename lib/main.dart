@@ -1,3 +1,6 @@
+// ignore_for_file: deprecated_member_use
+
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,37 +10,45 @@ import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/property_provider.dart';
 import 'providers/profile_provider.dart';
-import 'providers/admin_provider.dart';  
+import 'providers/admin_provider.dart';
 import 'screens/splash_screen.dart';
 import 'services/api_service.dart';
 import 'utils/theme.dart';
 import 'providers/owner_provider.dart';
+import 'package:yourhome/services/fcm_service.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _updateSystemUIOverlay(Brightness.light);
-
+  await Firebase.initializeApp();
   await ApiService().init();
+
+  try {
+    await FcmService.initialize();
+  } catch (e) {
+    debugPrint(' FCM initialization failed: $e');
+  }
 
   runApp(const MyApp());
 }
+
 void _updateSystemUIOverlay(Brightness brightness) {
   final isDark = brightness == Brightness.dark;
-  
+
   SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.edgeToEdge,
   );
 
   SystemChrome.setSystemUIOverlayStyle(
     SystemUiOverlayStyle(
-      // Status Bar
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor: isDark 
-          ? const Color(0xFF141A2C)
-          : Colors.white,            
-      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: isDark ? const Color(0xFF141A2C) : Colors.white,
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
       systemNavigationBarDividerColor: Colors.transparent,
     ),
   );
@@ -81,6 +92,7 @@ class MyApp extends StatelessWidget {
           });
 
           return MaterialApp(
+            navigatorKey: navigatorKey,
             title: 'YourHome',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yourhome/services/websocket_manager.dart';
+import 'package:yourhome/services/fcm_service.dart';
 import '../models/auth_model.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
@@ -127,6 +128,13 @@ class AuthProvider extends ChangeNotifier {
         print('❌ Error connecting WebSocket after OTP verify: $e');
       }
 
+      // ✅ ADDED — sync FCM token now that we're logged in
+      try {
+        await FcmService.syncToken();
+      } catch (e) {
+        print('❌ Error syncing FCM token after OTP verify: $e');
+      }
+
       _setLoading(false);
       return true;
     } else {
@@ -157,6 +165,13 @@ class AuthProvider extends ChangeNotifier {
         print('✅ WebSocket connect triggered after login');
       } catch (e) {
         print('❌ Error connecting WebSocket after login: $e');
+      }
+
+      // ✅ ADDED — sync FCM token now that we're logged in
+      try {
+        await FcmService.syncToken();
+      } catch (e) {
+        print('❌ Error syncing FCM token after login: $e');
       }
 
       _setLoading(false);
@@ -333,6 +348,13 @@ class AuthProvider extends ChangeNotifier {
           } catch (e) {
             print('❌ Error connecting WebSocket on cold start: $e');
           }
+
+          // ✅ ADDED — re-sync FCM token on cold start too (session already valid)
+          try {
+            await FcmService.syncToken();
+          } catch (e) {
+            print('❌ Error syncing FCM token on cold start: $e');
+          }
         }
 
         notifyListeners();
@@ -342,6 +364,15 @@ class AuthProvider extends ChangeNotifier {
 
  Future<void> logout() async {
   _setLoading(true);
+
+  // ✅ ADDED — clear FCM token from server BEFORE wiping local session,
+  // since it still needs a valid Authorization header to reach the server.
+  try {
+    await FcmService.clearToken();
+  } catch (e) {
+    print('❌ Error clearing FCM token on logout: $e');
+  }
+
   await _authService.logout();
   await clearProfileImage();
   
