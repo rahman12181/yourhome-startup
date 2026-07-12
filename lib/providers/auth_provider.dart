@@ -21,7 +21,6 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isAuthenticated => _user != null;
 
-  // ✅ GET PROFILE IMAGE
   String? get profileImage {
     if (_user?.profileImage != null && _user!.profileImage!.isNotEmpty) {
       return _user!.profileImage;
@@ -29,44 +28,36 @@ class AuthProvider extends ChangeNotifier {
     return _localProfileImagePath;
   }
 
-  // ✅ GET USER INITIAL
   String getUserInitial() {
     if (_user == null) return 'U';
     final name = _user!.name.isNotEmpty ? _user!.name : _user!.email;
     return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
 
-  // ✅ GET USER DISPLAY NAME
   String getUserDisplayName() {
     if (_user == null) return 'Guest';
     return _user!.name.isNotEmpty ? _user!.name : _user!.email.split('@').first;
   }
 
-  // ✅ GET USER EMAIL
   String getUserEmail() {
     return _user?.email ?? '';
   }
 
   String? get accessToken => _user?.accessToken;
-// OR
- String? get token => _user?.accessToken;
+  String? get token => _user?.accessToken;
 
-  // ✅ GET ACCESS TOKEN - ADD THIS
   Future<String?> getAccessToken() async {
     return await _storage.getAccessToken();
   }
 
-  // ✅ GET REFRESH TOKEN - ADD THIS
   Future<String?> getRefreshToken() async {
     return await _storage.getRefreshToken();
   }
 
-  // ✅ GET PROFILE IMAGE - ADD THIS
   Future<String?> getProfileImageFromStorage() async {
     return await _storage.getProfileImage();
   }
 
-  // ✅ SET PROFILE IMAGE - ADD THIS
   Future<void> setProfileImage(String imageUrl) async {
     await _storage.setProfileImage(imageUrl);
     if (_user != null) {
@@ -79,16 +70,26 @@ class AuthProvider extends ChangeNotifier {
     return await _storage.isLoggedIn();
   }
 
-  Future<bool> register(RegisterRequest request, {
+  // ✅ FIXED: CORRECT REGISTER METHOD - NO EXTRA PARAMETER
+  Future<bool> register({
     required String name,
     required String email,
     required String password,
     String? phone,
     String? profileImage,
+    String? referralCode,
   }) async {
     _setLoading(true);
     _clearError();
 
+    final request = RegisterRequest(
+      name: name,
+      email: email,
+      password: password,
+      phone: phone ?? '',
+      referralCode: referralCode,
+    );
+    
     final response = await _authService.register(request);
     
     if (response.success && response.data != null) {
@@ -117,7 +118,6 @@ class AuthProvider extends ChangeNotifier {
       _user = response.data;
       await _saveUserData(_user!);
 
-      // ✅ ADDED — connect WebSocket right after OTP verification (register flow)
       try {
         WebSocketManager().connect(
           token: _user!.accessToken,
@@ -128,7 +128,6 @@ class AuthProvider extends ChangeNotifier {
         print('❌ Error connecting WebSocket after OTP verify: $e');
       }
 
-      // ✅ ADDED — sync FCM token now that we're logged in
       try {
         await FcmService.syncToken();
       } catch (e) {
@@ -156,7 +155,6 @@ class AuthProvider extends ChangeNotifier {
       await _saveUserData(_user!);
       await loadLocalProfileImage();
 
-      // ✅ ADDED — connect WebSocket right after login, don't wait for chat screen to open
       try {
         WebSocketManager().connect(
           token: _user!.accessToken,
@@ -167,7 +165,6 @@ class AuthProvider extends ChangeNotifier {
         print('❌ Error connecting WebSocket after login: $e');
       }
 
-      // ✅ ADDED — sync FCM token now that we're logged in
       try {
         await FcmService.syncToken();
       } catch (e) {
@@ -337,7 +334,6 @@ class AuthProvider extends ChangeNotifier {
         );
         await loadLocalProfileImage();
 
-        // ✅ ADDED — reconnect WebSocket on cold start (app reopened, user already logged in)
         if (accessToken.isNotEmpty) {
           try {
             WebSocketManager().connect(
@@ -349,7 +345,6 @@ class AuthProvider extends ChangeNotifier {
             print('❌ Error connecting WebSocket on cold start: $e');
           }
 
-          // ✅ ADDED — re-sync FCM token on cold start too (session already valid)
           try {
             await FcmService.syncToken();
           } catch (e) {
@@ -362,34 +357,31 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
- Future<void> logout() async {
-  _setLoading(true);
+  Future<void> logout() async {
+    _setLoading(true);
 
-  // ✅ ADDED — clear FCM token from server BEFORE wiping local session,
-  // since it still needs a valid Authorization header to reach the server.
-  try {
-    await FcmService.clearToken();
-  } catch (e) {
-    print('❌ Error clearing FCM token on logout: $e');
-  }
+    try {
+      await FcmService.clearToken();
+    } catch (e) {
+      print('❌ Error clearing FCM token on logout: $e');
+    }
 
-  await _authService.logout();
-  await clearProfileImage();
-  
-  //  Disconnect WebSocket on logout
-  try {
-    final wsManager = WebSocketManager();
-    wsManager.disconnect();
-    print('✅ WebSocket disconnected on logout');
-  } catch (e) {
-    print('❌ Error disconnecting WebSocket: $e');
+    await _authService.logout();
+    await clearProfileImage();
+    
+    try {
+      final wsManager = WebSocketManager();
+      wsManager.disconnect();
+      print('✅ WebSocket disconnected on logout');
+    } catch (e) {
+      print('❌ Error disconnecting WebSocket: $e');
+    }
+    
+    _user = null;
+    _localProfileImagePath = null;
+    _setLoading(false);
+    notifyListeners();
   }
-  
-  _user = null;
-  _localProfileImagePath = null;
-  _setLoading(false);
-  notifyListeners();
-}
 
   void _setLoading(bool loading) {
     _isLoading = loading;

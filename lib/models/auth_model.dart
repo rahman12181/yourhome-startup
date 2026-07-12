@@ -108,28 +108,37 @@ class AuthData {
 }
 
 // ✅ REGISTER REQUEST
+// ✅ FIND THIS CLASS
 class RegisterRequest {
   final String name;
   final String email;
-  final String? phone;
+  final String phone;
   final String password;
-  final String? profileImage;
+  final String? referralCode; // ✅ YEH LINE ADD KARO
 
   RegisterRequest({
     required this.name,
     required this.email,
-    this.phone,
+    required this.phone,
     required this.password,
-    this.profileImage,
+    this.referralCode, // ✅ YEH LINE ADD KARO
   });
 
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'email': email,
-    'phone': phone,
-    'password': password,
-    if (profileImage != null) 'profileImage': profileImage,
-  };
+  Map<String, dynamic> toJson() {
+    final data = {
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'password': password,
+    };
+    
+    // ✅ YEH IF BLOCK ADD KARO
+    if (referralCode != null && referralCode!.isNotEmpty) {
+      data['referralCode'] = referralCode!;
+    }
+    
+    return data;
+  }
 }
 
 // ✅ LOGIN REQUEST

@@ -1135,7 +1135,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== PREMIUM LOGOUT ==========
+  //PREMIUM LOGOUT 
   Widget _buildPremiumLogout(
     BuildContext context,
     AuthProvider authProvider,

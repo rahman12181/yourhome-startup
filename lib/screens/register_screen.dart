@@ -27,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _referralCodeController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeTerms = false;
@@ -105,10 +106,12 @@ class _RegisterScreenState extends State<RegisterScreen>
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _referralCodeController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
+  // ✅ FIXED: CORRECT REGISTER METHOD
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreeTerms) {
@@ -126,21 +129,19 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // ✅ GET REFERRAL CODE
+    final referralCode = _referralCodeController.text.trim();
+
+    // ✅ SINGLE CORRECT CALL - NO DUPLICATE
     final success = await authProvider.register(
-      RegisterRequest(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        phone: _phoneController.text.trim().isNotEmpty
-            ? _phoneController.text.trim()
-            : null,
-      ),
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      phone: _phoneController.text.trim().isNotEmpty
-          ? _phoneController.text.trim()
+      phone: _phoneController.text.trim().isNotEmpty 
+          ? _phoneController.text.trim() 
           : null,
+      referralCode: referralCode.isEmpty ? null : referralCode,
     );
 
     if (!mounted) return;
@@ -328,7 +329,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                         ),
                         const SizedBox(height: 32),
 
-                        // Form - Direct on screen (No Card) - FIXED
+                        // Form - Direct on screen (No Card)
                         SlideTransition(
                           position: _slideUp,
                           child: Form(
@@ -336,7 +337,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // ✅ Full Name - FIXED (No SizedBox)
+                                // ✅ Full Name
                                 TextFormField(
                                   controller: _nameController,
                                   style: GoogleFonts.poppins(
@@ -358,7 +359,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     filled: true,
                                     fillColor: fieldFillColor,
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16.0,  // ✅ Fixed padding
+                                      vertical: 16.0,
                                       horizontal: 16.0,
                                     ),
                                     border: OutlineInputBorder(
@@ -389,7 +390,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ Email - FIXED (No SizedBox)
+                                // ✅ Email
                                 TextFormField(
                                   controller: _emailController,
                                   style: GoogleFonts.poppins(
@@ -412,7 +413,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     filled: true,
                                     fillColor: fieldFillColor,
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16.0,  // ✅ Fixed padding
+                                      vertical: 16.0,
                                       horizontal: 16.0,
                                     ),
                                     border: OutlineInputBorder(
@@ -448,7 +449,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ Phone - FIXED (No SizedBox)
+                                // ✅ Phone
                                 TextFormField(
                                   controller: _phoneController,
                                   style: GoogleFonts.poppins(
@@ -471,7 +472,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     filled: true,
                                     fillColor: fieldFillColor,
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16.0,  // ✅ Fixed padding
+                                      vertical: 16.0,
                                       horizontal: 16.0,
                                     ),
                                     border: OutlineInputBorder(
@@ -511,7 +512,88 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ Password - FIXED (No SizedBox)
+                                // ✅ REFERRAL CODE FIELD
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const Color(0xFFEC4899).withOpacity(0.08),
+                                        const Color(0xFFEC4899).withOpacity(0.02),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(isDesktop ? 18 : 16),
+                                    border: Border.all(
+                                      color: const Color(0xFFEC4899).withOpacity(0.2),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: TextFormField(
+                                    controller: _referralCodeController,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: isDesktop ? 16 : 15,
+                                      color: textColor,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: 'Referral Code (Optional)',
+                                      labelStyle: GoogleFonts.poppins(
+                                        color: hintColor,
+                                        fontSize: isDesktop ? 14 : 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      prefixIcon: Icon(
+                                        Icons.share_rounded,
+                                        color: const Color(0xFFEC4899),
+                                        size: isDesktop ? 24 : 22,
+                                      ),
+                                      filled: true,
+                                      fillColor: fieldFillColor.withOpacity(0.5),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 16.0,
+                                        horizontal: 16.0,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(isDesktop ? 18 : 16),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(isDesktop ? 18 : 16),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(isDesktop ? 18 : 16),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFFEC4899),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      hintText: 'Enter referral code (e.g. NST-000042)',
+                                      hintStyle: GoogleFonts.poppins(
+                                        color: hintColor?.withOpacity(0.5),
+                                        fontSize: isDesktop ? 15 : 14,
+                                      ),
+                                      helperText: '🎁 Get ₹19 bonus when you refer friends!',
+                                      helperStyle: GoogleFonts.poppins(
+                                        color: const Color(0xFFEC4899).withOpacity(0.7),
+                                        fontSize: isDesktop ? 12 : 11,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                    onChanged: (value) {
+                                      // Auto-format: Convert to uppercase
+                                      if (value.isNotEmpty) {
+                                        _referralCodeController.text = value.toUpperCase();
+                                        _referralCodeController.selection = TextSelection.fromPosition(
+                                          TextPosition(offset: _referralCodeController.text.length),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ),
+                                SizedBox(height: formSpacing),
+
+                                // ✅ Password
                                 TextFormField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
@@ -548,7 +630,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     filled: true,
                                     fillColor: fieldFillColor,
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16.0,  // ✅ Fixed padding
+                                      vertical: 16.0,
                                       horizontal: 16.0,
                                     ),
                                     border: OutlineInputBorder(
@@ -579,7 +661,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ Confirm Password - FIXED (No SizedBox)
+                                // ✅ Confirm Password
                                 TextFormField(
                                   controller: _confirmPasswordController,
                                   obscureText: _obscureConfirmPassword,
@@ -617,7 +699,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     filled: true,
                                     fillColor: fieldFillColor,
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16.0,  // ✅ Fixed padding
+                                      vertical: 16.0,
                                       horizontal: 16.0,
                                     ),
                                     border: OutlineInputBorder(
@@ -690,7 +772,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 const SizedBox(height: 24),
 
-                                // Register Button - Same as Login
+                                // Register Button
                                 SizedBox(
                                   height: buttonHeight,
                                   child: Container(

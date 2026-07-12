@@ -200,4 +200,78 @@ class ApiService {
       ),
     );
   }
+
+//IN THE ApiService CLASS, ADD THESE METHODS
+
+  //  REFER & EARN APIs 
+
+  /// Get My Referral Info
+  Future<Response> getReferralInfo() async {
+    return await get('/user/referral/info');
+  }
+
+  ///Get My Referral History
+  Future<Response> getReferralHistory() async {
+    return await get('/user/referral/history');
+  }
+
+  /// Get Wallet Transaction History
+  Future<Response> getWalletTransactions({
+    int page = 0,
+    int size = 20,
+  }) async {
+    return await get(
+      '/user/wallet/transactions',
+      queryParameters: {
+        'page': page,
+        'size': size,
+      },
+    );
+  }
+
+  /// Request Withdrawal
+  Future<Response> requestWithdrawal({
+    required double amount,
+    required String upiId,
+  }) async {
+    return await post(
+      '/user/wallet/withdraw',
+      data: {
+        'amount': amount,
+        'upiId': upiId,
+      },
+    );
+  }
+
+  /// Get My Withdrawal Requests
+  Future<Response> getWithdrawals() async {
+    return await get('/user/wallet/withdrawals');
+  }
+
+  ///- Get Pending Withdrawals (Admin)
+  Future<Response> getPendingWithdrawals() async {
+    return await get('/admin/withdrawals/pending');
+  }
+
+  /// Approve Withdrawal (Admin)
+  Future<Response> approveWithdrawal({
+    required int withdrawalId,
+    required String transactionRef,
+  }) async {
+    return await patch(
+      '/admin/withdrawals/$withdrawalId/approve',
+      data: {'transactionRef': transactionRef},
+    );
+  }
+
+  /// Reject Withdrawal (Admin)
+  Future<Response> rejectWithdrawal({
+    required int withdrawalId,
+    required String reason,
+  }) async {
+    return await patch(
+      '/admin/withdrawals/$withdrawalId/reject',
+      data: {'reason': reason},
+    );
+  }
 }

@@ -1,0 +1,330 @@
+// lib/providers/referral_provider.dart
+
+import 'package:flutter/material.dart';
+import '../models/referral_model.dart';
+import '../services/api_service.dart';
+
+class ReferralProvider extends ChangeNotifier {
+  final ApiService _api = ApiService();
+
+  // States
+  ReferralInfo? _referralInfo;
+  List<ReferralHistory> _history = [];
+  List<WalletTransaction> _transactions = [];
+  List<WithdrawalRequest> _withdrawals = [];
+  List<PendingWithdrawal> _pendingWithdrawals = [];
+
+  bool _isLoading = false;
+  bool _isHistoryLoading = false;
+  bool _isTransactionLoading = false;
+  String? _error;
+
+  // Getters
+  ReferralInfo? get referralInfo => _referralInfo;
+  List<ReferralHistory> get history => _history;
+  List<WalletTransaction> get transactions => _transactions;
+  List<WithdrawalRequest> get withdrawals => _withdrawals;
+  List<PendingWithdrawal> get pendingWithdrawals => _pendingWithdrawals;
+  bool get isLoading => _isLoading;
+  bool get isHistoryLoading => _isHistoryLoading;
+  bool get isTransactionLoading => _isTransactionLoading;
+  String? get error => _error;
+
+  double get walletBalance => _referralInfo?.walletBalance ?? 0.0;
+  bool get canWithdraw => walletBalance >= 100.0;
+
+  // ========== 13.1 - Get Referral Info ==========
+  Future<bool> fetchReferralInfo() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.getReferralInfo();
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        _referralInfo = ReferralInfo.fromJson(response.data['data']);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.data['message'] ?? 'Failed to fetch referral info';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========== 13.2 - Get Referral History ==========
+  Future<bool> fetchReferralHistory() async {
+    _isHistoryLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.getReferralHistory();
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final data = response.data['data'] as List? ?? [];
+        _history = data.map((item) => ReferralHistory.fromJson(item)).toList();
+        _isHistoryLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.data['message'] ?? 'Failed to fetch history';
+        _isHistoryLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isHistoryLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========== 13.3 - Get Wallet Transactions ==========
+  Future<bool> fetchWalletTransactions({int page = 0, int size = 20}) async {
+    _isTransactionLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.getWalletTransactions(page: page, size: size);
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final data = response.data['data'];
+        final content = data['content'] as List? ?? [];
+        _transactions = content.map((item) => WalletTransaction.fromJson(item)).toList();
+        _isTransactionLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.data['message'] ?? 'Failed to fetch transactions';
+        _isTransactionLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isTransactionLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========== 13.4 - Request Withdrawal ==========
+  Future<Map<String, dynamic>> requestWithdrawal({
+    required double amount,
+    required String upiId,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.requestWithdrawal(
+        amount: amount,
+        upiId: upiId,
+      );
+
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        _isLoading = false;
+        notifyListeners();
+        // Refresh wallet balance
+        await fetchReferralInfo();
+        return {
+          'success': true,
+          'message': response.data['message'],
+          'data': response.data['data'],
+        };
+      } else {
+        _error = response.data['message'] ?? 'Withdrawal failed';
+        _isLoading = false;
+        notifyListeners();
+        return {
+          'success': false,
+          'message': _error,
+        };
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return {
+        'success': false,
+        'message': _error,
+      };
+    }
+  }
+
+  // ========== 13.5 - Get My Withdrawals ==========
+  Future<bool> fetchWithdrawals() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.getWithdrawals();
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final data = response.data['data'] as List? ?? [];
+        _withdrawals = data.map((item) => WithdrawalRequest.fromJson(item)).toList();
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.data['message'] ?? 'Failed to fetch withdrawals';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========== 13.6 - Get Pending Withdrawals (Admin) ==========
+  Future<bool> fetchPendingWithdrawals() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.getPendingWithdrawals();
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final data = response.data['data'] as List? ?? [];
+        _pendingWithdrawals = data.map((item) => PendingWithdrawal.fromJson(item)).toList();
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.data['message'] ?? 'Failed to fetch pending withdrawals';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========== 13.7 - Approve Withdrawal (Admin) ==========
+  Future<Map<String, dynamic>> approveWithdrawal({
+    required int withdrawalId,
+    required String transactionRef,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.approveWithdrawal(
+        withdrawalId: withdrawalId,
+        transactionRef: transactionRef,
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        _isLoading = false;
+        notifyListeners();
+        // Refresh pending list
+        await fetchPendingWithdrawals();
+        return {
+          'success': true,
+          'message': response.data['message'],
+          'data': response.data['data'],
+        };
+      } else {
+        _error = response.data['message'] ?? 'Approval failed';
+        _isLoading = false;
+        notifyListeners();
+        return {
+          'success': false,
+          'message': _error,
+        };
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return {
+        'success': false,
+        'message': _error,
+      };
+    }
+  }
+
+  // ========== 13.8 - Reject Withdrawal (Admin) ==========
+  Future<Map<String, dynamic>> rejectWithdrawal({
+    required int withdrawalId,
+    required String reason,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.rejectWithdrawal(
+        withdrawalId: withdrawalId,
+        reason: reason,
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        _isLoading = false;
+        notifyListeners();
+        // Refresh pending list
+        await fetchPendingWithdrawals();
+        return {
+          'success': true,
+          'message': response.data['message'],
+          'data': response.data['data'],
+        };
+      } else {
+        _error = response.data['message'] ?? 'Rejection failed';
+        _isLoading = false;
+        notifyListeners();
+        return {
+          'success': false,
+          'message': _error,
+        };
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return {
+        'success': false,
+        'message': _error,
+      };
+    }
+  }
+
+  // ========== Clear Error ==========
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  // ========== Reset ==========
+  void reset() {
+    _referralInfo = null;
+    _history = [];
+    _transactions = [];
+    _withdrawals = [];
+    _pendingWithdrawals = [];
+    _isLoading = false;
+    _isHistoryLoading = false;
+    _isTransactionLoading = false;
+    _error = null;
+    notifyListeners();
+  }
+}

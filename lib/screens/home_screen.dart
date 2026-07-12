@@ -11,6 +11,7 @@ import 'package:yourhome/models/property_model.dart';
 import 'package:yourhome/screens/admin/admin_profile_screen.dart';
 import 'package:yourhome/screens/owner/owner_profile_screen.dart';
 import 'package:yourhome/screens/reels/reels_feed_screen.dart';
+import 'package:yourhome/screens/refer_and_earn_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/property_provider.dart';
@@ -807,9 +808,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       'icon': Icons.local_offer_rounded,
     },
     {
-      'title': '🏠 Refer & Earn ₹500!',
+      'title': '🏠 Refer & Earn ₹19!',
       'subtitle': 'Share with friends and earn rewards',
-      'color': _HomePalette.pink,
+      'color': _HomePalette.studentPrimary,
       'icon': Icons.share_rounded,
     },
     {
@@ -1303,18 +1304,58 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ========== OFFER BANNER ==========
-  Widget _buildOfferBanner(BuildContext context, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: SizedBox(
-        height: 100,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          itemCount: _offers.length,
-          itemBuilder: (context, index) {
-            final offer = _offers[index];
-            return Container(
+ Widget _buildOfferBanner(BuildContext context, bool isDark) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: _offers.length,
+        itemBuilder: (context, index) {
+          final offer = _offers[index];
+          
+          // ✅ CHECK if this is the Refer card
+          final isReferCard = offer['title'] == '🏠 Refer & Earn ₹19!';
+          
+          return GestureDetector(
+            onTap: () {
+              if (isReferCard) {
+                // ✅ NAVIGATE to Refer & Earn Screen
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => 
+                      const ReferAndEarnScreen(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: ScaleTransition(
+                          scale: Tween<double>(begin: 0.95, end: 1.0).animate(animation),
+                          child: child,
+                        ),
+                      );
+                    },
+                    transitionDuration: const Duration(milliseconds: 350),
+                  ),
+                );
+              } else {
+                // Other offers logic
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(offer['title']),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: Colors.grey[800],
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              }
+            },
+            child: Container(
               width: MediaQuery.of(context).size.width - 80,
               margin: const EdgeInsets.only(right: 12),
               padding: const EdgeInsets.all(16),
@@ -1376,14 +1417,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Claim',
+                      isReferCard ? 'Share' : 'Claim',
                       style: GoogleFonts.poppins(
                         color: offer['color'] as Color,
                         fontWeight: FontWeight.w600,
@@ -1393,12 +1433,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                 ],
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ========== QUICK ACTIONS ==========
   Widget _buildQuickActions(BuildContext context, bool isDark) {
@@ -1514,7 +1555,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 child: Text(
                   'See All',
                   style: GoogleFonts.poppins(
-                    color: _HomePalette.studentPrimary,
+                    color: const Color.fromRGBO(37, 99, 235, 1),
                     fontWeight: FontWeight.w500,
                     fontSize: 12,
                   ),

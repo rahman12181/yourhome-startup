@@ -5,8 +5,10 @@ import 'package:yourhome/models/admin_model.dart';
 import 'package:yourhome/screens/admin/admin_owner_verification_page.dart';
 import 'package:yourhome/screens/admin/admin_report_management_page.dart';
 import 'package:yourhome/screens/admin/admin_subscription_screen.dart';
+import 'package:yourhome/screens/admin/admin_withdrawals_screen.dart'; // ✅ NEW IMPORT
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/referral_provider.dart'; // ✅ NEW IMPORT
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -49,6 +51,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
         listen: false,
       );
       adminProvider.loadAllAdminData();
+      
+      // ✅ NEW: Load referral data too
+      final referralProvider = Provider.of<ReferralProvider>(
+        context,
+        listen: false,
+      );
+      referralProvider.fetchPendingWithdrawals();
+      referralProvider.fetchWithdrawals();
     } catch (e) {
       print('❌ Error loading admin data: $e');
     }
@@ -64,6 +74,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final adminProvider = Provider.of<AdminProvider>(context);
+    final referralProvider = Provider.of<ReferralProvider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
     final stats = adminProvider.dashboardStats;
@@ -77,6 +88,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
           : RefreshIndicator(
               onRefresh: () async {
                 await adminProvider.loadAllAdminData();
+                await referralProvider.fetchPendingWithdrawals();
+                await referralProvider.fetchWithdrawals();
               },
               color: const Color(0xFF7C3AED),
               child: FadeTransition(
@@ -86,6 +99,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
+                      // ✅ NEW: Withdrawal Stats Card
+                      _buildWithdrawalStats(context, isDark, referralProvider),
+                      const SizedBox(height: 16),
                       // Stats Grid
                       _buildStatsGrid(context, isDark, stats),
                       const SizedBox(height: 24),
@@ -93,10 +109,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                       _buildRevenueBreakdown(context, isDark, stats),
                       const SizedBox(height: 24),
                       // Quick Actions
-                      _buildQuickActions(context, isDark),
+                      _buildQuickActions(context, isDark, referralProvider),
                       const SizedBox(height: 24),
                       // Pending Items
-                      _buildPendingItems(context, isDark, adminProvider),
+                      _buildPendingItems(context, isDark, adminProvider, referralProvider),
                     ],
                   ),
                 ),
@@ -199,6 +215,253 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
       ),
     );
   }
+
+  // ============== ✅ PREMIUM WITHDRAWAL STATS CARD ==============
+Widget _buildWithdrawalStats(
+  BuildContext context,
+  bool isDark,
+  ReferralProvider provider,
+) {
+  final pendingCount = provider.pendingWithdrawals.length;
+  final pendingAmount = provider.pendingWithdrawals.fold(
+    0.0,
+    (sum, item) => sum + item.amount,
+  );
+  final totalWithdrawals = provider.withdrawals.length;
+  final approvedWithdrawals = provider.withdrawals.where((w) => w.status == 'APPROVED').length;
+  final rejectedWithdrawals = provider.withdrawals.where((w) => w.status == 'REJECTED').length;
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+        ),
+      ],
+      border: Border.all(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+        width: 1,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.payments_rounded,
+                color: Color(0xFF7C3AED),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Withdrawals Overview',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              ),
+            ),
+            const Spacer(),
+            if (pendingCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Colors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$pendingCount Pending',
+                      style: GoogleFonts.poppins(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Manage all withdrawal requests from users',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: isDark ? Colors.grey[400] : Colors.grey[500],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Stats Grid - 4 cards in a row
+        Row(
+          children: [
+            _buildWithdrawalStatItem(
+              context,
+              'Pending Amount',
+              '₹${pendingAmount.toStringAsFixed(0)}',
+              Icons.pending_rounded,
+              Colors.orange,
+              isDark,
+            ),
+            const SizedBox(width: 10),
+            _buildWithdrawalStatItem(
+              context,
+              'Total Requests',
+              totalWithdrawals.toString(),
+              Icons.receipt_long_rounded,
+              const Color(0xFF7C3AED),
+              isDark,
+            ),
+            const SizedBox(width: 10),
+            _buildWithdrawalStatItem(
+              context,
+              'Approved',
+              approvedWithdrawals.toString(),
+              Icons.check_circle_rounded,
+              Colors.green,
+              isDark,
+            ),
+            const SizedBox(width: 10),
+            _buildWithdrawalStatItem(
+              context,
+              'Rejected',
+              rejectedWithdrawals.toString(),
+              Icons.cancel_rounded,
+              Colors.red,
+              isDark,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // View All Button
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AdminWithdrawalsScreen(),
+                ),
+              );
+            },
+            icon: Icon(
+              Icons.arrow_forward_rounded,
+              color: const Color(0xFF7C3AED),
+              size: 18,
+            ),
+            label: Text(
+              'View All Withdrawals',
+              style: GoogleFonts.poppins(
+                color: const Color(0xFF7C3AED),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(
+                color: const Color(0xFF7C3AED).withOpacity(0.3),
+                width: 1.5,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ============== ✅ WITHDRAWAL STAT ITEM ==============
+Widget _buildWithdrawalStatItem(
+  BuildContext context,
+  String label,
+  String value,
+  IconData icon,
+  Color color,
+  bool isDark,
+) {
+  return Expanded(
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: color.withOpacity(0.12),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 16,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            ),
+          ),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 9,
+              color: isDark ? Colors.grey[400] : Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   // ============== STATS GRID ==============
   Widget _buildStatsGrid(
@@ -561,8 +824,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     );
   }
 
-  // ============== QUICK ACTIONS ==============
-  Widget _buildQuickActions(BuildContext context, bool isDark) {
+  // ============== UPDATED: QUICK ACTIONS ==============
+  Widget _buildQuickActions(
+    BuildContext context,
+    bool isDark,
+    ReferralProvider referralProvider,
+  ) {
+    final pendingCount = referralProvider.pendingWithdrawals.length;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -614,6 +883,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
               Expanded(
                 child: _buildQuickActionItem(
                   context,
+                  '💳 Withdrawals',
+                  Icons.payments_rounded,
+                  const Color(0xFF7C3AED),
+                  isDark,
+                  badge: pendingCount > 0 ? pendingCount.toString() : null,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdminWithdrawalsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickActionItem(
+                  context,
                   '👥 Verify\nOwners',
                   Icons.verified_rounded,
                   Colors.blue,
@@ -655,17 +943,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                   },
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildQuickActionItem(
-                  context,
-                  '📊 View\nAnalytics',
-                  Icons.analytics_rounded,
-                  Colors.purple,
-                  isDark,
-                  onTap: () {},
-                ),
-              ),
             ],
           ),
         ],
@@ -680,6 +957,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     Color color,
     bool isDark, {
     required VoidCallback onTap,
+    String? badge,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -693,39 +971,72 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
             width: 1,
           ),
         ),
-        child: Column(
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 24),
+            Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                height: 1.2,
+            if (badge != null)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  child: Text(
+                    badge,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
           ],
         ),
       ),
     );
   }
 
-  // ============== PENDING ITEMS ==============
+  // ============== UPDATED: PENDING ITEMS ==============
   Widget _buildPendingItems(
     BuildContext context,
     bool isDark,
     AdminProvider provider,
+    ReferralProvider referralProvider,
   ) {
+    final pendingWithdrawals = referralProvider.pendingWithdrawals.length;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -774,6 +1085,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
           const SizedBox(height: 12),
           Row(
             children: [
+              // ✅ NEW: Withdrawals Pending
+              _buildPendingItem(
+                context,
+                '💳 Withdrawals',
+                pendingWithdrawals.toString(),
+                const Color(0xFF7C3AED),
+                isDark,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminWithdrawalsScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 10),
               _buildPendingItem(
                 context,
                 '👥 Owners',
@@ -803,7 +1131,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                 const Color(0xFFEF4444),
                 isDark,
                 onTap: () {
-                 Navigator.push(
+                  Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const AdminReportManagementPage(),
