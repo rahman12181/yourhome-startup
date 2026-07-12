@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:yourhome/screens/help_support_screen.dart';
+import 'package:yourhome/screens/owner/owner_apply_page.dart';
 import 'package:yourhome/screens/privacy_policy_screen.dart';
 import '../providers/profile_provider.dart';
 import '../providers/auth_provider.dart';
@@ -248,8 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (mounted && success) {
         _showSnackBar('Profile picture updated successfully!', isError: false);
       } else if (mounted) {
-        _showSnackBar(
-            profileProvider.error ?? 'Failed to upload image',
+        _showSnackBar(profileProvider.error ?? 'Failed to upload image',
             isError: true);
       }
     }
@@ -390,8 +390,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               position: _slideUp,
                               child: ScaleTransition(
                                 scale: _scaleIn,
-                                child:
-                                    _buildOtherUserContent(context, isDark),
+                                child: _buildOtherUserContent(context, isDark),
                               ),
                             ),
                           )
@@ -443,8 +442,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 physics: const BouncingScrollPhysics(
                                   parent: AlwaysScrollableScrollPhysics(),
                                 ),
-                                padding: const EdgeInsets.fromLTRB(
-                                    16, 8, 16, 24),
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 8, 16, 24),
                                 child: Column(
                                   children: [
                                     _buildPremiumHeader(
@@ -676,9 +675,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               : null,
                           child: imageUrl.isEmpty
                               ? Text(
-                                  name.isNotEmpty
-                                      ? name[0].toUpperCase()
-                                      : 'U',
+                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
                                   style: GoogleFonts.poppins(
                                     fontSize: 32,
                                     color: _Palette.primary,
@@ -700,8 +697,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 colors: [_Palette.gold, Color(0xFFFBBF24)],
                               ),
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: Colors.white, width: 2.5),
+                              border:
+                                  Border.all(color: Colors.white, width: 2.5),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.25),
@@ -941,6 +938,15 @@ class _ProfileScreenState extends State<ProfileScreen>
         'color': _Palette.primary,
       },
       {
+        'icon': Icons.business_center_rounded,
+        'title': 'Become an Owner',
+        'subtitle': 'Apply to list your properties',
+        'screen': const OwnerApplyPage(),
+        'badge': 'NEW',
+        'badgeColor': const Color.fromARGB(255, 37, 99, 235),
+        'color': const Color.fromARGB(255, 37, 99, 235),
+      },
+      {
         'icon': Icons.book_online_rounded,
         'title': 'My Bookings',
         'subtitle': 'View all your booking requests',
@@ -1018,8 +1024,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 child: InkWell(
                   borderRadius: BorderRadius.vertical(
                     top: index == 0 ? const Radius.circular(20) : Radius.zero,
-                    bottom:
-                        isLast ? const Radius.circular(20) : Radius.zero,
+                    bottom: isLast ? const Radius.circular(20) : Radius.zero,
                   ),
                   onTap: () {
                     HapticFeedback.selectionClick();
@@ -1038,8 +1043,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     }
                   },
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
                     child: Row(
                       children: [
                         Container(
@@ -1187,8 +1192,18 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // ========== OTHER USER CONTENT ==========
   static const List<String> _monthShort = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   void _copyToClipboard(String value, String label) {
@@ -1292,9 +1307,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                     child: CircleAvatar(
                       radius: 46,
-                      backgroundColor: isDark
-                          ? _Palette.darkSurfaceAlt
-                          : Colors.white,
+                      backgroundColor:
+                          isDark ? _Palette.darkSurfaceAlt : Colors.white,
                       backgroundImage: profile.profilePic != null &&
                               profile.profilePic!.isNotEmpty
                           ? CachedNetworkImageProvider(profile.profilePic!)
@@ -1422,9 +1436,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Expanded(
                   child: _trustBadge(
                     icon: Icons.verified_user_rounded,
-                    label: profile.isEmailVerified
-                        ? 'ID Verified'
-                        : 'Unverified',
+                    label:
+                        profile.isEmailVerified ? 'ID Verified' : 'Unverified',
                     color: profile.isEmailVerified
                         ? const Color(0xFF16A34A)
                         : Colors.grey,
@@ -1460,8 +1473,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           FadeTransition(
             opacity: _staggerAnimations[4],
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
                 color: isDark ? _Palette.darkSurface : Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -1512,8 +1524,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     'User ID',
                     profile.displayId,
                     isDark,
-                    onTap: () =>
-                        _copyToClipboard(profile.displayId, 'User ID'),
+                    onTap: () => _copyToClipboard(profile.displayId, 'User ID'),
                   ),
                   Divider(
                       height: 1,
@@ -1651,8 +1662,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildDetailRow(
-      IconData icon, String label, String value, bool isDark,
+  Widget _buildDetailRow(IconData icon, String label, String value, bool isDark,
       {VoidCallback? onTap}) {
     final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1926,12 +1936,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context, false),
                         style: OutlinedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 13),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
                           side: BorderSide(
-                            color: isDark
-                                ? Colors.grey[700]!
-                                : Colors.grey[300]!,
+                            color:
+                                isDark ? Colors.grey[700]! : Colors.grey[300]!,
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -1941,8 +1949,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           'Cancel',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600,
-                            color:
-                                isDark ? Colors.grey[300] : Colors.grey[700],
+                            color: isDark ? Colors.grey[300] : Colors.grey[700],
                           ),
                         ),
                       ),
@@ -1952,8 +1959,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(context, true),
                         style: ElevatedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 13),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
                           backgroundColor: _Palette.danger,
                           foregroundColor: Colors.white,
                           elevation: 0,

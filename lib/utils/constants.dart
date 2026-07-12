@@ -9,10 +9,10 @@ class AppConstants {
       return 'http://localhost:8080';
     }
     if (Platform.isAndroid) {
-      return 'http://192.168.0.109:8080';
+      return 'http://192.168.1.49:8080';
     }
     if (Platform.isIOS) {
-      return 'http://192.168.0.101:8080';
+      return 'http://192.168.1.49:8080';
     }
     return 'http://10.0.2.2:8080';
   }
@@ -23,10 +23,10 @@ class AppConstants {
       return 'ws://localhost:8080/ws';
     }
     if (Platform.isAndroid) {
-      return 'ws://192.168.0.109:8080/ws';
+      return 'ws://192.168.1.49:8080/ws';
     }
     if (Platform.isIOS) {
-      return 'ws://192.168.0.101:8080/ws';
+      return 'ws://192.168.1.49:8080/ws';
     }
     return 'ws://10.0.2.2:8080/ws';
   }
