@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -111,7 +109,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.dispose();
   }
 
-  // ✅ FIXED: CORRECT REGISTER METHOD
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreeTerms) {
@@ -130,10 +127,8 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
-    // ✅ GET REFERRAL CODE
     final referralCode = _referralCodeController.text.trim();
 
-    // ✅ SINGLE CORRECT CALL - NO DUPLICATE
     final success = await authProvider.register(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
@@ -147,6 +142,18 @@ class _RegisterScreenState extends State<RegisterScreen>
     if (!mounted) return;
 
     if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('✅ OTP sent successfully! Please check your email.'),
+          backgroundColor: const Color(0xFF22C55E),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -159,12 +166,13 @@ class _RegisterScreenState extends State<RegisterScreen>
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authProvider.error ?? 'Registration failed'),
+          content: Text(authProvider.error ?? 'Registration failed. Please try again.'),
           backgroundColor: const Color(0xFFEF4444),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -178,7 +186,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     final isTablet = screenWidth >= 600 && screenWidth < 900;
     final isDesktop = screenWidth >= 900;
 
-    // Same gradient as login screen
     final gradientColors = isDark
         ? [
             const Color(0xFF0A0E1A),
@@ -209,7 +216,6 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     final primaryBlue = const Color(0xFF2563EB);
 
-    // Responsive values
     final cardWidth = _getResponsiveWidth(context);
     final buttonHeight = isDesktop ? 50.0 : (isTablet ? 48.0 : 46.0);
     final titleSize = _getResponsiveFontSize(context, 32);
@@ -242,7 +248,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Back Button + Theme Toggle - Like Login
                         Row(
                           children: [
                             Container(
@@ -268,7 +273,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                               ),
                             ),
                             const Spacer(),
-                            // Theme toggle
                             Container(
                               decoration: BoxDecoration(
                                 color: isDark
@@ -307,7 +311,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                         ),
                         const SizedBox(height: 20),
 
-                        // Title - Direct on screen (No Card)
                         Text(
                           'Create Account',
                           style: GoogleFonts.playfairDisplay(
@@ -329,7 +332,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                         ),
                         const SizedBox(height: 32),
 
-                        // Form - Direct on screen (No Card)
                         SlideTransition(
                           position: _slideUp,
                           child: Form(
@@ -337,7 +339,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // ✅ Full Name
                                 TextFormField(
                                   controller: _nameController,
                                   style: GoogleFonts.poppins(
@@ -390,7 +391,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ Email
                                 TextFormField(
                                   controller: _emailController,
                                   style: GoogleFonts.poppins(
@@ -449,7 +449,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ Phone
                                 TextFormField(
                                   controller: _phoneController,
                                   style: GoogleFonts.poppins(
@@ -512,7 +511,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ REFERRAL CODE FIELD
                                 Container(
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
@@ -581,7 +579,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       ),
                                     ),
                                     onChanged: (value) {
-                                      // Auto-format: Convert to uppercase
                                       if (value.isNotEmpty) {
                                         _referralCodeController.text = value.toUpperCase();
                                         _referralCodeController.selection = TextSelection.fromPosition(
@@ -593,7 +590,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ Password
                                 TextFormField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
@@ -661,7 +657,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 SizedBox(height: formSpacing),
 
-                                // ✅ Confirm Password
                                 TextFormField(
                                   controller: _confirmPasswordController,
                                   obscureText: _obscureConfirmPassword,
@@ -738,7 +733,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 const SizedBox(height: 16),
 
-                                // Terms and Conditions
                                 Row(
                                   children: [
                                     SizedBox(
@@ -772,7 +766,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 const SizedBox(height: 24),
 
-                                // Register Button
                                 SizedBox(
                                   height: buttonHeight,
                                   child: Container(
@@ -841,7 +834,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 const SizedBox(height: 24),
 
-                                // Login Link
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -901,7 +893,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  // Responsive helper methods
   double _getResponsiveWidth(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     if (width < 600) {

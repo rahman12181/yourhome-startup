@@ -12,7 +12,6 @@ class ApiService {
   final StorageService _storage = StorageService();
   bool _isInitialized = false;
 
-  // ✅ Initialize method - call this from main.dart
   Future<void> init() async {
     if (_isInitialized) return;
     
@@ -38,7 +37,6 @@ class ApiService {
         return handler.next(options);
       },
       onResponse: (response, handler) {
-        // ✅ ADD THIS - Print response for debugging
         print('📥 Response: ${response.statusCode}');
         print('📥 Data: ${response.data}');
         return handler.next(response);
@@ -201,21 +199,19 @@ class ApiService {
     );
   }
 
-//IN THE ApiService CLASS, ADD THESE METHODS
+  // ==================== REFER & EARN APIs ====================
 
-  //  REFER & EARN APIs 
-
-  /// Get My Referral Info
+  /// 13.1 - Get My Referral Info
   Future<Response> getReferralInfo() async {
     return await get('/user/referral/info');
   }
 
-  ///Get My Referral History
+  /// 13.2 - Get My Referral History
   Future<Response> getReferralHistory() async {
     return await get('/user/referral/history');
   }
 
-  /// Get Wallet Transaction History
+  /// 13.3 - Get Wallet Transaction History
   Future<Response> getWalletTransactions({
     int page = 0,
     int size = 20,
@@ -229,7 +225,7 @@ class ApiService {
     );
   }
 
-  /// Request Withdrawal
+  /// 13.4 - Request Withdrawal
   Future<Response> requestWithdrawal({
     required double amount,
     required String upiId,
@@ -243,28 +239,27 @@ class ApiService {
     );
   }
 
-  /// Get My Withdrawal Requests
+  /// 13.5 - Get My Withdrawal Requests
   Future<Response> getWithdrawals() async {
     return await get('/user/wallet/withdrawals');
   }
 
-  ///- Get Pending Withdrawals (Admin)
+  /// 13.6 - Get Pending Withdrawals (Admin)
   Future<Response> getPendingWithdrawals() async {
     return await get('/admin/withdrawals/pending');
   }
 
-  /// Approve Withdrawal (Admin)
+  /// 13.7 - Approve Withdrawal (Admin) - Updated: No body required
   Future<Response> approveWithdrawal({
     required int withdrawalId,
-    required String transactionRef,
   }) async {
     return await patch(
       '/admin/withdrawals/$withdrawalId/approve',
-      data: {'transactionRef': transactionRef},
+      data: {},
     );
   }
 
-  /// Reject Withdrawal (Admin)
+  /// 13.8 - Reject Withdrawal (Admin)
   Future<Response> rejectWithdrawal({
     required int withdrawalId,
     required String reason,
@@ -272,6 +267,20 @@ class ApiService {
     return await patch(
       '/admin/withdrawals/$withdrawalId/reject',
       data: {'reason': reason},
+    );
+  }
+
+  /// 13.9 - Get Full Payment History (Admin) - NEW
+  Future<Response> getPaymentHistory({
+    String? status,
+  }) async {
+    final queryParams = <String, dynamic>{};
+    if (status != null && status.isNotEmpty) {
+      queryParams['status'] = status;
+    }
+    return await get(
+      '/admin/withdrawals/all',
+      queryParameters: queryParams,
     );
   }
 }

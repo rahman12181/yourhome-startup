@@ -70,42 +70,35 @@ class AuthProvider extends ChangeNotifier {
     return await _storage.isLoggedIn();
   }
 
-  // ✅ FIXED: CORRECT REGISTER METHOD - NO EXTRA PARAMETER
-  Future<bool> register({
-    required String name,
-    required String email,
-    required String password,
-    String? phone,
-    String? profileImage,
-    String? referralCode,
-  }) async {
-    _setLoading(true);
-    _clearError();
+ Future<bool> register({
+  required String name,
+  required String email,
+  required String password,
+  String? phone,
+  String? profileImage,
+  String? referralCode,
+}) async {
+  _setLoading(true);
+  _clearError();
 
-    final request = RegisterRequest(
-      name: name,
-      email: email,
-      password: password,
-      phone: phone ?? '',
-      referralCode: referralCode,
-    );
-    
-    final response = await _authService.register(request);
-    
-    if (response.success && response.data != null) {
-      _user = response.data;
-      if (profileImage != null) {
-        await saveLocalProfileImage(profileImage);
-      }
-      await _saveUserData(_user!);
-      _setLoading(false);
-      return true;
-    } else {
-      _error = response.message;
-      _setLoading(false);
-      return false;
-    }
+  final request = RegisterRequest(
+    name: name,
+    email: email,
+    password: password,
+    phone: phone ?? '',
+    referralCode: referralCode,
+  );
+
+  final response = await _authService.register(request);
+  if (response.success) {
+    _setLoading(false);
+    return true;
+  } else {
+    _error = response.message;
+    _setLoading(false);
+    return false;
   }
+}
 
   Future<bool> verifyOtp(String email, String otp) async {
     _setLoading(true);

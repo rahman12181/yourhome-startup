@@ -1,5 +1,3 @@
-// lib/models/referral_model.dart
-
 class ReferralInfo {
   final String referralCode;
   final String referralLink;
@@ -38,7 +36,7 @@ class ReferralInfo {
 class ReferralHistory {
   final String referredUserName;
   final String referredUserDisplayId;
-  final String status; // PENDING, REWARDED
+  final String status;
   final double rewardAmount;
   final String joinedAt;
   final String? rewardedAt;
@@ -66,7 +64,7 @@ class ReferralHistory {
 
 class WalletTransaction {
   final int transactionId;
-  final String type; // CREDIT, DEBIT
+  final String type;
   final double amount;
   final String reason;
   final double balanceAfter;
@@ -130,9 +128,10 @@ class WithdrawalRequest {
   final int withdrawalId;
   final double amount;
   final String upiId;
-  final String status; // PENDING, APPROVED, REJECTED
+  final String status;
   final String? transactionRef;
   final String? adminNote;
+  final String? failureReason;
   final String requestedAt;
   final String? processedAt;
 
@@ -143,6 +142,7 @@ class WithdrawalRequest {
     required this.status,
     this.transactionRef,
     this.adminNote,
+    this.failureReason,
     required this.requestedAt,
     this.processedAt,
   });
@@ -155,6 +155,7 @@ class WithdrawalRequest {
       status: json['status'] ?? 'PENDING',
       transactionRef: json['transactionRef'],
       adminNote: json['adminNote'],
+      failureReason: json['failureReason'],
       requestedAt: json['requestedAt'] ?? '',
       processedAt: json['processedAt'],
     );
@@ -215,6 +216,53 @@ class PendingWithdrawal {
       upiId: json['upiId'] ?? '',
       status: json['status'] ?? 'PENDING',
       requestedAt: json['requestedAt'] ?? '',
+      userId: json['userId'] ?? 0,
+      userName: json['userName'] ?? '',
+      userDisplayId: json['userDisplayId'] ?? '',
+    );
+  }
+}
+
+class WithdrawalHistoryItem {
+  final int withdrawalId;
+  final double amount;
+  final String upiId;
+  final String status;
+  final String? transactionRef;
+  final String? adminNote;
+  final String? failureReason;
+  final String requestedAt;
+  final String? processedAt;
+  final int userId;
+  final String userName;
+  final String userDisplayId;
+
+  WithdrawalHistoryItem({
+    required this.withdrawalId,
+    required this.amount,
+    required this.upiId,
+    required this.status,
+    this.transactionRef,
+    this.adminNote,
+    this.failureReason,
+    required this.requestedAt,
+    this.processedAt,
+    required this.userId,
+    required this.userName,
+    required this.userDisplayId,
+  });
+
+  factory WithdrawalHistoryItem.fromJson(Map<String, dynamic> json) {
+    return WithdrawalHistoryItem(
+      withdrawalId: json['withdrawalId'] ?? 0,
+      amount: (json['amount'] ?? 0).toDouble(),
+      upiId: json['upiId'] ?? '',
+      status: json['status'] ?? 'PENDING',
+      transactionRef: json['transactionRef'],
+      adminNote: json['adminNote'],
+      failureReason: json['failureReason'],
+      requestedAt: json['requestedAt'] ?? '',
+      processedAt: json['processedAt'],
       userId: json['userId'] ?? 0,
       userName: json['userName'] ?? '',
       userDisplayId: json['userDisplayId'] ?? '',

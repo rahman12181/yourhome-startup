@@ -1,5 +1,3 @@
-// lib/screens/owner/owner_booking_management_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +6,22 @@ import 'package:intl/intl.dart';
 import '../../providers/owner_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../models/booking_model.dart';
+
+// ==================== DESIGN TOKENS ====================
+class _BookPalette {
+  static const primary = Color(0xFF2563EB);
+  static const primaryLight = Color(0xFF60A5FA);
+  static const success = Color(0xFF16A34A);
+  static const successLight = Color(0xFF22C55E);
+  static const danger = Color(0xFFDC2626);
+  static const dangerLight = Color(0xFFF87171);
+  static const warning = Color(0xFFF59E0B);
+
+  static const darkBg = Color(0xFF0A0E1A);
+  static const darkSurface = Color(0xFF141A2C);
+  static const darkSurfaceAlt = Color(0xFF1A1F33);
+  static const lightBg = Color(0xFFF5F7FA);
+}
 
 class OwnerBookingManagementPage extends StatefulWidget {
   const OwnerBookingManagementPage({super.key});
@@ -22,77 +36,45 @@ class _OwnerBookingManagementPageState
     with TickerProviderStateMixin {
   bool _isFirstLoad = true;
   late TabController _tabController;
-  
-  late AnimationController _mainController;
-  late Animation<double> _fadeIn;
-  late Animation<Offset> _slideUp;
-  late Animation<double> _scaleIn;
-  
-  late AnimationController _staggerController;
-  late List<Animation<double>> _staggerAnimations;
+
+  late AnimationController _headerController;
+  late Animation<double> _headerFade;
+  late Animation<Offset> _headerSlide;
+
+  int _selectedSegment = 0;
 
   @override
   void initState() {
     super.initState();
-    _setupAnimations();
     _tabController = TabController(length: 3, vsync: this);
-    
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) return;
+      setState(() => _selectedSegment = _tabController.index);
+    });
+
+    _headerController = AnimationController(
+      duration: const Duration(milliseconds: 550),
+      vsync: this,
+    );
+    _headerFade = CurvedAnimation(parent: _headerController, curve: Curves.easeOut);
+    _headerSlide = Tween<Offset>(
+      begin: const Offset(0, -0.15),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _headerController, curve: Curves.easeOutCubic));
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isFirstLoad && mounted) {
         _isFirstLoad = false;
         _loadBookings();
       }
+      _headerController.forward();
     });
-  }
-
-  void _setupAnimations() {
-    _mainController = AnimationController(
-      duration: const Duration(milliseconds: 700),
-      vsync: this,
-    );
-
-    _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainController, curve: Curves.easeInOutCubic),
-    );
-
-    _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.04),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _mainController, curve: Curves.easeOutCubic),
-    );
-
-    _scaleIn = Tween<double>(begin: 0.96, end: 1.0).animate(
-      CurvedAnimation(parent: _mainController, curve: Curves.easeOutBack),
-    );
-
-    _staggerController = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-
-    _staggerAnimations = List.generate(20, (index) {
-      return Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _staggerController,
-          curve: Interval(
-            index * 0.05,
-            0.5 + (index * 0.025),
-            curve: Curves.easeOutCubic,
-          ),
-        ),
-      );
-    });
-
-    _mainController.forward();
-    _staggerController.forward();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _mainController.dispose();
-    _staggerController.dispose();
+    _headerController.dispose();
     super.dispose();
   }
 
@@ -102,47 +84,42 @@ class _OwnerBookingManagementPageState
   }
 
   Future<void> _handleAccept(int requestId) async {
+    HapticFeedback.mediumImpact();
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
     final success = await ownerProvider.acceptBookingRequest(requestId, 'Booking accepted!');
     if (success && mounted) {
-      _showSnackBar('✅ Booking accepted successfully!', const Color(0xFF22C55E));
+      _showSnackBar('Booking accepted successfully', _BookPalette.success, Icons.check_circle_rounded);
       _loadBookings();
     }
   }
 
   Future<void> _handleReject(int requestId) async {
+    HapticFeedback.mediumImpact();
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
     final success = await ownerProvider.rejectBookingRequest(requestId, 'Booking rejected.');
     if (success && mounted) {
-      _showSnackBar('❌ Booking rejected', const Color(0xFFEF4444));
+      _showSnackBar('Booking rejected', _BookPalette.danger, Icons.cancel_rounded);
       _loadBookings();
     }
   }
 
-  void _showSnackBar(String message, Color color) {
+  void _showSnackBar(String message, Color color, IconData icon) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            Icon(
-              color == const Color(0xFF22C55E) ? Icons.check_circle : Icons.cancel,
-              color: Colors.white,
-              size: 20,
-            ),
+            Icon(icon, color: Colors.white, size: 20),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                message,
-                style: GoogleFonts.poppins(fontSize: 13),
-              ),
+              child: Text(message, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
             ),
           ],
         ),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         duration: const Duration(seconds: 2),
-        margin: const EdgeInsets.all(12),
+        margin: const EdgeInsets.all(14),
       ),
     );
   }
@@ -163,13 +140,8 @@ class _OwnerBookingManagementPageState
   String _formatDate(dynamic date) {
     if (date == null) return 'N/A';
     try {
-      if (date is DateTime) {
-        return DateFormat('dd MMM yyyy').format(date);
-      }
-      if (date is String) {
-        final parsed = DateTime.parse(date);
-        return DateFormat('dd MMM yyyy').format(parsed);
-      }
+      if (date is DateTime) return DateFormat('dd MMM yyyy').format(date);
+      if (date is String) return DateFormat('dd MMM yyyy').format(DateTime.parse(date));
       return date.toString();
     } catch (_) {
       return date.toString();
@@ -177,9 +149,7 @@ class _OwnerBookingManagementPageState
   }
 
   String _getTimeAgo(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
-    
+    final diff = DateTime.now().difference(date);
     if (diff.inDays > 7) return '${(diff.inDays / 7).floor()}w ago';
     if (diff.inDays > 0) return '${diff.inDays}d ago';
     if (diff.inHours > 0) return '${diff.inHours}h ago';
@@ -196,1069 +166,705 @@ class _OwnerBookingManagementPageState
     final pending = allBookings.where((b) => b.status == 'PENDING').toList();
     final accepted = allBookings.where((b) => b.status == 'ACCEPTED').toList();
     final rejected = allBookings.where((b) => b.status == 'REJECTED').toList();
+    final lists = [pending, accepted, rejected];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
-        appBar: _buildPremiumAppBar(context, isDark, allBookings.length, pending.length),
-        body: ownerProvider.isLoading && allBookings.isEmpty
-            ? _buildLoadingState(isDark)
-            : RefreshIndicator(
-                onRefresh: _loadBookings,
-                color: const Color(0xFF2563EB),
-                backgroundColor: isDark ? const Color(0xFF1A1F33) : Colors.white,
-                child: FadeTransition(
-                  opacity: _fadeIn,
-                  child: SlideTransition(
-                    position: _slideUp,
-                    child: ScaleTransition(
-                      scale: _scaleIn,
-                      child: Column(
-                        children: [
-                          _buildPremiumTabBar(isDark, pending.length, accepted.length, rejected.length),
-                          Expanded(
-                            child: TabBarView(
-                              controller: _tabController,
-                              children: [
-                                _buildBookingList(context, pending, 'PENDING', isDark),
-                                _buildBookingList(context, accepted, 'ACCEPTED', isDark),
-                                _buildBookingList(context, rejected, 'REJECTED', isDark),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+        backgroundColor: isDark ? _BookPalette.darkBg : _BookPalette.lightBg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              FadeTransition(
+                opacity: _headerFade,
+                child: SlideTransition(
+                  position: _headerSlide,
+                  child: _buildHeroHeader(context, isDark, allBookings.length, pending.length),
                 ),
               ),
+              _buildSegmentedControl(isDark, pending.length, accepted.length, rejected.length),
+              Expanded(
+                child: ownerProvider.isLoading && allBookings.isEmpty
+                    ? _buildLoadingState(isDark)
+                    : RefreshIndicator(
+                        onRefresh: _loadBookings,
+                        color: _BookPalette.primary,
+                        backgroundColor: isDark ? _BookPalette.darkSurfaceAlt : Colors.white,
+                        child: TabBarView(
+                          controller: _tabController,
+                          physics: const BouncingScrollPhysics(),
+                          children: List.generate(3, (i) {
+                            final status = ['PENDING', 'ACCEPTED', 'REJECTED'][i];
+                            return _buildBookingList(context, lists[i], status, isDark);
+                          }),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // ========== PREMIUM APP BAR ==========
-  PreferredSizeWidget _buildPremiumAppBar(
-    BuildContext context,
-    bool isDark,
-    int total,
-    int pending,
-  ) {
-    return AppBar(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // ==================== HERO HEADER ====================
+  Widget _buildHeroHeader(BuildContext context, bool isDark, int total, int pending) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Booking Requests',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
-                child: const Icon(
-                  Icons.book_online_rounded,
-                  color: Colors.white,
-                  size: 18,
+                const SizedBox(height: 4),
+                Text(
+                  pending > 0
+                      ? '$pending waiting for your response'
+                      : 'You\'re all caught up',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: pending > 0
+                        ? _BookPalette.warning
+                        : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Booking Requests',
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              _buildStatChip('$total Total', const Color(0xFF2563EB), isDark),
-              const SizedBox(width: 6),
-              _buildStatChip('$pending Pending', Colors.orange, isDark),
-            ],
+          _buildIconButton(
+            icon: Icons.refresh_rounded,
+            isDark: isDark,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _loadBookings();
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildIconButton({required IconData icon, required bool isDark, required VoidCallback onTap}) {
+    return Material(
+      color: isDark ? _BookPalette.darkSurfaceAlt : Colors.white,
+      shape: const CircleBorder(),
       elevation: 0,
-      backgroundColor: Colors.transparent,
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(11),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1F33) : Colors.white,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: IconButton(
-            icon: Icon(
-              Icons.refresh_rounded,
-              color: isDark ? Colors.white : const Color(0xFF4B5563),
-              size: 22,
+          child: Icon(icon, size: 20, color: _BookPalette.primary),
+        ),
+      ),
+    );
+  }
+
+  // ==================== SEGMENTED CONTROL ====================
+  Widget _buildSegmentedControl(bool isDark, int pending, int accepted, int rejected) {
+    final segments = [
+      {'label': 'Pending', 'count': pending, 'color': _BookPalette.warning},
+      {'label': 'Accepted', 'count': accepted, 'color': _BookPalette.success},
+      {'label': 'Rejected', 'count': rejected, 'color': _BookPalette.danger},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: isDark ? _BookPalette.darkSurfaceAlt : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
-            onPressed: _loadBookings,
+          ],
+        ),
+        child: Row(
+          children: List.generate(3, (i) {
+            final seg = segments[i];
+            final isSelected = _selectedSegment == i;
+            final color = seg['color'] as Color;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedSegment = i);
+                  _tabController.animateTo(i);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected ? color.withOpacity(isDark ? 0.18 : 0.1) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(13),
+                    border: isSelected ? Border.all(color: color.withOpacity(0.35)) : null,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        seg['label'] as String,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12.5,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? color : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        (seg['count'] as int).toString(),
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: isSelected ? color : (isDark ? Colors.grey[300] : Colors.grey[500]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(color: _BookPalette.primary, strokeWidth: 2.6),
+          const SizedBox(height: 16),
+          Text(
+            'Loading bookings...',
+            style: GoogleFonts.poppins(fontSize: 13, color: isDark ? Colors.grey[400] : Colors.grey[500]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== BOOKING LIST ====================
+  Widget _buildBookingList(BuildContext context, List<BookingRequest> bookings, String status, bool isDark) {
+    if (bookings.isEmpty) return _buildEmptyState(isDark, status);
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      physics: const BouncingScrollPhysics(),
+      itemCount: bookings.length,
+      itemBuilder: (context, index) {
+        return TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: Duration(milliseconds: 320 + (index * 40).clamp(0, 300)),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(offset: Offset(0, (1 - value) * 16), child: child),
+            );
+          },
+          child: _buildTicketCard(context, bookings[index], isDark),
+        );
+      },
+    );
+  }
+
+  // ==================== TICKET-STYLE CARD ====================
+  Widget _buildTicketCard(BuildContext context, BookingRequest booking, bool isDark) {
+    final statusColors = {
+      'PENDING': _BookPalette.warning,
+      'ACCEPTED': _BookPalette.success,
+      'REJECTED': _BookPalette.danger,
+    };
+    final color = statusColors[booking.status] ?? Colors.grey;
+    final isPending = booking.status == 'PENDING';
+    final initial = booking.propertyTitle.isNotEmpty ? booking.propertyTitle[0].toUpperCase() : 'P';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? _BookPalette.darkSurfaceAlt : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              _showBookingDetailsSheet(context, booking, isDark);
+            },
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Left accent strip
+                  Container(width: 5, color: color),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Top row: avatar + title + status
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [color.withOpacity(0.9), color.withOpacity(0.6)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Text(
+                                  initial,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 17,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      booking.propertyTitle,
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14.5,
+                                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.location_on_rounded,
+                                            size: 12, color: isDark ? Colors.grey[500] : Colors.grey[500]),
+                                        const SizedBox(width: 2),
+                                        Expanded(
+                                          child: Text(
+                                            '${booking.propertyCity} · Room ${booking.roomNumber ?? 'N/A'}',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 11.5,
+                                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: color.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  _getStatusDisplay(booking.status),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: color,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // Dashed-style divider
+                          _buildDashedDivider(isDark),
+
+                          const SizedBox(height: 12),
+
+                          // Details row
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildMiniStat(Icons.calendar_today_rounded,
+                                    _formatDate(booking.moveInDate), isDark),
+                              ),
+                              Expanded(
+                                child: _buildMiniStat(Icons.access_time_rounded,
+                                    '${booking.durationMonths ?? 1} mo', isDark),
+                              ),
+                              Expanded(
+                                child: _buildMiniStat(Icons.history_rounded,
+                                    _getTimeAgo(booking.requestedAt), isDark),
+                              ),
+                            ],
+                          ),
+
+                          if (booking.message != null && booking.message!.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(11),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.format_quote_rounded,
+                                      size: 14, color: isDark ? Colors.grey[500] : Colors.grey[400]),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      booking.message!,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11.5,
+                                        fontStyle: FontStyle.italic,
+                                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          const SizedBox(height: 14),
+
+                          if (isPending)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionButton(
+                                    label: 'Accept',
+                                    icon: Icons.check_rounded,
+                                    filled: true,
+                                    color: _BookPalette.success,
+                                    onTap: () => _handleAccept(booking.requestId),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _buildActionButton(
+                                    label: 'Reject',
+                                    icon: Icons.close_rounded,
+                                    filled: false,
+                                    color: _BookPalette.danger,
+                                    onTap: () => _handleReject(booking.requestId),
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            _buildActionButton(
+                              label: 'View Details',
+                              icon: Icons.arrow_forward_rounded,
+                              filled: false,
+                              color: _BookPalette.primary,
+                              fullWidth: true,
+                              onTap: () => _showBookingDetailsSheet(context, booking, isDark),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashedDivider(bool isDark) {
+    return SizedBox(
+      height: 1,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final dashWidth = 5.0;
+          final dashCount = (constraints.maxWidth / (dashWidth * 2)).floor();
+          return Flex(
+            direction: Axis.horizontal,
+            children: List.generate(dashCount, (_) {
+              return Expanded(
+                child: Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                  color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06),
+                ),
+              );
+            }),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMiniStat(IconData icon, String value, bool isDark) {
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: isDark ? Colors.grey[500] : Colors.grey[500]),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.grey[300] : Colors.grey[700],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStatChip(String text, Color color, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text,
-        style: GoogleFonts.poppins(
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-
-  // ========== PREMIUM TAB BAR ==========
-  Widget _buildPremiumTabBar(bool isDark, int pending, int accepted, int rejected) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      height: 46,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: TabBar(
-        controller: _tabController,
-        labelColor: Colors.white,
-        unselectedLabelColor: isDark ? Colors.grey[400] : Colors.grey[600],
-        labelStyle: GoogleFonts.poppins(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: GoogleFonts.poppins(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-        indicator: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2563EB), Color(0xFF3B82F6), Color(0xFF60A5FA)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerColor: Colors.transparent,
-        splashBorderRadius: BorderRadius.circular(10),
-        tabs: [
-          _buildPremiumTab('Pending', pending, Colors.orange, isDark),
-          _buildPremiumTab('Accepted', accepted, Colors.green, isDark),
-          _buildPremiumTab('Rejected', rejected, Colors.red, isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPremiumTab(String label, int count, Color color, bool isDark) {
-    return Tab(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(label),
-          if (count > 0) ...[
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                count.toString(),
-                style: GoogleFonts.poppins(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ========== LOADING STATE ==========
-  Widget _buildLoadingState(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.25),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Loading bookings...',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.grey[400] : Colors.grey[500],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ========== BOOKING LIST ==========
-  Widget _buildBookingList(
-    BuildContext context,
-    List<BookingRequest> bookings,
-    String status,
-    bool isDark,
-  ) {
-    if (bookings.isEmpty) {
-      return _buildEmptyState(isDark, status);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      physics: const BouncingScrollPhysics(),
-      itemCount: bookings.length,
-      itemBuilder: (context, index) {
-        final booking = bookings[index];
-        final animation = _staggerAnimations[index % _staggerAnimations.length];
-        
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.03),
-              end: Offset.zero,
-            ).animate(animation),
-            child: _buildPremiumBookingCard(context, booking, isDark),
-          ),
-        );
-      },
-    );
-  }
-
-  // ========== PREMIUM BOOKING CARD ==========
-  Widget _buildPremiumBookingCard(BuildContext context, BookingRequest booking, bool isDark) {
-    final statusColors = {
-      'PENDING': Colors.orange,
-      'ACCEPTED': Colors.green,
-      'REJECTED': Colors.red,
-    };
-    final statusIcons = {
-      'PENDING': Icons.hourglass_top_rounded,
-      'ACCEPTED': Icons.check_circle_rounded,
-      'REJECTED': Icons.cancel_rounded,
-    };
-    final color = statusColors[booking.status] ?? Colors.grey;
-    final icon = statusIcons[booking.status] ?? Icons.help_rounded;
-    final isPending = booking.status == 'PENDING';
-    final statusDisplay = _getStatusDisplay(booking.status);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: color.withValues(alpha: 0.15),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            _showBookingDetails(context, booking, isDark);
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [color.withValues(alpha: 0.15), color.withValues(alpha: 0.05)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: color.withValues(alpha: 0.15),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Icon(icon, color: color, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            booking.propertyTitle,
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on_rounded,
-                                size: 12,
-                                color: isDark ? Colors.grey[500] : Colors.grey[400],
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                booking.propertyCity,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: isDark ? Colors.grey[400] : Colors.grey[500],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '• Room ${booking.roomNumber ?? 'N/A'}',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: isDark ? Colors.grey[400] : Colors.grey[500],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: color.withValues(alpha: 0.15),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            statusDisplay,
-                            style: GoogleFonts.poppins(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                              color: color,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 12),
-                
-                // User Info (Using data from booking)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isDark
-                          ? [const Color(0xFF141A2C), const Color(0xFF1A1F33)]
-                          : [Colors.grey[50]!, Colors.white],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[200]!,
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.transparent,
-                          child: Text(
-                            'U', // ✅ Default since no userName in model
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'User', // ✅ Default since no userName in model
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 13,
-                                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                              ),
-                            ),
-                            Text(
-                              'Requested ${_getTimeAgo(booking.requestedAt)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                color: isDark ? Colors.grey[500] : Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 12),
-                
-                // Details Row - ✅ FIXED: No 'guests' field
-                Row(
-                  children: [
-                    _buildDetailItem(
-                      icon: Icons.calendar_today_rounded,
-                      label: 'Move-in',
-                      value: _formatDate(booking.moveInDate),
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildDetailItem(
-                      icon: Icons.access_time_rounded,
-                      label: 'Duration',
-                      value: '${booking.durationMonths ?? 1} months',
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildDetailItem(
-                      icon: Icons.meeting_room_rounded,
-                      label: 'Room',
-                      value: booking.roomNumber ?? 'N/A',
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-                
-                // Message
-                if (booking.message != null && booking.message!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.grey[50],
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[200]!,
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.format_quote_rounded,
-                          size: 14,
-                          color: isDark ? Colors.grey[500] : Colors.grey[400],
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            booking.message!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              fontStyle: FontStyle.italic,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                
-                // Owner Response
-                if (booking.ownerResponse != null && booking.ownerResponse!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.reply_rounded,
-                          size: 14,
-                          color: Colors.green,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            booking.ownerResponse!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: Colors.green,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                
-                const SizedBox(height: 14),
-                
-                // Action Buttons
-                if (isPending)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF22C55E).withValues(alpha: 0.3),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => _handleAccept(booking.requestId),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.check_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Accept',
-                                      style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.red.withValues(alpha: 0.2),
-                              width: 1,
-                            ),
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => _handleReject(booking.requestId),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.close_rounded,
-                                      color: Colors.red,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Reject',
-                                      style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                if (!isPending)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                        width: 1,
-                      ),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          _showBookingDetails(context, booking, isDark);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.visibility_rounded,
-                                color: Color(0xFF2563EB),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'View Details',
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                  color: const Color(0xFF2563EB),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailItem({
-    required IconData icon,
+  Widget _buildActionButton({
     required String label,
-    required String value,
-    required bool isDark,
+    required IconData icon,
+    required bool filled,
+    required Color color,
+    required VoidCallback onTap,
+    bool fullWidth = false,
   }) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final child = Material(
+      color: filled ? Colors.transparent : color.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(13),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: filled
+              ? BoxDecoration(
+                  gradient: LinearGradient(colors: [color, color.withOpacity(0.8)]),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: [
+                    BoxShadow(color: color.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
+                )
+              : BoxDecoration(
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: color.withOpacity(0.3)),
+                ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 12,
-                color: isDark ? Colors.grey[500] : Colors.grey[400],
-              ),
-              const SizedBox(width: 4),
+              Icon(icon, size: 17, color: filled ? Colors.white : color),
+              const SizedBox(width: 7),
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  fontSize: 9,
-                  color: isDark ? Colors.grey[500] : Colors.grey[400],
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: filled ? Colors.white : color,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
-          ),
-        ],
+        ),
       ),
     );
+    return fullWidth ? SizedBox(width: double.infinity, child: child) : child;
   }
 
-  // ========== BOOKING DETAILS DIALOG ==========
-  void _showBookingDetails(BuildContext context, BookingRequest booking, bool isDark) {
-    showDialog(
+  // ==================== BOOKING DETAILS BOTTOM SHEET ====================
+  void _showBookingDetailsSheet(BuildContext context, BookingRequest booking, bool isDark) {
+    final statusColors = {
+      'PENDING': _BookPalette.warning,
+      'ACCEPTED': _BookPalette.success,
+      'REJECTED': _BookPalette.danger,
+    };
+    final color = statusColors[booking.status] ?? Colors.grey;
+
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: true,
-      builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        backgroundColor: isDark ? const Color(0xFF1A1F33) : Colors.white,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          width: 400,
-          constraints: const BoxConstraints(maxHeight: 600),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        initialChildSize: 0.62,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? _BookPalette.darkSurfaceAlt : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.book_online_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Booking Details',
-                    style: GoogleFonts.playfairDisplay(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      size: 24,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
+              const SizedBox(height: 10),
+              Container(
+                width: 42,
+                height: 4.5,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              const SizedBox(height: 16),
               Expanded(
                 child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 24),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailDialogRow('Property', booking.propertyTitle, isDark),
-                      _buildDetailDialogRow('City', booking.propertyCity, isDark),
-                      _buildDetailDialogRow('Room', booking.roomNumber ?? 'N/A', isDark),
-                      _buildDetailDialogRow('Move-in Date', _formatDate(booking.moveInDate), isDark),
-                      _buildDetailDialogRow('Duration', '${booking.durationMonths ?? 1} months', isDark),
-                      _buildDetailDialogRow('Status', _getStatusDisplay(booking.status), isDark, color: true),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(11),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(colors: [color, color.withOpacity(0.7)]),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.book_online_rounded, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Booking Details',
+                                  style: GoogleFonts.playfairDisplay(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 20,
+                                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                                  ),
+                                ),
+                                Text(
+                                  _getStatusDisplay(booking.status),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 22),
+                      _buildSheetRow(Icons.apartment_rounded, 'Property', booking.propertyTitle, isDark),
+                      _buildSheetRow(Icons.location_on_rounded, 'City', booking.propertyCity, isDark),
+                      _buildSheetRow(Icons.meeting_room_rounded, 'Room', booking.roomNumber ?? 'N/A', isDark),
+                      _buildSheetRow(Icons.calendar_today_rounded, 'Move-in Date',
+                          _formatDate(booking.moveInDate), isDark),
+                      _buildSheetRow(Icons.access_time_rounded, 'Duration',
+                          '${booking.durationMonths ?? 1} months', isDark),
                       if (booking.message != null && booking.message!.isNotEmpty)
-                        _buildDetailDialogRow('Message', booking.message!, isDark),
+                        _buildSheetRow(Icons.format_quote_rounded, 'Message', booking.message!, isDark),
                       if (booking.ownerResponse != null && booking.ownerResponse!.isNotEmpty)
-                        _buildDetailDialogRow('Your Response', booking.ownerResponse!, isDark),
-                      _buildDetailDialogRow('Requested', _formatDate(booking.requestedAt), isDark),
+                        _buildSheetRow(Icons.reply_rounded, 'Your Response', booking.ownerResponse!, isDark,
+                            valueColor: _BookPalette.success),
+                      _buildSheetRow(Icons.upload_rounded, 'Requested',
+                          _formatDate(booking.requestedAt), isDark),
                       if (booking.respondedAt != null)
-                        _buildDetailDialogRow('Responded', _formatDate(booking.respondedAt), isDark),
+                        _buildSheetRow(Icons.done_all_rounded, 'Responded',
+                            _formatDate(booking.respondedAt), isDark),
+                      const SizedBox(height: 20),
+                      if (booking.status == 'PENDING')
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildActionButton(
+                                label: 'Accept',
+                                icon: Icons.check_rounded,
+                                filled: true,
+                                color: _BookPalette.success,
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  _handleAccept(booking.requestId);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _buildActionButton(
+                                label: 'Reject',
+                                icon: Icons.close_rounded,
+                                filled: false,
+                                color: _BookPalette.danger,
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  _handleReject(booking.requestId);
+                                },
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        _buildActionButton(
+                          label: 'Close',
+                          icon: Icons.close_rounded,
+                          filled: false,
+                          color: _BookPalette.primary,
+                          fullWidth: true,
+                          onTap: () => Navigator.pop(sheetContext),
+                        ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              if (booking.status == 'PENDING')
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () {
-                              Navigator.pop(context);
-                              _handleAccept(booking.requestId);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.check_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Accept',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.red.withValues(alpha: 0.2),
-                            width: 1,
-                          ),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () {
-                              Navigator.pop(context);
-                              _handleReject(booking.requestId);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.close_rounded,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Reject',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              if (booking.status != 'PENDING')
-                SizedBox(
-                  width: double.infinity,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                        width: 1,
-                      ),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.close_rounded,
-                                color: Color(0xFF2563EB),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Close',
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                  color: const Color(0xFF2563EB),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
@@ -1266,43 +872,43 @@ class _OwnerBookingManagementPageState
     );
   }
 
-  Widget _buildDetailDialogRow(String label, String value, bool isDark, {bool color = false}) {
-    final statusColors = {
-      'Pending': Colors.orange,
-      'Accepted': Colors.green,
-      'Rejected': Colors.red,
-    };
-    final textColor = color && statusColors.containsKey(value) 
-        ? statusColors[value] 
-        : (isDark ? Colors.white : const Color(0xFF1A1A2E));
-
+  Widget _buildSheetRow(IconData icon, String label, String value, bool isDark, {Color? valueColor}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-              ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _BookPalette.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Icon(icon, size: 16, color: _BookPalette.primary),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: textColor,
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.grey[500] : Colors.grey[500],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: valueColor ?? (isDark ? Colors.white : const Color(0xFF1A1A2E)),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1310,7 +916,7 @@ class _OwnerBookingManagementPageState
     );
   }
 
-  // ========== EMPTY STATE ==========
+  // ==================== EMPTY STATE ====================
   Widget _buildEmptyState(bool isDark, String status) {
     final icons = {
       'PENDING': Icons.pending_actions_rounded,
@@ -1322,39 +928,41 @@ class _OwnerBookingManagementPageState
       'ACCEPTED': 'No accepted bookings',
       'REJECTED': 'No rejected bookings',
     };
+    final colors = {
+      'PENDING': _BookPalette.warning,
+      'ACCEPTED': _BookPalette.success,
+      'REJECTED': _BookPalette.danger,
+    };
     final icon = icons[status] ?? Icons.book_online_rounded;
     final message = messages[status] ?? 'No bookings found';
+    final color = colors[status] ?? _BookPalette.primary;
 
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(26),
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.grey[100],
+              color: color.withOpacity(0.08),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              size: 56,
-              color: isDark ? Colors.grey[600] : Colors.grey[400],
-            ),
+            child: Icon(icon, size: 52, color: color.withOpacity(0.6)),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           Text(
             message,
             style: GoogleFonts.playfairDisplay(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+              fontSize: 19,
+              fontWeight: FontWeight.w700,
               color: isDark ? Colors.white : const Color(0xFF1A1A2E),
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            'Pull to refresh',
+            'Pull down to refresh',
             style: GoogleFonts.poppins(
-              fontSize: 12,
+              fontSize: 12.5,
               color: isDark ? Colors.grey[400] : Colors.grey[500],
             ),
           ),

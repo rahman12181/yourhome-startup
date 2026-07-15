@@ -3,12 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:yourhome/models/admin_model.dart';
 import 'package:yourhome/screens/admin/admin_owner_verification_page.dart';
+import 'package:yourhome/screens/admin/admin_payment_history_screen.dart';
 import 'package:yourhome/screens/admin/admin_report_management_page.dart';
 import 'package:yourhome/screens/admin/admin_subscription_screen.dart';
-import 'package:yourhome/screens/admin/admin_withdrawals_screen.dart'; // ✅ NEW IMPORT
+import 'package:yourhome/screens/admin/admin_withdrawals_screen.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/referral_provider.dart'; // ✅ NEW IMPORT
+import '../../providers/referral_provider.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -52,7 +53,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
       );
       adminProvider.loadAllAdminData();
       
-      // ✅ NEW: Load referral data too
       final referralProvider = Provider.of<ReferralProvider>(
         context,
         listen: false,
@@ -81,8 +81,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF7F8FC),
-      appBar: _buildAppBar(context, isDark, user),
+          isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+      appBar: _buildPremiumAppBar(context, isDark, user),
       body: adminProvider.isLoading && stats == null
           ? _buildLoadingState(isDark)
           : RefreshIndicator(
@@ -96,23 +96,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                 opacity: _fadeAnimation,
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Column(
                     children: [
-                      // ✅ NEW: Withdrawal Stats Card
+                      _buildWelcomeHeader(context, isDark, user),
+                      const SizedBox(height: 16),
                       _buildWithdrawalStats(context, isDark, referralProvider),
                       const SizedBox(height: 16),
-                      // Stats Grid
                       _buildStatsGrid(context, isDark, stats),
-                      const SizedBox(height: 24),
-                      // Revenue Breakdown
+                      const SizedBox(height: 20),
                       _buildRevenueBreakdown(context, isDark, stats),
-                      const SizedBox(height: 24),
-                      // Quick Actions
+                      const SizedBox(height: 20),
                       _buildQuickActions(context, isDark, referralProvider),
-                      const SizedBox(height: 24),
-                      // Pending Items
+                      const SizedBox(height: 20),
                       _buildPendingItems(context, isDark, adminProvider, referralProvider),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -121,64 +119,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     );
   }
 
-  // ============== APP BAR ==============
-  PreferredSizeWidget _buildAppBar(
+  PreferredSizeWidget _buildPremiumAppBar(
     BuildContext context,
     bool isDark,
     dynamic user,
   ) {
     return AppBar(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
       title: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7C3AED).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.admin_panel_settings_rounded,
-              color: Color(0xFF7C3AED),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'Admin Dashboard',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              fontSize: 20,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
-          ),
-        ],
-      ),
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      actions: [
-        IconButton(
-          icon: Icon(
-            Icons.refresh_rounded,
-            color: isDark ? Colors.white : const Color(0xFF4B5563),
-          ),
-          onPressed: _loadData,
-        ),
-      ],
-    );
-  }
-
-  // ============== LOADING STATE ==============
-  Widget _buildLoadingState(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 50,
-            height: 50,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+                colors: [Color(0xFF7C3AED), Color(0xFF9F67F5)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -186,29 +141,158 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF7C3AED).withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: const Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
-              ),
+            child: const Icon(
+              Icons.admin_panel_settings_rounded,
+              color: Colors.white,
+              size: 22,
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Loading dashboard...',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Admin Dashboard',
+                style: GoogleFonts.playfairDisplay(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+              Text(
+                'Welcome back, ${user?.name ?? 'Admin'}',
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: isDark ? Colors.grey[400] : Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: Icon(
+              Icons.refresh_rounded,
+              color: isDark ? Colors.white : const Color(0xFF4B5563),
+              size: 22,
+            ),
+            onPressed: _loadData,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWelcomeHeader(BuildContext context, bool isDark, dynamic user) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF7C3AED),
+            const Color(0xFF9F67F5),
+            const Color(0xFFB794F4),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C3AED).withOpacity(0.3),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '👋 Welcome Admin!',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Here\'s your daily overview. You have full control.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'System Active',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Colors.white,
+              size: 32,
             ),
           ),
         ],
@@ -216,254 +300,303 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     );
   }
 
-  // ============== ✅ PREMIUM WITHDRAWAL STATS CARD ==============
-Widget _buildWithdrawalStats(
-  BuildContext context,
-  bool isDark,
-  ReferralProvider provider,
-) {
-  final pendingCount = provider.pendingWithdrawals.length;
-  final pendingAmount = provider.pendingWithdrawals.fold(
-    0.0,
-    (sum, item) => sum + item.amount,
-  );
-  final totalWithdrawals = provider.withdrawals.length;
-  final approvedWithdrawals = provider.withdrawals.where((w) => w.status == 'APPROVED').length;
-  final rejectedWithdrawals = provider.withdrawals.where((w) => w.status == 'REJECTED').length;
+  Widget _buildWithdrawalStats(
+    BuildContext context,
+    bool isDark,
+    ReferralProvider provider,
+  ) {
+    final pendingCount = provider.pendingWithdrawals.length;
+    final pendingAmount = provider.pendingWithdrawals.fold(
+      0.0,
+      (sum, item) => sum + item.amount,
+    );
+    final totalWithdrawals = provider.withdrawals.length;
+    final approvedWithdrawals = provider.withdrawals.where((w) => w.status == 'APPROVED').length;
+    final rejectedWithdrawals = provider.withdrawals.where((w) => w.status == 'REJECTED').length;
+    final processingWithdrawals = provider.withdrawals.where((w) => w.status == 'PROCESSING').length;
+    final failedWithdrawals = provider.withdrawals.where((w) => w.status == 'FAILED').length;
 
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.04),
-          blurRadius: 20,
-          offset: const Offset(0, 8),
-        ),
-      ],
-      border: Border.all(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
-        width: 1,
-      ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.payments_rounded,
-                color: Color(0xFF7C3AED),
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'Withdrawals Overview',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-              ),
-            ),
-            const Spacer(),
-            if (pendingCount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.orange.withOpacity(0.2),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Colors.orange,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$pendingCount Pending',
-                      style: GoogleFonts.poppins(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Manage all withdrawal requests from users',
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            color: isDark ? Colors.grey[400] : Colors.grey[500],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Stats Grid - 4 cards in a row
-        Row(
-          children: [
-            _buildWithdrawalStatItem(
-              context,
-              'Pending Amount',
-              '₹${pendingAmount.toStringAsFixed(0)}',
-              Icons.pending_rounded,
-              Colors.orange,
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildWithdrawalStatItem(
-              context,
-              'Total Requests',
-              totalWithdrawals.toString(),
-              Icons.receipt_long_rounded,
-              const Color(0xFF7C3AED),
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildWithdrawalStatItem(
-              context,
-              'Approved',
-              approvedWithdrawals.toString(),
-              Icons.check_circle_rounded,
-              Colors.green,
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildWithdrawalStatItem(
-              context,
-              'Rejected',
-              rejectedWithdrawals.toString(),
-              Icons.cancel_rounded,
-              Colors.red,
-              isDark,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // View All Button
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AdminWithdrawalsScreen(),
-                ),
-              );
-            },
-            icon: Icon(
-              Icons.arrow_forward_rounded,
-              color: const Color(0xFF7C3AED),
-              size: 18,
-            ),
-            label: Text(
-              'View All Withdrawals',
-              style: GoogleFonts.poppins(
-                color: const Color(0xFF7C3AED),
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(
-                color: const Color(0xFF7C3AED).withOpacity(0.3),
-                width: 1.5,
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// ============== ✅ WITHDRAWAL STAT ITEM ==============
-Widget _buildWithdrawalStatItem(
-  BuildContext context,
-  String label,
-  String value,
-  IconData icon,
-  Color color,
-  bool isDark,
-) {
-  return Expanded(
-    child: Container(
-      padding: const EdgeInsets.all(12),
+    return Container(
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(14),
+        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
         border: Border.all(
-          color: color.withOpacity(0.12),
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
           width: 1,
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 16,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF7C3AED), Color(0xFF9F67F5)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.payments_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Withdrawals Overview',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                ),
+              ),
+              if (pendingCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.orange.withOpacity(0.25),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.orange,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '$pendingCount Pending',
+                        style: GoogleFonts.poppins(
+                          color: Colors.orange,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildWithdrawalStatItem(
+                context,
+                'Pending Amount',
+                '₹${pendingAmount.toStringAsFixed(0)}',
+                Icons.pending_rounded,
+                Colors.orange,
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildWithdrawalStatItem(
+                context,
+                'Total',
+                totalWithdrawals.toString(),
+                Icons.receipt_long_rounded,
+                const Color(0xFF7C3AED),
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildWithdrawalStatItem(
+                context,
+                'Approved',
+                approvedWithdrawals.toString(),
+                Icons.check_circle_rounded,
+                Colors.green,
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildWithdrawalStatItem(
+                context,
+                'Processing',
+                processingWithdrawals.toString(),
+                Icons.autorenew_rounded,
+                Colors.blue,
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildWithdrawalStatItem(
+                context,
+                'Failed',
+                failedWithdrawals.toString(),
+                Icons.cancel_rounded,
+                Colors.red,
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildWithdrawalStatItem(
+                context,
+                'Rejected',
+                rejectedWithdrawals.toString(),
+                Icons.block_rounded,
+                Colors.grey,
+                isDark,
+              ),
+            ],
           ),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 9,
-              color: isDark ? Colors.grey[400] : Colors.grey[500],
-            ),
-            textAlign: TextAlign.center,
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  context,
+                  'View All Withdrawals',
+                  Icons.arrow_forward_rounded,
+                  const Color(0xFF7C3AED),
+                  isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdminWithdrawalsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildActionButton(
+                  context,
+                  'Payment History',
+                  Icons.history_rounded,
+                  const Color(0xFF8B5CF6),
+                  isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdminPaymentHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
 
-  // ============== STATS GRID ==============
+  Widget _buildActionButton(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color color,
+    bool isDark, {
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      height: 44,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, color: color, size: 18),
+        label: Text(
+          label,
+          style: GoogleFonts.poppins(
+            color: color,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(
+            color: color.withOpacity(0.3),
+            width: 1.5,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWithdrawalStatItem(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    bool isDark,
+  ) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.12),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 16,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 8,
+                color: isDark ? Colors.grey[400] : Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatsGrid(
     BuildContext context,
     bool isDark,
@@ -471,90 +604,133 @@ Widget _buildWithdrawalStatItem(
   ) {
     if (stats == null) return const SizedBox.shrink();
 
-    return Column(
-      children: [
-        // Row 1: Users, Owners, Verified Owners, Pending
-        Row(
-          children: [
-            _buildStatCard(
-              context,
-              'Total Users',
-              stats.totalUsers.toString(),
-              Icons.people_rounded,
-              const Color(0xFF3B82F6),
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildStatCard(
-              context,
-              'Total Owners',
-              stats.totalOwners.toString(),
-              Icons.business_center_rounded,
-              const Color(0xFF8B5CF6),
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildStatCard(
-              context,
-              'Verified Owners',
-              stats.verifiedOwners.toString(),
-              Icons.verified_rounded,
-              const Color(0xFF22C55E),
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildStatCard(
-              context,
-              'Pending Verif.',
-              stats.pendingVerifications.toString(),
-              Icons.pending_actions_rounded,
-              const Color(0xFFF59E0B),
-              isDark,
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+          width: 1,
         ),
-        const SizedBox(height: 10),
-        // Row 2: Properties, Published, Pending Props, Revenue
-        Row(
-          children: [
-            _buildStatCard(
-              context,
-              'Total Properties',
-              stats.totalProperties.toString(),
-              Icons.apartment_rounded,
-              const Color(0xFF06B6D4),
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildStatCard(
-              context,
-              'Published',
-              stats.publishedProperties.toString(),
-              Icons.check_circle_rounded,
-              const Color(0xFF22C55E),
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildStatCard(
-              context,
-              'Pending Props',
-              stats.pendingProperties.toString(),
-              Icons.pending_rounded,
-              const Color(0xFFF59E0B),
-              isDark,
-            ),
-            const SizedBox(width: 10),
-            _buildStatCard(
-              context,
-              'Total Revenue',
-              '₹${stats.totalRevenue.toStringAsFixed(0)}',
-              Icons.currency_rupee_rounded,
-              const Color(0xFF10B981),
-              isDark,
-            ),
-          ],
-        ),
-      ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.dashboard_rounded,
+                  color: Color(0xFF3B82F6),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Statistics',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _buildStatCard(
+                context,
+                'Total Users',
+                stats.totalUsers.toString(),
+                Icons.people_rounded,
+                const Color(0xFF3B82F6),
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildStatCard(
+                context,
+                'Total Owners',
+                stats.totalOwners.toString(),
+                Icons.business_center_rounded,
+                const Color(0xFF8B5CF6),
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildStatCard(
+                context,
+                'Verified',
+                stats.verifiedOwners.toString(),
+                Icons.verified_rounded,
+                const Color(0xFF22C55E),
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildStatCard(
+                context,
+                'Pending Verif.',
+                stats.pendingVerifications.toString(),
+                Icons.pending_actions_rounded,
+                const Color(0xFFF59E0B),
+                isDark,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildStatCard(
+                context,
+                'Properties',
+                stats.totalProperties.toString(),
+                Icons.apartment_rounded,
+                const Color(0xFF06B6D4),
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildStatCard(
+                context,
+                'Published',
+                stats.publishedProperties.toString(),
+                Icons.check_circle_rounded,
+                const Color(0xFF22C55E),
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildStatCard(
+                context,
+                'Pending Props',
+                stats.pendingProperties.toString(),
+                Icons.pending_rounded,
+                const Color(0xFFF59E0B),
+                isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildStatCard(
+                context,
+                'Revenue',
+                '₹${stats.totalRevenue.toStringAsFixed(0)}',
+                Icons.currency_rupee_rounded,
+                const Color(0xFF10B981),
+                isDark,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -568,17 +744,10 @@ Widget _buildWithdrawalStatItem(
   ) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: color.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: color.withOpacity(0.1),
             width: 1,
@@ -588,18 +757,18 @@ Widget _buildWithdrawalStatItem(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
               ),
-              child: Icon(icon, color: color, size: 18),
+              child: Icon(icon, color: color, size: 14),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               value,
               style: GoogleFonts.poppins(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : const Color(0xFF1A1A2E),
               ),
@@ -607,7 +776,7 @@ Widget _buildWithdrawalStatItem(
             Text(
               label,
               style: GoogleFonts.poppins(
-                fontSize: 10,
+                fontSize: 8,
                 color: isDark ? Colors.grey[400] : Colors.grey[500],
               ),
               maxLines: 2,
@@ -619,7 +788,6 @@ Widget _buildWithdrawalStatItem(
     );
   }
 
-  // ============== REVENUE BREAKDOWN ==============
   Widget _buildRevenueBreakdown(
     BuildContext context,
     bool isDark,
@@ -634,8 +802,8 @@ Widget _buildWithdrawalStatItem(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 24,
             offset: const Offset(0, 8),
           ),
         ],
@@ -653,35 +821,26 @@ Widget _buildWithdrawalStatItem(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF10B981).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.attach_money_rounded,
                   color: Color(0xFF10B981),
-                  size: 22,
+                  size: 18,
                 ),
               ),
               const SizedBox(width: 10),
               Text(
                 'Revenue Breakdown',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Dono subscription types ka combined revenue',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: isDark ? Colors.grey[400] : Colors.grey[500],
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Listing Subscription
+          const SizedBox(height: 12),
           _buildRevenueItem(
             context,
             '📋 Listing Subscription',
@@ -690,8 +849,7 @@ Widget _buildWithdrawalStatItem(
             const Color(0xFF3B82F6),
             isDark,
           ),
-          const SizedBox(height: 12),
-          // Property Access
+          const SizedBox(height: 10),
           _buildRevenueItem(
             context,
             '🏠 Property Access',
@@ -701,7 +859,6 @@ Widget _buildWithdrawalStatItem(
             isDark,
           ),
           const Divider(height: 24),
-          // Total Revenue
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -716,14 +873,14 @@ Widget _buildWithdrawalStatItem(
                     child: const Icon(
                       Icons.attach_money_rounded,
                       color: Color(0xFF10B981),
-                      size: 18,
+                      size: 16,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Total Revenue',
                     style: GoogleFonts.poppins(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                     ),
@@ -739,17 +896,6 @@ Widget _buildWithdrawalStatItem(
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'Listing + Property Access combined',
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                color: isDark ? Colors.grey[500] : Colors.grey[400],
-              ),
-            ),
           ),
         ],
       ),
@@ -777,7 +923,7 @@ Widget _buildWithdrawalStatItem(
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               shape: BoxShape.circle,
@@ -785,10 +931,10 @@ Widget _buildWithdrawalStatItem(
             child: Icon(
               Icons.attach_money_rounded,
               color: color,
-              size: 18,
+              size: 16,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -796,7 +942,7 @@ Widget _buildWithdrawalStatItem(
                 Text(
                   title,
                   style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                   ),
@@ -804,7 +950,7 @@ Widget _buildWithdrawalStatItem(
                 Text(
                   subtitle,
                   style: GoogleFonts.poppins(
-                    fontSize: 10,
+                    fontSize: 9,
                     color: isDark ? Colors.grey[400] : Colors.grey[500],
                   ),
                 ),
@@ -824,7 +970,6 @@ Widget _buildWithdrawalStatItem(
     );
   }
 
-  // ============== UPDATED: QUICK ACTIONS ==============
   Widget _buildQuickActions(
     BuildContext context,
     bool isDark,
@@ -833,14 +978,14 @@ Widget _buildWithdrawalStatItem(
     final pendingCount = referralProvider.pendingWithdrawals.length;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1A1F33) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 24,
             offset: const Offset(0, 8),
           ),
         ],
@@ -858,26 +1003,26 @@ Widget _buildWithdrawalStatItem(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF7C3AED).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.flash_on_rounded,
                   color: Color(0xFF7C3AED),
-                  size: 22,
+                  size: 18,
                 ),
               ),
               const SizedBox(width: 10),
               Text(
                 'Quick Actions',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -902,7 +1047,25 @@ Widget _buildWithdrawalStatItem(
               Expanded(
                 child: _buildQuickActionItem(
                   context,
-                  '👥 Verify\nOwners',
+                  '📊 History',
+                  Icons.history_rounded,
+                  const Color(0xFF8B5CF6),
+                  isDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdminPaymentHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickActionItem(
+                  context,
+                  '👥 Verify',
                   Icons.verified_rounded,
                   Colors.blue,
                   isDark,
@@ -921,26 +1084,22 @@ Widget _buildWithdrawalStatItem(
               Expanded(
                 child: _buildQuickActionItem(
                   context,
-                  '🏢 Publish\nProperties',
+                  '🏢 Publish',
                   Icons.publish_rounded,
                   Colors.green,
                   isDark,
-                  onTap: () {
-                    // Navigate to Property Management -> Pending
-                  },
+                  onTap: () {},
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildQuickActionItem(
                   context,
-                  '🚨 Pending\nReports',
+                  '🚨 Reports',
                   Icons.flag_rounded,
                   Colors.red,
                   isDark,
-                  onTap: () {
-                    // Navigate to Reports
-                  },
+                  onTap: () {},
                 ),
               ),
             ],
@@ -967,7 +1126,7 @@ Widget _buildWithdrawalStatItem(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: color.withOpacity(0.15),
+            color: color.withOpacity(0.12),
             width: 1,
           ),
         ),
@@ -982,7 +1141,7 @@ Widget _buildWithdrawalStatItem(
                     color: color.withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icon, color: color, size: 24),
+                  child: Icon(icon, color: color, size: 22),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -999,8 +1158,8 @@ Widget _buildWithdrawalStatItem(
             ),
             if (badge != null)
               Positioned(
-                top: -4,
-                right: -4,
+                top: -6,
+                right: -6,
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: const BoxDecoration(
@@ -1008,14 +1167,14 @@ Widget _buildWithdrawalStatItem(
                     shape: BoxShape.circle,
                   ),
                   constraints: const BoxConstraints(
-                    minWidth: 18,
-                    minHeight: 18,
+                    minWidth: 20,
+                    minHeight: 20,
                   ),
                   child: Text(
                     badge,
                     style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontSize: 9,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
                     textAlign: TextAlign.center,
@@ -1028,7 +1187,6 @@ Widget _buildWithdrawalStatItem(
     );
   }
 
-  // ============== UPDATED: PENDING ITEMS ==============
   Widget _buildPendingItems(
     BuildContext context,
     bool isDark,
@@ -1038,14 +1196,14 @@ Widget _buildWithdrawalStatItem(
     final pendingWithdrawals = referralProvider.pendingWithdrawals.length;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1A1F33) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 24,
             offset: const Offset(0, 8),
           ),
         ],
@@ -1063,29 +1221,28 @@ Widget _buildWithdrawalStatItem(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF59E0B).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.pending_actions_rounded,
                   color: Color(0xFFF59E0B),
-                  size: 22,
+                  size: 18,
                 ),
               ),
               const SizedBox(width: 10),
               Text(
                 'Pending Items',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(
             children: [
-              // ✅ NEW: Withdrawals Pending
               _buildPendingItem(
                 context,
                 '💳 Withdrawals',
@@ -1101,29 +1258,25 @@ Widget _buildWithdrawalStatItem(
                   );
                 },
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _buildPendingItem(
                 context,
                 '👥 Owners',
                 provider.pendingOwners.length.toString(),
                 const Color(0xFFF59E0B),
                 isDark,
-                onTap: () {
-                  // Navigate to Pending Owners
-                },
+                onTap: () {},
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _buildPendingItem(
                 context,
                 '🏢 Properties',
                 provider.pendingProperties.length.toString(),
                 const Color(0xFF3B82F6),
                 isDark,
-                onTap: () {
-                  // Navigate to Pending Properties
-                },
+                onTap: () {},
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _buildPendingItem(
                 context,
                 '🚨 Reports',
@@ -1139,7 +1292,7 @@ Widget _buildWithdrawalStatItem(
                   );
                 },
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _buildPendingItem(
                 context,
                 '📋 Subs',
@@ -1177,12 +1330,12 @@ Widget _buildWithdrawalStatItem(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: color.withOpacity(0.15),
+              color: color.withOpacity(0.12),
               width: 1,
             ),
           ),
@@ -1200,7 +1353,7 @@ Widget _buildWithdrawalStatItem(
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  fontSize: 9,
+                  fontSize: 8,
                   color: isDark ? Colors.grey[400] : Colors.grey[600],
                 ),
                 textAlign: TextAlign.center,
@@ -1210,6 +1363,54 @@ Widget _buildWithdrawalStatItem(
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF7C3AED), Color(0xFF9F67F5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF7C3AED).withOpacity(0.3),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Loading dashboard...',
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+        ],
       ),
     );
   }

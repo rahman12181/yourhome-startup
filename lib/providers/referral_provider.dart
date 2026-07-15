@@ -1,5 +1,3 @@
-// lib/providers/referral_provider.dart
-
 import 'package:flutter/material.dart';
 import '../models/referral_model.dart';
 import '../services/api_service.dart';
@@ -7,24 +5,24 @@ import '../services/api_service.dart';
 class ReferralProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
 
-  // States
   ReferralInfo? _referralInfo;
   List<ReferralHistory> _history = [];
   List<WalletTransaction> _transactions = [];
   List<WithdrawalRequest> _withdrawals = [];
   List<PendingWithdrawal> _pendingWithdrawals = [];
+  List<WithdrawalHistoryItem> _paymentHistory = [];
 
   bool _isLoading = false;
   bool _isHistoryLoading = false;
   bool _isTransactionLoading = false;
   String? _error;
 
-  // Getters
   ReferralInfo? get referralInfo => _referralInfo;
   List<ReferralHistory> get history => _history;
   List<WalletTransaction> get transactions => _transactions;
   List<WithdrawalRequest> get withdrawals => _withdrawals;
   List<PendingWithdrawal> get pendingWithdrawals => _pendingWithdrawals;
+  List<WithdrawalHistoryItem> get paymentHistory => _paymentHistory;
   bool get isLoading => _isLoading;
   bool get isHistoryLoading => _isHistoryLoading;
   bool get isTransactionLoading => _isTransactionLoading;
@@ -33,7 +31,6 @@ class ReferralProvider extends ChangeNotifier {
   double get walletBalance => _referralInfo?.walletBalance ?? 0.0;
   bool get canWithdraw => walletBalance >= 100.0;
 
-  // ========== 13.1 - Get Referral Info ==========
   Future<bool> fetchReferralInfo() async {
     _isLoading = true;
     _error = null;
@@ -60,7 +57,6 @@ class ReferralProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 13.2 - Get Referral History ==========
   Future<bool> fetchReferralHistory() async {
     _isHistoryLoading = true;
     _error = null;
@@ -88,7 +84,6 @@ class ReferralProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 13.3 - Get Wallet Transactions ==========
   Future<bool> fetchWalletTransactions({int page = 0, int size = 20}) async {
     _isTransactionLoading = true;
     _error = null;
@@ -117,7 +112,6 @@ class ReferralProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 13.4 - Request Withdrawal ==========
   Future<Map<String, dynamic>> requestWithdrawal({
     required double amount,
     required String upiId,
@@ -135,7 +129,6 @@ class ReferralProvider extends ChangeNotifier {
       if (response.statusCode == 201 && response.data['success'] == true) {
         _isLoading = false;
         notifyListeners();
-        // Refresh wallet balance
         await fetchReferralInfo();
         return {
           'success': true,
@@ -162,7 +155,6 @@ class ReferralProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 13.5 - Get My Withdrawals ==========
   Future<bool> fetchWithdrawals() async {
     _isLoading = true;
     _error = null;
@@ -190,7 +182,6 @@ class ReferralProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 13.6 - Get Pending Withdrawals (Admin) ==========
   Future<bool> fetchPendingWithdrawals() async {
     _isLoading = true;
     _error = null;
@@ -218,10 +209,8 @@ class ReferralProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 13.7 - Approve Withdrawal (Admin) ==========
   Future<Map<String, dynamic>> approveWithdrawal({
     required int withdrawalId,
-    required String transactionRef,
   }) async {
     _isLoading = true;
     _error = null;
@@ -230,13 +219,11 @@ class ReferralProvider extends ChangeNotifier {
     try {
       final response = await _api.approveWithdrawal(
         withdrawalId: withdrawalId,
-        transactionRef: transactionRef,
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         _isLoading = false;
         notifyListeners();
-        // Refresh pending list
         await fetchPendingWithdrawals();
         return {
           'success': true,
@@ -263,7 +250,6 @@ class ReferralProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 13.8 - Reject Withdrawal (Admin) ==========
   Future<Map<String, dynamic>> rejectWithdrawal({
     required int withdrawalId,
     required String reason,
@@ -281,7 +267,6 @@ class ReferralProvider extends ChangeNotifier {
       if (response.statusCode == 200 && response.data['success'] == true) {
         _isLoading = false;
         notifyListeners();
-        // Refresh pending list
         await fetchPendingWithdrawals();
         return {
           'success': true,
@@ -308,19 +293,96 @@ class ReferralProvider extends ChangeNotifier {
     }
   }
 
-  // ========== Clear Error ==========
+  Future<bool> fetchPaymentHistory({String? status}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.getPaymentHistory(status: status);
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final data = response.data['data'] as List? ?? [];
+        _paymentHistory = data.map((item) => WithdrawalHistoryItem.fromJson(item)).toList();
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.data['message'] ?? 'Failed to fetch payment history';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Color getStatusColor(String status) {
+    switch (status) {
+      case 'PENDING':
+        return Colors.amber;
+      case 'PROCESSING':
+        return Colors.blue;
+      case 'APPROVED':
+        return Colors.green;
+      case 'FAILED':
+        return Colors.red;
+      case 'REJECTED':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String getStatusText(String status) {
+    switch (status) {
+      case 'PENDING':
+        return 'Pending';
+      case 'PROCESSING':
+        return 'Processing';
+      case 'APPROVED':
+        return 'Approved';
+      case 'FAILED':
+        return 'Failed';
+      case 'REJECTED':
+        return 'Rejected';
+      default:
+        return status;
+    }
+  }
+
+  String getStatusIcon(String status) {
+    switch (status) {
+      case 'PENDING':
+        return '⏳';
+      case 'PROCESSING':
+        return '🔄';
+      case 'APPROVED':
+        return '✅';
+      case 'FAILED':
+        return '❌';
+      case 'REJECTED':
+        return '🚫';
+      default:
+        return '❓';
+    }
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();
   }
 
-  // ========== Reset ==========
   void reset() {
     _referralInfo = null;
     _history = [];
     _transactions = [];
     _withdrawals = [];
     _pendingWithdrawals = [];
+    _paymentHistory = [];
     _isLoading = false;
     _isHistoryLoading = false;
     _isTransactionLoading = false;

@@ -1,7 +1,3 @@
-// lib/screens/admin/admin_withdrawals_screen.dart
-
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,6 +7,7 @@ import '../../providers/referral_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../models/referral_model.dart';
+import '../../widgets/status_chip.dart';
 
 class AdminWithdrawalsScreen extends StatefulWidget {
   const AdminWithdrawalsScreen({super.key});
@@ -24,7 +21,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
   late TabController _tabController;
   bool _isInitialLoad = true;
 
-  final TextEditingController _transactionRefController = TextEditingController();
   final TextEditingController _rejectReasonController = TextEditingController();
 
   late AnimationController _mainController;
@@ -89,7 +85,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _transactionRefController.dispose();
     _rejectReasonController.dispose();
     _mainController.dispose();
     _staggerController.dispose();
@@ -137,6 +132,8 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1];
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +185,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== ACCESS DENIED ==========
   Widget _buildAccessDenied(BuildContext context, bool isDark) {
     return Center(
       child: Column(
@@ -228,7 +224,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== PREMIUM APP BAR ==========
   Widget _buildPremiumAppBar(BuildContext context, bool isDark) {
     final provider = Provider.of<ReferralProvider>(context);
     final pendingCount = provider.pendingWithdrawals.length;
@@ -241,7 +236,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          // Back Button
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
@@ -305,7 +299,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
               ],
             ),
           ),
-          // Refresh Button
           Container(
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1A1F33) : Colors.white,
@@ -350,7 +343,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== PREMIUM TAB BAR ==========
   Widget _buildPremiumTabBar(bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -419,7 +411,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== LOADING STATE ==========
   Widget _buildLoadingState(bool isDark) {
     return Center(
       child: Column(
@@ -468,7 +459,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== PENDING LIST ==========
   Widget _buildPendingList(
     BuildContext context,
     bool isDark,
@@ -496,7 +486,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
-          // Summary Card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -577,7 +566,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== PREMIUM PENDING CARD ==========
   Widget _buildPremiumPendingCard(
     BuildContext context,
     bool isDark,
@@ -610,7 +598,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -691,7 +678,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
           ),
           const SizedBox(height: 12),
           
-          // Amount & UPI
           Row(
             children: [
               Expanded(
@@ -714,7 +700,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
           ),
           const SizedBox(height: 8),
           
-          // Time
           Row(
             children: [
               Icon(
@@ -734,7 +719,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
           ),
           const SizedBox(height: 14),
 
-          // Action Buttons - Premium
           Row(
             children: [
               Expanded(
@@ -874,7 +858,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== HISTORY LIST ==========
   Widget _buildHistoryList(
     BuildContext context,
     bool isDark,
@@ -916,196 +899,270 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== PREMIUM HISTORY CARD ==========
   Widget _buildPremiumHistoryCard(
-    BuildContext context,
-    bool isDark,
-    WithdrawalRequest item,
-  ) {
-    final isApproved = item.status == 'APPROVED';
-    final isRejected = item.status == 'REJECTED';
-    final statusColor = isApproved ? Colors.green : (isRejected ? Colors.red : Colors.orange);
-    final statusIcon = isApproved ? Icons.check_circle_rounded : (isRejected ? Icons.cancel_rounded : Icons.pending_rounded);
-    final statusText = isApproved ? 'Approved' : (isRejected ? 'Rejected' : 'Pending');
+  BuildContext context,
+  bool isDark,
+  WithdrawalRequest item,
+) {
+  final statusColor = _getStatusColor(item.status);
+  final statusIcon = _getStatusIcon(item.status);
+  final statusText = _getStatusText(item.status);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: statusColor.withOpacity(0.15),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: statusColor.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  return Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: statusColor.withOpacity(0.15),
+        width: 1,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  statusIcon,
-                  color: statusColor,
-                  size: 20,
-                ),
+      boxShadow: [
+        BoxShadow(
+          color: statusColor.withOpacity(0.04),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Withdrawal #${item.withdrawalId}',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      '₹${item.amount.toStringAsFixed(2)} • ${item.upiId}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        color: isDark ? Colors.grey[400] : Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
+              child: Icon(
+                statusIcon,
+                color: statusColor,
+                size: 20,
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  statusText,
-                  style: GoogleFonts.poppins(
-                    fontSize: 8,
-                    color: statusColor,
-                    fontWeight: FontWeight.w700,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Withdrawal #${item.withdrawalId}',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      fontSize: 14,
+                    ),
                   ),
+                  Text(
+                    '₹${item.amount.toStringAsFixed(2)} • ${item.upiId}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: isDark ? Colors.grey[400] : Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                statusText.toUpperCase(),
+                style: GoogleFonts.poppins(
+                  fontSize: 8,
+                  color: statusColor,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          
-          // Details
-          Row(
-            children: [
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        
+        Row(
+          children: [
+            Expanded(
+              child: _buildInfoColumn(
+                label: 'Requested',
+                value: _formatDate(item.requestedAt),
+                color: isDark ? Colors.grey[400] ?? Colors.grey : Colors.grey[600] ?? Colors.grey,
+                isDark: isDark,
+              ),
+            ),
+            if (item.processedAt != null)
               Expanded(
                 child: _buildInfoColumn(
-                  label: 'Requested',
-                  value: _formatDate(item.requestedAt),
+                  label: 'Processed',
+                  value: _formatDate(item.processedAt!),
                   color: isDark ? Colors.grey[400] ?? Colors.grey : Colors.grey[600] ?? Colors.grey,
                   isDark: isDark,
                 ),
               ),
-              if (item.processedAt != null)
-                Expanded(
-                  child: _buildInfoColumn(
-                    label: 'Processed',
-                    value: _formatDate(item.processedAt!),
-                    color: isDark ? Colors.grey[400] ?? Colors.grey : Colors.grey[600] ?? Colors.grey,
-                    isDark: isDark,
+          ],
+        ),
+
+        if (item.status == 'APPROVED' && item.transactionRef != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.verified_rounded,
+                    color: Colors.green,
+                    size: 12,
                   ),
-                ),
-            ],
+                  const SizedBox(width: 4),
+                  Text(
+                    'UTR: ${item.transactionRef}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      color: Colors.green,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
 
-          // Transaction Ref (if approved)
-          if (isApproved && item.transactionRef != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.verified_rounded,
-                      color: Colors.green,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'UPI Ref: ${item.transactionRef}',
+        if (item.status == 'FAILED' && item.failureReason != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.red,
+                    size: 12,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Failed: ${item.failureReason}',
                       style: GoogleFonts.poppins(
                         fontSize: 10,
-                        color: Colors.green,
+                        color: Colors.red,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
+          ),
 
-          // Admin Note (if rejected)
-          if (isRejected && item.adminNote != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.info_outline_rounded,
-                      color: Colors.red,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'Reason: ${item.adminNote}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 10,
-                          color: Colors.red,
-                          fontWeight: FontWeight.w500,
-                        ),
+        if (item.status == 'REJECTED' && item.adminNote != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: Colors.grey,
+                    size: 12,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Rejected: ${item.adminNote}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-        ],
-      ),
-    );
-  }
+          ),
+      ],
+    ),
+  );
+}
 
-  // ========== APPROVE DIALOG ==========
+  Color _getStatusColor(String status) {
+  switch (status) {
+    case 'PENDING':
+      return Colors.amber;
+    case 'PROCESSING':
+      return Colors.blue;
+    case 'APPROVED':
+      return Colors.green;
+    case 'FAILED':
+      return Colors.red;
+    case 'REJECTED':
+      return Colors.grey;
+    default:
+      return Colors.grey;
+  }
+}
+
+IconData _getStatusIcon(String status) {
+  switch (status) {
+    case 'PENDING':
+      return Icons.pending_rounded;
+    case 'PROCESSING':
+      return Icons.autorenew_rounded;
+    case 'APPROVED':
+      return Icons.check_circle_rounded;
+    case 'FAILED':
+      return Icons.cancel_rounded;
+    case 'REJECTED':
+      return Icons.block_rounded;
+    default:
+      return Icons.help_rounded;
+  }
+}
+
+String _getStatusText(String status) {
+  switch (status) {
+    case 'PENDING':
+      return 'Pending';
+    case 'PROCESSING':
+      return 'Processing';
+    case 'APPROVED':
+      return 'Approved';
+    case 'FAILED':
+      return 'Failed';
+    case 'REJECTED':
+      return 'Rejected';
+    default:
+      return status;
+  }
+}
+
   void _showApproveDialog(
     BuildContext context,
     bool isDark,
     ReferralProvider provider,
     PendingWithdrawal item,
   ) {
-    _transactionRefController.clear();
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1195,7 +1252,7 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Make sure you have sent the money via UPI before approving.',
+                            'Money will be sent automatically via UPI.\nNo manual entry required.',
                             style: GoogleFonts.poppins(
                               fontSize: 11,
                               color: isDark ? Colors.grey[400] : Colors.grey[600],
@@ -1205,43 +1262,12 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _transactionRefController,
+                  const SizedBox(height: 8),
+                  Text(
+                    '⚠️ This action cannot be undone.',
                     style: GoogleFonts.poppins(
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                      fontSize: 14,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'UPI Transaction Reference *',
-                      labelStyle: GoogleFonts.poppins(
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                      hintText: 'e.g. UPI2026071212345',
-                      hintStyle: GoogleFonts.poppins(
-                        color: isDark ? Colors.grey[500] : Colors.grey[400],
-                        fontSize: 12,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.receipt_long_rounded,
-                        color: Color(0xFF7C3AED),
-                        size: 20,
-                      ),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF1A2338) : Colors.grey[50],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: Colors.green,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      fontSize: 11,
+                      color: Colors.red,
                     ),
                   ),
                 ],
@@ -1271,28 +1297,16 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
                     child: InkWell(
                       borderRadius: BorderRadius.circular(10),
                       onTap: () async {
-                        final ref = _transactionRefController.text.trim();
-                        if (ref.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter UPI transaction reference'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-
                         Navigator.pop(context);
 
                         final result = await provider.approveWithdrawal(
                           withdrawalId: item.withdrawalId,
-                          transactionRef: ref,
                         );
 
                         if (result['success'] == true) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(result['message'] ?? 'Withdrawal approved!'),
+                              content: Text(result['message'] ?? 'Payout successful!'),
                               backgroundColor: Colors.green,
                             ),
                           );
@@ -1339,7 +1353,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== REJECT DIALOG ==========
   void _showRejectDialog(
     BuildContext context,
     bool isDark,
@@ -1582,7 +1595,6 @@ class _AdminWithdrawalsScreenState extends State<AdminWithdrawalsScreen>
     );
   }
 
-  // ========== EMPTY STATE ==========
   Widget _buildEmptyState(
     BuildContext context,
     bool isDark,

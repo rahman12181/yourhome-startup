@@ -1,5 +1,3 @@
-// lib/screens/refer_and_earn_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -162,7 +160,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM APP BAR ==========
   PreferredSizeWidget _buildPremiumAppBar(BuildContext context, bool isDark) {
     final provider = Provider.of<ReferralProvider>(context);
     final info = provider.referralInfo;
@@ -267,7 +264,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== LOADING STATE ==========
   Widget _buildLoadingState(bool isDark) {
     return Center(
       child: Column(
@@ -316,7 +312,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM BALANCE CARD ==========
   Widget _buildPremiumBalanceCard(
     BuildContext context,
     bool isDark,
@@ -446,7 +441,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM SHARE BUTTON ==========
   Widget _buildPremiumShareButton(
     BuildContext context,
     bool isDark,
@@ -505,7 +499,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM STATS ROW ==========
   Widget _buildPremiumStatsRow(
     BuildContext context,
     bool isDark,
@@ -564,7 +557,7 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
                     ),
                   ),
                   Text(
-                    stat['value'] as String,
+                    stat['label'] as String,
                     style: GoogleFonts.poppins(
                       fontSize: 9,
                       color: isDark ? Colors.grey[400] : Colors.grey[500],
@@ -579,7 +572,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM WITHDRAW BUTTON ==========
   Widget _buildPremiumWithdrawButton(
     BuildContext context,
     bool isDark,
@@ -643,7 +635,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM TABS ==========
   Widget _buildPremiumTabs(
     BuildContext context,
     bool isDark,
@@ -714,7 +705,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM HISTORY LIST ==========
   Widget _buildPremiumHistoryList(
     BuildContext context,
     bool isDark,
@@ -856,7 +846,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM TRANSACTION LIST ==========
   Widget _buildPremiumTransactionList(
     BuildContext context,
     bool isDark,
@@ -984,7 +973,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== LIST LOADING STATE ==========
   Widget _buildListLoadingState(bool isDark) {
     return Center(
       child: Column(
@@ -1004,7 +992,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== EMPTY STATE ==========
   Widget _buildEmptyState(
     BuildContext context,
     bool isDark,
@@ -1053,7 +1040,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
     );
   }
 
-  // ========== PREMIUM WITHDRAW BOTTOM SHEET ==========
   void _showWithdrawBottomSheet(
     BuildContext context,
     bool isDark,
@@ -1085,7 +1071,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Handle
                   Center(
                     child: Container(
                       width: 40,
@@ -1143,7 +1128,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
                   ),
                   const SizedBox(height: 20),
 
-                  // Amount Field
                   TextFormField(
                     controller: _amountController,
                     keyboardType: TextInputType.number,
@@ -1180,7 +1164,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
                   ),
                   const SizedBox(height: 16),
 
-                  // UPI Field
                   TextFormField(
                     controller: _upiController,
                     style: GoogleFonts.poppins(
@@ -1216,7 +1199,6 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
                   ),
                   const SizedBox(height: 24),
 
-                  // Submit Button
                   Container(
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
