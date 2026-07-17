@@ -1,15 +1,14 @@
-// ignore_for_file: deprecated_member_use
-
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yourhome/providers/payment_provider.dart';
 import 'package:yourhome/screens/owner/owner_profile_screen.dart';
-import 'package:yourhome/screens/owner/owner_my_reels_screen.dart'; // 👈 ADD THIS IMPORT
-import 'package:yourhome/screens/owner/owner_reels_upload_screen.dart'; // 👈 ADD THIS IMPORT
+import 'package:yourhome/screens/owner/owner_my_reels_screen.dart';
+import 'package:yourhome/screens/owner/owner_reels_upload_screen.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/owner_provider.dart';
 import '../../providers/profile_provider.dart';
@@ -35,7 +34,7 @@ class _OwnerPalette {
   static const lightBg = Color(0xFFF7F8FC);
   static const teal = Color(0xFF14B8A6);
   static const pink = Color(0xFFEC4899);
-  static const reelColor = Color(0xFFF59E0B); // 👈 ADD THIS
+  static const reelColor = Color(0xFFF59E0B);
 }
 
 class OwnerDashboardPage extends StatefulWidget {
@@ -49,6 +48,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     with SingleTickerProviderStateMixin {
   bool _isFirstLoad = true;
   int _unreadNotifications = 0;
+  bool _hasPayoutUpi = false;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -88,6 +88,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     await ownerProvider.loadAllOwnerData();
     _loadPropertyData(ownerProvider);
     _loadUnreadNotifications();
+    _checkPayoutUpiStatus();
   }
 
   void _loadPropertyData(OwnerProvider provider) {
@@ -109,6 +110,25 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       }
     } catch (_) {}
   }
+
+ Future<void> _checkPayoutUpiStatus() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool('has_payout_upi') ?? false;
+    setState(() => _hasPayoutUpi = saved);
+    
+    final res = await ApiService().get('/owner/payout-status');
+    if (mounted && res.data['success'] == true) {
+      final has = res.data['data']['hasPayoutUpi'] ?? false;
+      if (has != _hasPayoutUpi) {
+        setState(() => _hasPayoutUpi = has);
+        await prefs.setBool('has_payout_upi', has);
+      }
+    }
+  } catch (_) {
+    // ✅ Already using storage value, so no change needed
+  }
+}
 
   String _greeting() {
     final hour = DateTime.now().hour;
@@ -148,22 +168,22 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
- void _navigateToListingSubscription() {
-  final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
-  String propertyTitle = 'Listing Subscription';
-  int propertyId = 0;
-  if (ownerProvider.myProperties.isNotEmpty) {
-    final firstProperty = ownerProvider.myProperties.first;
-    propertyId = firstProperty.propertyId ?? 0;
-    propertyTitle = firstProperty.title ?? 'Listing';
+  void _navigateToListingSubscription() {
+    final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
+    String propertyTitle = 'Listing Subscription';
+    int propertyId = 0;
+    if (ownerProvider.myProperties.isNotEmpty) {
+      final firstProperty = ownerProvider.myProperties.first;
+      propertyId = firstProperty.propertyId ?? 0;
+      propertyTitle = firstProperty.title ?? 'Listing';
+    }
+    _navigateTo(
+      ListingSubscriptionPage(
+        propertyId: propertyId,
+        propertyTitle: propertyTitle,
+      ),
+    );
   }
-  _navigateTo(
-    ListingSubscriptionPage(
-      propertyId: propertyId,
-      propertyTitle: propertyTitle,
-    ),
-  );
-}
 
   @override
   Widget build(BuildContext context) {
@@ -206,7 +226,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Profile Header
                       _buildProfileHeader(
                         context,
                         isDark,
@@ -216,17 +235,15 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                         ownerProfile,
                       ),
                       const SizedBox(height: 16),
-                      // Verification Status Card
+                      _buildPayoutSetupCard(isDark),
+                      const SizedBox(height: 14),
                       if (verification != null)
                         _buildVerificationStatusCard(isDark, verification),
                       const SizedBox(height: 14),
-                      // Stats Grid
                       if (stats != null) _buildStatsGrid(isDark, stats),
                       const SizedBox(height: 18),
-                      // ========== 🎬 REELS SECTION ==========
-                      _buildReelsSection(context, isDark), // 👈 ADD THIS
+                      _buildReelsSection(context, isDark),
                       const SizedBox(height: 18),
-                      // Subscription Section
                       _buildSubscriptionSection(
                         context,
                         isDark,
@@ -234,10 +251,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                         listingSub,
                       ),
                       const SizedBox(height: 18),
-                      // Quick Actions
                       _buildQuickActions(context, isDark, verification),
                       const SizedBox(height: 18),
-                      // Pending Items
                       _buildPendingItems(context, isDark, ownerProvider),
                       const SizedBox(height: 8),
                     ],
@@ -248,7 +263,791 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
-  // ========== 🎬 REELS SECTION (NEW) ==========
+  Widget _buildPayoutSetupCard(bool isDark) {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      gradient: _hasPayoutUpi
+          ? LinearGradient(
+              colors: [Colors.green, Colors.teal],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            )
+          : const LinearGradient(
+              colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: (_hasPayoutUpi ? Colors.green : const Color(0xFFFF6B35))
+              .withOpacity(0.3),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            _hasPayoutUpi ? Icons.check_circle_rounded : Icons.payments_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _hasPayoutUpi ? '✅ Payment Setup Complete' : '💳 Set up Payments',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                _hasPayoutUpi
+                    ? 'You will receive rent payments automatically'
+                    : 'Add your UPI ID to receive rent payments',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!_hasPayoutUpi)
+          SizedBox(
+            width: 100,
+            height: 40,
+            child: ElevatedButton(
+              onPressed: _showPayoutUpiDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFFFF6B35),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: Text(
+                'Add UPI',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        if (_hasPayoutUpi)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.verified_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Active',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+  void _showPayoutUpiDialog() {
+    final TextEditingController upiController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1A1F33) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF6B35).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.payments_rounded,
+                  color: Color(0xFFFF6B35),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Add UPI ID',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'You will receive rent payments on this UPI ID',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: upiController,
+                style: GoogleFonts.poppins(
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+                decoration: InputDecoration(
+                  labelText: 'UPI ID',
+                  hintText: 'e.g. owner@okhdfcbank',
+                  prefixIcon: const Icon(Icons.payments_rounded),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF1A2338) : Colors.grey[50],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final upiId = upiController.text.trim();
+                if (upiId.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid UPI ID'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+                await _savePayoutUpi(upiId);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B35),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Save',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+ Future<void> _savePayoutUpi(String upiId) async {
+  final provider = Provider.of<PaymentProvider>(context, listen: false);
+  final result = await provider.setPayoutUpi(upiId);
+
+  if (result['success'] == true) {
+    // ✅ Update state
+    setState(() {
+      _hasPayoutUpi = true;
+    });
+    
+    // ✅ Save to storage
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_payout_upi', true);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                result['message'] ?? 'UPI ID saved successfully!',
+                style: GoogleFonts.poppins(fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    
+    // ✅ Refresh dashboard
+    await _loadAll();
+    
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result['message'] ?? 'Failed to save UPI ID'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+}
+
+  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
+    return AppBar(
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: _OwnerPalette.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.home_rounded,
+              color: _OwnerPalette.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Dashboard',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: 18,
+              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            ),
+          ),
+        ],
+      ),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      actions: [
+        IconButton(
+          icon: Icon(
+            Icons.refresh_rounded,
+            color: isDark ? Colors.white : const Color(0xFF4B5563),
+            size: 22,
+          ),
+          onPressed: _loadAll,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_OwnerPalette.primary, _OwnerPalette.primaryLight],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: _OwnerPalette.primary.withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading dashboard...',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(
+    BuildContext context,
+    bool isDark,
+    dynamic user,
+    String? profileImage,
+    dynamic verification,
+    dynamic ownerProfile,
+  ) {
+    final hasImage = profileImage != null && profileImage.isNotEmpty;
+    final isVerified = verification?.isVerified ?? false;
+    final businessName = ownerProfile?.businessName;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => _navigateTo(const OwnerProfileScreen()),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: hasImage
+                    ? null
+                    : const LinearGradient(
+                        colors: [
+                          _OwnerPalette.primary,
+                          _OwnerPalette.primaryLight
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _OwnerPalette.primary.withOpacity(0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 28,
+                backgroundColor: Colors.transparent,
+                backgroundImage:
+                    hasImage ? CachedNetworkImageProvider(profileImage) : null,
+                child: hasImage
+                    ? null
+                    : Text(
+                        user?.name?.isNotEmpty == true
+                            ? user!.name[0].toUpperCase()
+                            : 'O',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _greeting(),
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.grey[400] : Colors.grey[500],
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  user?.name?.isNotEmpty == true ? user!.name : 'Owner',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (businessName != null && businessName.isNotEmpty)
+                  Text(
+                    businessName,
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.grey[400] : Colors.grey[500],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                const SizedBox(height: 2),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (isVerified ? Colors.green : Colors.orange)
+                        .withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isVerified
+                            ? Icons.verified_rounded
+                            : Icons.hourglass_top_rounded,
+                        size: 10,
+                        color: isVerified ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        isVerified
+                            ? 'Verified Owner'
+                            : verification?.isRejected == true
+                                ? 'Rejected'
+                                : 'Pending',
+                        style: GoogleFonts.poppins(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w600,
+                          color: isVerified ? Colors.green : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildNotificationButton(isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationButton(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141A2C) : Colors.grey[100],
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              Icons.notifications_outlined,
+              color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+              size: 22,
+            ),
+            if (_unreadNotifications > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: _OwnerPalette.danger,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints:
+                      const BoxConstraints(minWidth: 14, minHeight: 14),
+                  child: Text(
+                    _unreadNotifications > 9
+                        ? '9+'
+                        : _unreadNotifications.toString(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 8,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          _navigateTo(const NotificationScreen());
+        },
+      ),
+    );
+  }
+
+  Widget _buildVerificationStatusCard(bool isDark, dynamic verification) {
+    final isVerified = verification.isVerified;
+    final isRejected = verification.isRejected;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isVerified
+              ? [Colors.green.withOpacity(0.10), Colors.teal.withOpacity(0.04)]
+              : isRejected
+                  ? [Colors.red.withOpacity(0.10), Colors.red.withOpacity(0.04)]
+                  : [
+                      Colors.orange.withOpacity(0.10),
+                      Colors.orange.withOpacity(0.04)
+                    ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isVerified
+              ? Colors.green.withOpacity(0.25)
+              : isRejected
+                  ? Colors.red.withOpacity(0.25)
+                  : Colors.orange.withOpacity(0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: isVerified
+                  ? Colors.green.withOpacity(0.15)
+                  : isRejected
+                      ? Colors.red.withOpacity(0.15)
+                      : Colors.orange.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isVerified
+                  ? Icons.verified_rounded
+                  : isRejected
+                      ? Icons.error_outline_rounded
+                      : Icons.hourglass_top_rounded,
+              color: isVerified
+                  ? Colors.green
+                  : isRejected
+                      ? Colors.red
+                      : Colors.orange,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isVerified
+                      ? '✔ Verified Owner'
+                      : isRejected
+                          ? '✖ Verification Rejected'
+                          : '⏳ Verification Pending',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                ),
+                Text(
+                  isVerified
+                      ? 'You can add properties & receive bookings'
+                      : isRejected
+                          ? '${verification.rejectionReason ?? "Please re-apply"}'
+                          : 'Admin reviews within 24-48 hours',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: isDark ? Colors.grey[400] : Colors.grey[500],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (isRejected)
+            TextButton(
+              onPressed: () => _navigateTo(const OwnerApplyPage()),
+              style: TextButton.styleFrom(
+                foregroundColor: _OwnerPalette.primary,
+                minimumSize: const Size(50, 28),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side:
+                      BorderSide(color: _OwnerPalette.primary.withOpacity(0.3)),
+                ),
+              ),
+              child: Text(
+                'Re-apply',
+                style: GoogleFonts.poppins(
+                    fontSize: 10, fontWeight: FontWeight.w600),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsGrid(bool isDark, dynamic stats) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            _buildStatCard('Properties', stats.totalProperties.toString(),
+                Icons.apartment_rounded, const Color(0xFF3B82F6), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Published', stats.publishedProperties.toString(),
+                Icons.check_circle_rounded, const Color(0xFF22C55E), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Rooms', stats.totalRooms.toString(),
+                Icons.bed_rounded, const Color(0xFF8B5CF6), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Available', stats.availableRooms.toString(),
+                Icons.meeting_room_rounded, const Color(0xFF06B6D4), isDark),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _buildStatCard('Bookings', stats.pendingRequests.toString(),
+                Icons.book_online_rounded, const Color(0xFFF59E0B), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard(
+                'Accepted',
+                stats.acceptedRequests?.toString() ?? '0',
+                Icons.check_rounded,
+                const Color(0xFF22C55E),
+                isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Rating', stats.averageRating.toStringAsFixed(1),
+                Icons.star_rounded, const Color(0xFFF59E0B), isDark),
+            const SizedBox(width: 8),
+            _buildStatCard('Views', stats.totalViews?.toString() ?? '0',
+                Icons.visibility_rounded, const Color(0xFF8B5CF6), isDark),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color, bool isDark) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+          border: Border.all(
+            color: color.withOpacity(0.08),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(icon, color: color, size: 14),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 8,
+                color: isDark ? Colors.grey[400] : Colors.grey[500],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildReelsSection(BuildContext context, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -318,9 +1117,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
           const SizedBox(height: 10),
           Row(
             children: [
-              // Upload Reel Card
               _buildReelsCard(
-                context: context, // 👈 FIXED: Added named parameter
+                context: context,
                 icon: Icons.upload_rounded,
                 label: 'Upload\nReel',
                 subtitle: '20-30s video',
@@ -329,9 +1127,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 onTap: () => _navigateTo(const OwnerReelsUploadScreen()),
               ),
               const SizedBox(width: 8),
-              // My Reels Card
               _buildReelsCard(
-                context: context, // 👈 FIXED: Added named parameter
+                context: context,
                 icon: Icons.video_library_rounded,
                 label: 'My\nReels',
                 subtitle: 'Manage all',
@@ -340,9 +1137,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 onTap: () => _navigateTo(const OwnerMyReelsScreen()),
               ),
               const SizedBox(width: 8),
-              // Stats Card
               _buildReelsCard(
-                context: context, // 👈 FIXED: Added named parameter
+                context: context,
                 icon: Icons.analytics_rounded,
                 label: 'Reel\nStats',
                 subtitle: 'Performance',
@@ -353,9 +1149,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 },
               ),
               const SizedBox(width: 8),
-              // Tips Card
               _buildReelsCard(
-                context: context, // 👈 FIXED: Added named parameter
+                context: context,
                 icon: Icons.tips_and_updates_rounded,
                 label: 'Tips\n& Tricks',
                 subtitle: 'Grow more',
@@ -373,7 +1168,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   Widget _buildReelsCard({
-    required BuildContext context, // 👈 Make sure this is here
+    required BuildContext context,
     required IconData icon,
     required String label,
     required String subtitle,
@@ -533,517 +1328,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
-  // ============== APP BAR ==============
-  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
-    return AppBar(
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: _OwnerPalette.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.home_rounded,
-              color: _OwnerPalette.primary,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Dashboard',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              fontSize: 18,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
-          ),
-        ],
-      ),
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      actions: [
-        IconButton(
-          icon: Icon(
-            Icons.refresh_rounded,
-            color: isDark ? Colors.white : const Color(0xFF4B5563),
-            size: 22,
-          ),
-          onPressed: _loadAll,
-        ),
-      ],
-    );
-  }
-
-  // ============== LOADING STATE ==============
-  Widget _buildLoadingState(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_OwnerPalette.primary, _OwnerPalette.primaryLight],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: _OwnerPalette.primary.withOpacity(0.3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Loading dashboard...',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============== PROFILE HEADER ==============
-  Widget _buildProfileHeader(
-    BuildContext context,
-    bool isDark,
-    dynamic user,
-    String? profileImage,
-    dynamic verification,
-    dynamic ownerProfile,
-  ) {
-    final hasImage = profileImage != null && profileImage.isNotEmpty;
-    final isVerified = verification?.isVerified ?? false;
-    final businessName = ownerProfile?.businessName;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-        border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]!,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Profile Picture
-          GestureDetector(
-            onTap: () => _navigateTo(const OwnerProfileScreen()),
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: hasImage
-                    ? null
-                    : const LinearGradient(
-                        colors: [
-                          _OwnerPalette.primary,
-                          _OwnerPalette.primaryLight
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                boxShadow: [
-                  BoxShadow(
-                    color: _OwnerPalette.primary.withOpacity(0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.transparent,
-                backgroundImage:
-                    hasImage ? CachedNetworkImageProvider(profileImage) : null,
-                child: hasImage
-                    ? null
-                    : Text(
-                        user?.name?.isNotEmpty == true
-                            ? user!.name[0].toUpperCase()
-                            : 'O',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // User Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _greeting(),
-                  style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.grey[400] : Colors.grey[500],
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  user?.name?.isNotEmpty == true ? user!.name : 'Owner',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (businessName != null && businessName.isNotEmpty)
-                  Text(
-                    businessName,
-                    style: GoogleFonts.poppins(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? Colors.grey[400] : Colors.grey[500],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                const SizedBox(height: 2),
-                // Verification Badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: (isVerified ? Colors.green : Colors.orange)
-                        .withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isVerified
-                            ? Icons.verified_rounded
-                            : Icons.hourglass_top_rounded,
-                        size: 10,
-                        color: isVerified ? Colors.green : Colors.orange,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        isVerified
-                            ? 'Verified Owner'
-                            : verification?.isRejected == true
-                                ? 'Rejected'
-                                : 'Pending',
-                        style: GoogleFonts.poppins(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w600,
-                          color: isVerified ? Colors.green : Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Notification Button
-          _buildNotificationButton(isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationButton(bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141A2C) : Colors.grey[100],
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(
-              Icons.notifications_outlined,
-              color: isDark ? Colors.white70 : const Color(0xFF4B5563),
-              size: 22,
-            ),
-            if (_unreadNotifications > 0)
-              Positioned(
-                right: -2,
-                top: -2,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    color: _OwnerPalette.danger,
-                    shape: BoxShape.circle,
-                  ),
-                  constraints:
-                      const BoxConstraints(minWidth: 14, minHeight: 14),
-                  child: Text(
-                    _unreadNotifications > 9
-                        ? '9+'
-                        : _unreadNotifications.toString(),
-                    style: GoogleFonts.poppins(
-                      fontSize: 8,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        onPressed: () {
-          HapticFeedback.selectionClick();
-          _navigateTo(const NotificationScreen());
-        },
-      ),
-    );
-  }
-
-  // ============== VERIFICATION STATUS CARD ==============
-  Widget _buildVerificationStatusCard(bool isDark, dynamic verification) {
-    final isVerified = verification.isVerified;
-    final isRejected = verification.isRejected;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isVerified
-              ? [Colors.green.withOpacity(0.10), Colors.teal.withOpacity(0.04)]
-              : isRejected
-                  ? [Colors.red.withOpacity(0.10), Colors.red.withOpacity(0.04)]
-                  : [
-                      Colors.orange.withOpacity(0.10),
-                      Colors.orange.withOpacity(0.04)
-                    ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isVerified
-              ? Colors.green.withOpacity(0.25)
-              : isRejected
-                  ? Colors.red.withOpacity(0.25)
-                  : Colors.orange.withOpacity(0.25),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: isVerified
-                  ? Colors.green.withOpacity(0.15)
-                  : isRejected
-                      ? Colors.red.withOpacity(0.15)
-                      : Colors.orange.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isVerified
-                  ? Icons.verified_rounded
-                  : isRejected
-                      ? Icons.error_outline_rounded
-                      : Icons.hourglass_top_rounded,
-              color: isVerified
-                  ? Colors.green
-                  : isRejected
-                      ? Colors.red
-                      : Colors.orange,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isVerified
-                      ? '✔ Verified Owner'
-                      : isRejected
-                          ? '✖ Verification Rejected'
-                          : '⏳ Verification Pending',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                  ),
-                ),
-                Text(
-                  isVerified
-                      ? 'You can add properties & receive bookings'
-                      : isRejected
-                          ? '${verification.rejectionReason ?? "Please re-apply"}'
-                          : 'Admin reviews within 24-48 hours',
-                  style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    color: isDark ? Colors.grey[400] : Colors.grey[500],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          if (isRejected)
-            TextButton(
-              onPressed: () => _navigateTo(const OwnerApplyPage()),
-              style: TextButton.styleFrom(
-                foregroundColor: _OwnerPalette.primary,
-                minimumSize: const Size(50, 28),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side:
-                      BorderSide(color: _OwnerPalette.primary.withOpacity(0.3)),
-                ),
-              ),
-              child: Text(
-                'Re-apply',
-                style: GoogleFonts.poppins(
-                    fontSize: 10, fontWeight: FontWeight.w600),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ============== STATS GRID ==============
-  Widget _buildStatsGrid(bool isDark, dynamic stats) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            _buildStatCard('Properties', stats.totalProperties.toString(),
-                Icons.apartment_rounded, const Color(0xFF3B82F6), isDark),
-            const SizedBox(width: 8),
-            _buildStatCard('Published', stats.publishedProperties.toString(),
-                Icons.check_circle_rounded, const Color(0xFF22C55E), isDark),
-            const SizedBox(width: 8),
-            _buildStatCard('Rooms', stats.totalRooms.toString(),
-                Icons.bed_rounded, const Color(0xFF8B5CF6), isDark),
-            const SizedBox(width: 8),
-            _buildStatCard('Available', stats.availableRooms.toString(),
-                Icons.meeting_room_rounded, const Color(0xFF06B6D4), isDark),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildStatCard('Bookings', stats.pendingRequests.toString(),
-                Icons.book_online_rounded, const Color(0xFFF59E0B), isDark),
-            const SizedBox(width: 8),
-            _buildStatCard(
-                'Accepted',
-                stats.acceptedRequests?.toString() ?? '0',
-                Icons.check_rounded,
-                const Color(0xFF22C55E),
-                isDark),
-            const SizedBox(width: 8),
-            _buildStatCard('Rating', stats.averageRating.toStringAsFixed(1),
-                Icons.star_rounded, const Color(0xFFF59E0B), isDark),
-            const SizedBox(width: 8),
-            _buildStatCard('Views', stats.totalViews?.toString() ?? '0',
-                Icons.visibility_rounded, const Color(0xFF8B5CF6), isDark),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(
-      String label, String value, IconData icon, Color color, bool isDark) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-          border: Border.all(
-            color: color.withOpacity(0.08),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(icon, color: color, size: 14),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-              ),
-            ),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 8,
-                color: isDark ? Colors.grey[400] : Colors.grey[500],
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============== SUBSCRIPTION SECTION ==============
   Widget _buildSubscriptionSection(
     BuildContext context,
     bool isDark,
@@ -1213,7 +1497,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
-  // ============== QUICK ACTIONS ==============
   Widget _buildQuickActions(
       BuildContext context, bool isDark, dynamic verification) {
     return Container(
@@ -1360,7 +1643,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
-  // ============== PENDING ITEMS ==============
   Widget _buildPendingItems(
       BuildContext context, bool isDark, OwnerProvider provider) {
     final bookings = provider.bookingRequests;

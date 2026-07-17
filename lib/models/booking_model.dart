@@ -3,32 +3,30 @@ class BookingRequest {
   final int propertyId;
   final String propertyTitle;
   final String propertyCity;
-  final String? coverImage;
-  final int? roomId;
   final String? roomNumber;
   final DateTime moveInDate;
   final int? durationMonths;
-  final String? message;
   final String status;
+  final String? message;
   final String? ownerResponse;
   final DateTime requestedAt;
   final DateTime? respondedAt;
+  final bool isPaid; // ✅ NEW
 
   BookingRequest({
     required this.requestId,
     required this.propertyId,
     required this.propertyTitle,
     required this.propertyCity,
-    this.coverImage,
-    this.roomId,
     this.roomNumber,
     required this.moveInDate,
     this.durationMonths,
-    this.message,
     required this.status,
+    this.message,
     this.ownerResponse,
     required this.requestedAt,
     this.respondedAt,
+    this.isPaid = false, // ✅ NEW
   });
 
   factory BookingRequest.fromJson(Map<String, dynamic> json) {
@@ -37,18 +35,21 @@ class BookingRequest {
       propertyId: json['propertyId'] ?? 0,
       propertyTitle: json['propertyTitle'] ?? '',
       propertyCity: json['propertyCity'] ?? '',
-      coverImage: json['coverImage'],
-      roomId: json['roomId'],
       roomNumber: json['roomNumber'],
-      moveInDate: DateTime.parse(json['moveInDate'] ?? DateTime.now().toIso8601String()),
+      moveInDate: json['moveInDate'] != null 
+          ? DateTime.parse(json['moveInDate']) 
+          : DateTime.now(),
       durationMonths: json['durationMonths'],
-      message: json['message'],
       status: json['status'] ?? 'PENDING',
+      message: json['message'],
       ownerResponse: json['ownerResponse'],
-      requestedAt: DateTime.parse(json['requestedAt'] ?? DateTime.now().toIso8601String()),
+      requestedAt: json['requestedAt'] != null 
+          ? DateTime.parse(json['requestedAt']) 
+          : DateTime.now(),
       respondedAt: json['respondedAt'] != null 
           ? DateTime.parse(json['respondedAt']) 
           : null,
+      isPaid: json['isPaid'] ?? false, // ✅ NEW
     );
   }
 }

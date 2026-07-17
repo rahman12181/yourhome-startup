@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:yourhome/models/booking_model.dart';
+import 'package:yourhome/providers/auth_provider.dart';
+import 'package:yourhome/screens/booking/booking_payment_screen.dart';
 import '../providers/property_provider.dart';
 import '../models/property_model.dart';
 import '../models/room_model.dart';
@@ -37,6 +39,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   List<Room> _rooms = [];
   List<Review> _reviews = [];
   int _selectedTabIndex = 0;
+  int? _activeBookingRequestId;
+  String? _bookingStatus;
+  bool _isCheckingBooking = false;
 
   final ChatService _chatService = ChatService();
 
@@ -62,6 +67,42 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     super.dispose();
   }
 
+Future<void> _checkActiveBooking() async {
+
+  setState(() => _isCheckingBooking = true);
+
+  try {
+    final bookingService = BookingService();
+    
+    // ✅ FIX: Use getMyBookings() instead of getUserBookings
+    final response = await bookingService.getMyBookings();
+    
+    if (response.success && response.data != null) {
+      final bookings = response.data!;
+      BookingRequest? activeBooking;
+      for (final booking in bookings) {
+        if (booking.propertyId == widget.propertyId &&
+            booking.status == 'ACCEPTED' &&
+            !booking.isPaid) {
+          activeBooking = booking;
+          break;
+        }
+      }
+
+      if (activeBooking != null) {
+        setState(() {
+          _activeBookingRequestId = activeBooking?.requestId;
+          _bookingStatus = 'ACCEPTED';
+        });
+      }
+    }
+  } catch (e) {
+    print('Error checking booking: $e');
+  }
+
+  setState(() => _isCheckingBooking = false);
+}
+
   Future<void> _loadPropertyDetail() async {
     setState(() => _isLoading = true);
 
@@ -70,17 +111,19 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       listen: false,
     );
 
-    // ✅ Load all data
     await propertyProvider.getPropertyDetail(widget.propertyId);
-    await propertyProvider.getRooms(widget.propertyId); // ✅ Rooms API
+    await propertyProvider.getRooms(widget.propertyId);
     await propertyProvider.getSavedProperties();
 
     final property = propertyProvider.selectedProperty;
     if (property != null) {
       _property = property;
-      _rooms = propertyProvider.rooms; // ✅ Rooms from API
+      _rooms = propertyProvider.rooms;
       _isSaved = propertyProvider.savedProperties
           .any((p) => p.propertyId == property.propertyId);
+
+      // ✅ Check for active booking
+      await _checkActiveBooking();
     } else {
       _error = propertyProvider.error ?? 'Failed to load property';
     }
@@ -193,7 +236,24 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   // ✅ PREMIUM BOOKING BOTTOM SHEET (replaces old dialog + dropdown)
   Future<void> _bookNow() async {
     if (_property == null) return;
+    if (_activeBookingRequestId != null && _bookingStatus == 'ACCEPTED') {
+      // Navigate to payment screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BookingPaymentScreen(
+            bookingRequestId: _activeBookingRequestId!,
+            propertyTitle: _property!.title,
+            roomNumber:
+                _rooms.isNotEmpty ? _rooms.first.roomNumber ?? 'N/A' : 'N/A',
+            originalAmount: _property!.monthlyRentMin ?? 10000,
+          ),
+        ),
+      );
+      return;
+    }
 
+    // ✅ Otherwise open booking bottom sheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -209,6 +269,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
             text: 'Booking request sent successfully!',
             bg: Colors.grey[900]!,
           );
+          // ✅ Refresh booking status
+          _checkActiveBooking();
         },
       ),
     );
@@ -296,7 +358,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final bodyColor = isDark ? const Color(0xFF12121E) : const Color(0xFFF7F8FA);
+    final bodyColor =
+        isDark ? const Color(0xFF12121E) : const Color(0xFFF7F8FA);
 
     if (_isLoading) {
       return Scaffold(
@@ -363,8 +426,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 28, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -388,6 +451,258 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           ),
         ],
       ),
+    );
+  }
+
+  // ============== BOOK NOW SECTION (Premium with Payment) ==============
+  Widget _buildBookNowSection(bool isDark) {
+    final property = _property!;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B1B2F) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.07),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ShaderMask(
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: [_primary, _primary.withOpacity(0.65)],
+                    ).createShader(bounds),
+                    child: Text(
+                      property.monthlyRentMin != null
+                          ? '₹${property.monthlyRentMin!.toStringAsFixed(0)}'
+                          : 'Contact for price',
+                      style: GoogleFonts.poppins(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  if (property.monthlyRentMax != null &&
+                      property.monthlyRentMax != property.monthlyRentMin)
+                    Text(
+                      '— ₹${property.monthlyRentMax!.toStringAsFixed(0)} /month',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                ],
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF11998E).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  '${property.availableRooms} available',
+                  style: GoogleFonts.poppins(
+                    color: const Color(0xFF11998E),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (property.securityDeposit != null)
+            Text(
+              'Security: ₹${property.securityDeposit!.toStringAsFixed(0)} • ${property.isNegotiable ? 'Negotiable' : 'Fixed'}',
+              style: GoogleFonts.poppins(
+                fontSize: 12.5,
+                color: Colors.grey[600],
+              ),
+            ),
+          const SizedBox(height: 18),
+
+          // ✅ Booking Status / Pay Button
+          _buildBookingActionButton(isDark),
+
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _secondaryActionButton(
+                  icon: Icons.chat_bubble_outline,
+                  label: 'Chat',
+                  onTap: _chatWithOwner,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _secondaryActionButton(
+                  icon: Icons.play_circle_outline,
+                  label: 'Tour',
+                  onTap: _watchTour,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _secondaryActionButton(
+                  icon: Icons.flag_outlined,
+                  label: 'Report',
+                  onTap: _reportProperty,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// ✅ NEW: Booking Action Button with Status
+  Widget _buildBookingActionButton(bool isDark) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final isLoggedIn = authProvider.isLoggedIn;
+
+    // If booking is ACCEPTED -> Show Pay Now
+    if (_activeBookingRequestId != null && _bookingStatus == 'ACCEPTED') {
+      return SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _primary,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _bookNow,
+              child: Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.payment_rounded,
+                        color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Book Now (Pay)',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // If booking is PENDING -> Show status
+    if (_activeBookingRequestId != null && _bookingStatus == 'PENDING') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.orange.withOpacity(0.3),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.hourglass_top_rounded,
+                color: Colors.orange, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              '⏳ Booking Request Pending',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Default: Book Now
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_primary, _primary.withOpacity(0.75)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: _primary.withOpacity(0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: (isLoggedIn == true) ? _bookNow : _showLoginPrompt,
+            child: Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.bolt, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    (isLoggedIn == true) ? 'Book Now' : 'Login to Book',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLoginPrompt() {
+    _showSnack(
+      icon: Icons.login_rounded,
+      iconColor: Colors.white,
+      text: 'Please login to book this property',
+      bg: Colors.orange[700]!,
     );
   }
 
@@ -639,8 +954,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
               _buildTag(property.propertyType, _primary),
               _buildTag(property.genderAllowed, Colors.purple),
               _buildTag('${property.viewCount} views', Colors.blueGrey),
-              _buildTag(
-                  '${property.availableRooms} available', const Color(0xFF11998E)),
+              _buildTag('${property.availableRooms} available',
+                  const Color(0xFF11998E)),
             ],
           ),
           const SizedBox(height: 20),
@@ -704,8 +1019,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
         controller: _tabController,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.grey[600],
-        labelStyle: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600, fontSize: 12.5),
+        labelStyle:
+            GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12.5),
         unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12.5),
         indicator: BoxDecoration(
           gradient: LinearGradient(
@@ -918,7 +1233,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.location_off, size: 48, color: Colors.grey[500]),
+                        Icon(Icons.location_off,
+                            size: 48, color: Colors.grey[500]),
                         const SizedBox(height: 8),
                         Text(
                           'Location not available',
@@ -1022,7 +1338,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                     if (property.isVerifiedOwner)
                       Row(
                         children: [
-                          const Icon(Icons.verified, size: 14, color: Colors.blue),
+                          const Icon(Icons.verified,
+                              size: 14, color: Colors.blue),
                           const SizedBox(width: 4),
                           Text(
                             'Verified Owner',
@@ -1303,7 +1620,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                       children: List.generate(5, (index) {
                         final rating = _property!.averageRating ?? 4.0;
                         return Icon(
-                          index < rating.round() ? Icons.star : Icons.star_border,
+                          index < rating.round()
+                              ? Icons.star
+                              : Icons.star_border,
                           color: Colors.amber,
                           size: 18,
                         );
@@ -1378,7 +1697,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                       Row(
                         children: List.generate(5, (index) {
                           return Icon(
-                            index < review.rating ? Icons.star : Icons.star_border,
+                            index < review.rating
+                                ? Icons.star
+                                : Icons.star_border,
                             color: Colors.amber,
                             size: 13,
                           );
@@ -1514,163 +1835,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== BOOK NOW SECTION (Premium) ==============
-  Widget _buildBookNowSection(bool isDark) {
-    final property = _property!;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B1B2F) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.07),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ShaderMask(
-                    shaderCallback: (bounds) => LinearGradient(
-                      colors: [_primary, _primary.withOpacity(0.65)],
-                    ).createShader(bounds),
-                    child: Text(
-                      property.monthlyRentMin != null
-                          ? '₹${property.monthlyRentMin!.toStringAsFixed(0)}'
-                          : 'Contact for price',
-                      style: GoogleFonts.poppins(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  if (property.monthlyRentMax != null &&
-                      property.monthlyRentMax != property.monthlyRentMin)
-                    Text(
-                      '— ₹${property.monthlyRentMax!.toStringAsFixed(0)} /month',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF11998E).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Text(
-                  '${property.availableRooms} available',
-                  style: GoogleFonts.poppins(
-                    color: const Color(0xFF11998E),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (property.securityDeposit != null)
-            Text(
-              'Security: ₹${property.securityDeposit!.toStringAsFixed(0)} • ${property.isNegotiable ? 'Negotiable' : 'Fixed'}',
-              style: GoogleFonts.poppins(
-                fontSize: 12.5,
-                color: Colors.grey[600],
-              ),
-            ),
-          const SizedBox(height: 18),
-          // Book Now Button — premium gradient
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [_primary, _primary.withOpacity(0.75)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: _primary.withOpacity(0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: _bookNow,
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.bolt, color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Book Now',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _secondaryActionButton(
-                  icon: Icons.chat_bubble_outline,
-                  label: 'Chat',
-                  onTap: _chatWithOwner,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _secondaryActionButton(
-                  icon: Icons.play_circle_outline,
-                  label: 'Tour',
-                  onTap: _watchTour,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _secondaryActionButton(
-                  icon: Icons.flag_outlined,
-                  label: 'Report',
-                  onTap: _reportProperty,
-                  color: Colors.red,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _secondaryActionButton({
     required IconData icon,
@@ -1684,7 +1848,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       icon: Icon(icon, size: 17, color: c),
       label: Text(
         label,
-        style: GoogleFonts.poppins(fontSize: 12, color: c, fontWeight: FontWeight.w500),
+        style: GoogleFonts.poppins(
+            fontSize: 12, color: c, fontWeight: FontWeight.w500),
       ),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1837,8 +2002,18 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
@@ -1949,7 +2124,8 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.bolt, color: Colors.white, size: 20),
+                        child: const Icon(Icons.bolt,
+                            color: Colors.white, size: 20),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -2023,7 +2199,8 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                         const SizedBox(height: 22),
 
                         // ─── Message ───
-                        _sectionTitle('Message to Owner', isDark, optional: true),
+                        _sectionTitle('Message to Owner', isDark,
+                            optional: true),
                         const SizedBox(height: 10),
                         _buildMessageField(isDark),
                         const SizedBox(height: 22),
@@ -2085,7 +2262,8 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                                       ),
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         const Icon(Icons.send_rounded,
                                             color: Colors.white, size: 18),
@@ -2143,124 +2321,128 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
 
   // ─── Room selector: smooth selectable cards instead of a dropdown ───
   Widget _buildRoomSelector(bool isDark) {
-    return Column(
-      children: [
-        _roomOptionCard(
-          isDark: isDark,
-          selected: _selectedRoomId == null,
-          title: 'Any Available Room',
-          subtitle: 'Owner will assign the best available room',
-          trailing: null,
-          onTap: () => setState(() => _selectedRoomId = null),
-          icon: Icons.auto_awesome,
-        ),
-        const SizedBox(height: 10),
-        ..._allRooms.map((room) {
-          final isAvailable = room.status == 'AVAILABLE';
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _roomOptionCard(
-              isDark: isDark,
-              selected: _selectedRoomId == room.roomId,
-              enabled: isAvailable,
-              title: 'Room ${room.roomNumber ?? room.roomId}',
-              subtitle: isAvailable
-                  ? '${room.roomType}${room.hasAc ? ' • AC' : ''}'
-                  : '${room.roomType}${room.hasAc ? ' • AC' : ''} • Occupied',
-              trailing: '₹${room.monthlyRent.toStringAsFixed(0)}/mo',
-              onTap: isAvailable
-                  ? () => setState(() => _selectedRoomId = room.roomId)
-                  : null,
-              icon: Icons.bed_outlined,
-            ),
-          );
-        }),
-        if (_allRooms.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              'No rooms listed for this property yet — request will be sent for any available room.',
-              style: GoogleFonts.poppins(
-                fontSize: 11.5,
-                color: Colors.grey[500],
-              ),
+  return Column(
+    children: [
+      _roomOptionCard(
+        isDark: isDark,
+        selected: _selectedRoomId == null,
+        title: 'Any Available Room',
+        subtitle: 'Owner will assign the best available room',
+        trailing: null,
+        onTap: () => setState(() => _selectedRoomId = null),
+        icon: Icons.auto_awesome,
+      ),
+      const SizedBox(height: 10),
+      ..._allRooms.map((room) {
+        final isAvailable = room.status == 'AVAILABLE';
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _roomOptionCard(
+            isDark: isDark,
+            selected: _selectedRoomId == room.roomId,
+            enabled: isAvailable,
+            title: 'Room ${room.roomNumber ?? room.roomId}',
+            subtitle: isAvailable
+                ? '${room.roomType}${room.hasAc ? ' • AC' : ''}'
+                : '${room.roomType}${room.hasAc ? ' • AC' : ''} • Occupied',
+            trailing: isAvailable ? '₹${room.monthlyRent.toStringAsFixed(0)}/mo' : 'Unavailable',
+            onTap: isAvailable
+                ? () => setState(() {
+                    _selectedRoomId = room.roomId;
+                    print('✅ Room selected: ${room.roomId}');
+                  })
+                : null,
+            icon: Icons.bed_outlined,
+          ),
+        );
+      }),
+      if (_allRooms.isEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            'No rooms listed for this property yet — request will be sent for any available room.',
+            style: GoogleFonts.poppins(
+              fontSize: 11.5,
+              color: Colors.grey[500],
             ),
           ),
-      ],
-    );
-  }
+        ),
+    ],
+  );
+}
 
-  Widget _roomOptionCard({
-    required bool isDark,
-    required bool selected,
-    required String title,
-    required String subtitle,
-    required String? trailing,
-    required VoidCallback? onTap,
-    required IconData icon,
-    bool enabled = true,
-  }) {
-    final color = _primary;
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: enabled ? onTap : null,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: selected
-                    ? color.withOpacity(isDark ? 0.16 : 0.08)
-                    : (isDark ? const Color(0xFF1E1E38) : Colors.grey[50]),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: selected ? color : Colors.transparent,
-                  width: 1.6,
-                ),
+ Widget _roomOptionCard({
+  required bool isDark,
+  required bool selected,
+  required String title,
+  required String subtitle,
+  required String? trailing,
+  required VoidCallback? onTap,
+  required IconData icon,
+  bool enabled = true,
+}) {
+  final color = _primary;
+  return Opacity(
+    opacity: enabled ? 1 : 0.5,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: enabled ? onTap : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: selected
+                  ? color.withOpacity(isDark ? 0.16 : 0.08)
+                  : (isDark ? const Color(0xFF1E1E38) : Colors.grey[50]),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected ? color : Colors.transparent,
+                width: 1.6,
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? color.withOpacity(0.15)
-                          : Colors.grey.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, size: 18, color: selected ? color : Colors.grey[600]),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? color.withOpacity(0.15)
+                        : Colors.grey.withOpacity(0.12),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : Colors.black,
-                          ),
+                  child: Icon(icon,
+                      size: 18, color: selected ? color : Colors.grey[600]),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11.5,
-                            color: !enabled ? Colors.red[300] : Colors.grey[500],
-                          ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11.5,
+                          color: !enabled ? Colors.red[300] : Colors.grey[500],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  if (trailing != null)
+                ),
+                if (trailing != null)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: Text(
@@ -2268,25 +2450,28 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: color,
+                        color: enabled ? color : Colors.grey,
                       ),
                     ),
                   ),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: selected
-                        ? Icon(Icons.check_circle, color: color, size: 20, key: const ValueKey('sel'))
-                        : Icon(Icons.circle_outlined,
-                            color: Colors.grey[400], size: 20, key: const ValueKey('unsel')),
-                  ),
-                ],
-              ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: selected
+                      ? Icon(Icons.check_circle,
+                          color: color, size: 20, key: const ValueKey('sel'))
+                      : Icon(Icons.circle_outlined,
+                          color: Colors.grey[400],
+                          size: 20,
+                          key: const ValueKey('unsel')),
+                ),
+              ],
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ─── Date field ───
   Widget _buildDateField(bool isDark) {
@@ -2320,8 +2505,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                 ),
               ),
             ),
-            Icon(Icons.keyboard_arrow_down_rounded,
-                color: Colors.grey[500]),
+            Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey[500]),
           ],
         ),
       ),
@@ -2347,7 +2531,8 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 gradient: selected
-                    ? LinearGradient(colors: [_primary, _primary.withOpacity(0.7)])
+                    ? LinearGradient(
+                        colors: [_primary, _primary.withOpacity(0.7)])
                     : null,
                 color: selected
                     ? null
@@ -2449,12 +2634,16 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
           _summaryRow('Monthly Rent',
               '₹${_estimatedMonthlyRent.toStringAsFixed(0)}', isDark),
           const SizedBox(height: 6),
-          _summaryRow('Duration', '$_durationMonths month${_durationMonths > 1 ? 's' : ''}',
+          _summaryRow(
+              'Duration',
+              '$_durationMonths month${_durationMonths > 1 ? 's' : ''}',
               isDark),
           const SizedBox(height: 6),
           if (widget.property.securityDeposit != null)
-            _summaryRow('Security Deposit',
-                '₹${widget.property.securityDeposit!.toStringAsFixed(0)}', isDark),
+            _summaryRow(
+                'Security Deposit',
+                '₹${widget.property.securityDeposit!.toStringAsFixed(0)}',
+                isDark),
           const Divider(height: 20),
           _summaryRow(
             'Estimated Total',
@@ -2467,7 +2656,8 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     );
   }
 
-  Widget _summaryRow(String label, String value, bool isDark, {bool bold = false}) {
+  Widget _summaryRow(String label, String value, bool isDark,
+      {bool bold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -2564,7 +2754,8 @@ class _ReportDialogState extends State<ReportDialog> {
                         color: Colors.red.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.flag_rounded, color: Colors.red, size: 18),
+                      child: const Icon(Icons.flag_rounded,
+                          color: Colors.red, size: 18),
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -2600,15 +2791,17 @@ class _ReportDialogState extends State<ReportDialog> {
                     ),
                     prefixIcon: const Icon(Icons.category_outlined),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF1E1E38) : Colors.grey[50],
+                    fillColor:
+                        isDark ? const Color(0xFF1E1E38) : Colors.grey[50],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
                   ),
-                  validator: (value) => value == null ? 'Please select a type' : null,
+                  validator: (value) =>
+                      value == null ? 'Please select a type' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -2620,19 +2813,21 @@ class _ReportDialogState extends State<ReportDialog> {
                     ),
                     prefixIcon: const Icon(Icons.title_rounded),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF1E1E38) : Colors.grey[50],
+                    fillColor:
+                        isDark ? const Color(0xFF1E1E38) : Colors.grey[50],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
                   ),
                   style: GoogleFonts.poppins(
                     color: isDark ? Colors.white : Colors.black,
                   ),
-                  validator: (value) =>
-                      (value == null || value.isEmpty) ? 'Please enter a reason' : null,
+                  validator: (value) => (value == null || value.isEmpty)
+                      ? 'Please enter a reason'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -2645,13 +2840,14 @@ class _ReportDialogState extends State<ReportDialog> {
                     ),
                     prefixIcon: const Icon(Icons.description_outlined),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF1E1E38) : Colors.grey[50],
+                    fillColor:
+                        isDark ? const Color(0xFF1E1E38) : Colors.grey[50],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
                   ),
                   style: GoogleFonts.poppins(
                     color: isDark ? Colors.white : Colors.black,
@@ -2691,13 +2887,14 @@ class _ReportDialogState extends State<ReportDialog> {
                                 width: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
                                 ),
                               )
                             : Text(
                                 'Submit',
-                                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                                style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600),
                               ),
                       ),
                     ),
@@ -2731,8 +2928,7 @@ class InAppVideoPlayerScreen extends StatefulWidget {
   });
 
   @override
-  State<InAppVideoPlayerScreen> createState() =>
-      _InAppVideoPlayerScreenState();
+  State<InAppVideoPlayerScreen> createState() => _InAppVideoPlayerScreenState();
 }
 
 class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {

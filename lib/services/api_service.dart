@@ -14,7 +14,7 @@ class ApiService {
 
   Future<void> init() async {
     if (_isInitialized) return;
-    
+
     _dio = Dio(BaseOptions(
       baseUrl: AppConstants.baseUrl,
       connectTimeout: const Duration(seconds: 30),
@@ -44,7 +44,7 @@ class ApiService {
       onError: (error, handler) async {
         print('❌ Error: ${error.message}');
         print('❌ Error Response: ${error.response?.data}');
-        
+
         if (error.response?.statusCode == 401) {
           final refreshed = await _refreshToken();
           if (refreshed) {
@@ -57,13 +57,14 @@ class ApiService {
         return handler.next(error);
       },
     ));
-    
+
     _isInitialized = true;
   }
 
   Dio get dio {
     if (!_isInitialized) {
-      throw Exception('ApiService not initialized. Call ApiService().init() first.');
+      throw Exception(
+          'ApiService not initialized. Call ApiService().init() first.');
     }
     return _dio;
   }
@@ -280,6 +281,75 @@ class ApiService {
     }
     return await get(
       '/admin/withdrawals/all',
+      queryParameters: queryParams,
+    );
+  }
+
+  // ==================== MODULE 14 - BOOKING PAYMENTS ====================
+
+  /// 14.1 - Get Payment Summary
+  Future<Response> getPaymentSummary(int bookingRequestId) async {
+    return await get('/user/bookings/$bookingRequestId/payment-summary');
+  }
+
+  /// 14.2 - Initiate Payment
+  Future<Response> initiatePayment(
+    int bookingRequestId, {
+    String? couponCode,
+  }) async {
+    final data = <String, dynamic>{};
+    if (couponCode != null && couponCode.isNotEmpty) {
+      data['couponCode'] = couponCode;
+    }
+    return await post(
+      '/user/bookings/$bookingRequestId/pay/initiate',
+      data: data,
+    );
+  }
+
+  /// 14.3 - Confirm Payment
+  Future<Response> confirmPayment({
+    required int bookingRequestId,
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+  }) async {
+    return await post(
+      '/user/bookings/$bookingRequestId/pay/confirm',
+      data: {
+        'razorpayOrderId': razorpayOrderId,
+        'razorpayPaymentId': razorpayPaymentId,
+        'razorpaySignature': razorpaySignature,
+      },
+    );
+  }
+
+  /// 14.4 - Get My Payments (Student)
+  Future<Response> getStudentPayments() async {
+    return await get('/user/payments');
+  }
+
+  /// 14.5 - Set Payout UPI ID (Owner)
+  Future<Response> setPayoutUpi(String upiId) async {
+    return await put(
+      '/owner/payout-upi',
+      data: {'payoutUpiId': upiId},
+    );
+  }
+
+  /// 14.6 - Get My Payments (Owner)
+  Future<Response> getOwnerPayments() async {
+    return await get('/owner/payments');
+  }
+
+  /// 14.7 - Get All Rent Payments (Admin)
+  Future<Response> getAdminRentPayments({String? status}) async {
+    final queryParams = <String, dynamic>{};
+    if (status != null && status.isNotEmpty) {
+      queryParams['status'] = status;
+    }
+    return await get(
+      '/admin/rent-payments/all',
       queryParameters: queryParams,
     );
   }
