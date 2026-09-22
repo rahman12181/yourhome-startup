@@ -270,6 +270,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> loadLocalProfileImagePublic() async {
+    
     await loadLocalProfileImage();
   }
 

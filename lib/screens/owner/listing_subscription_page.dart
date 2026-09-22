@@ -106,10 +106,12 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
 
       if (success && mounted) {
         _showSnackBar(
-          'Subscription Activated!',
+          'Subscription Activated! 🎉',
           'Your listing subscription is now active.',
           Colors.green,
         );
+        // Refresh subscription status
+        await provider.getListingSubscriptionDetails();
         Navigator.pop(context, true);
       } else if (mounted) {
         _showSnackBar(
@@ -162,6 +164,10 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
         (plan) => plan.code == _selectedPlanCode,
       );
 
+      final user = provider.ownerProfile;
+      final phone = user?.phone ?? '9876543210';
+      final email = user?.email ?? 'user@example.com';
+
       final order = await provider.buyListingSubscription(
         selectedPlan.code,
       );
@@ -178,14 +184,14 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
 
       final options = {
         'key': AppConstants.razorpayKeyId,
-        'amount': order.amount,
+        'amount': order.amount, // Already in paise from server
         'currency': order.currency,
         'order_id': order.razorpayOrderId,
         'name': AppConstants.appName,
         'description': 'Listing Subscription - ${widget.propertyTitle}',
         'prefill': {
-          'contact': provider.ownerProfile?.phone ?? '9876543210',
-          'email': provider.ownerProfile?.email ?? 'user@example.com',
+          'contact': phone,
+          'email': email,
         },
         'theme': {
           'color': '#7C3AED',
@@ -230,15 +236,14 @@ class _ListingSubscriptionPageState extends State<ListingSubscriptionPage> {
         ),
       ),
       body: SafeArea(
-      child: _isFetching
-          ? const Center(child: CustomLoadingWidget(message: 'Loading plans...'))
-          : _error != null
-              ? _buildErrorWidget(isDark)
-              : _plans.isEmpty
-                  ? _buildEmptyWidget(isDark)
-            
-                  : _buildBody(isDark),
-    ),
+        child: _isFetching
+            ? const Center(child: CustomLoadingWidget(message: 'Loading plans...'))
+            : _error != null
+                ? _buildErrorWidget(isDark)
+                : _plans.isEmpty
+                    ? _buildEmptyWidget(isDark)
+                    : _buildBody(isDark),
+      ),
     );
   }
 

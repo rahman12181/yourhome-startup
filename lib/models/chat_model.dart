@@ -49,6 +49,29 @@ class Conversation {
       return 'Just now';
     }
   }
+
+  // ✅ NEW — copyWith method
+  Conversation copyWith({
+    int? conversationId,
+    int? otherUserId,
+    String? otherUserName,
+    String? otherUserPic,
+    String? propertyTitle,
+    String? lastMessage,
+    DateTime? lastMessageAt,
+    int? unreadCount,
+  }) {
+    return Conversation(
+      conversationId: conversationId ?? this.conversationId,
+      otherUserId: otherUserId ?? this.otherUserId,
+      otherUserName: otherUserName ?? this.otherUserName,
+      otherUserPic: otherUserPic ?? this.otherUserPic,
+      propertyTitle: propertyTitle ?? this.propertyTitle,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      unreadCount: unreadCount ?? this.unreadCount,
+    );
+  }
 }
 
 // ✅ FIXED MESSAGE CLASS

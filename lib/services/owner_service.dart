@@ -4,6 +4,7 @@ import '../models/property_model.dart';
 import '../models/room_model.dart';
 import '../models/booking_model.dart';
 import '../models/api_response.dart';
+import '../models/dashboard_model.dart';
 import 'api_service.dart';
 
 class OwnerService {
@@ -642,6 +643,172 @@ class OwnerService {
       return ApiResponse<SubscriptionOrder>.error(e.toString());
     }
   }
+
+  // ==================== OWNER DASHBOARD ANALYTICS ====================
+
+// 8.1 Get Dashboard Summary (all-in-one)
+Future<ApiResponse<DashboardSummary>> getDashboardSummary() async {
+  try {
+    final response = await _api.get('/owner/dashboard/summary');
+    return ApiResponse<DashboardSummary>.fromJson(
+      response.data,
+      (data) => DashboardSummary.fromJson(data as Map<String, dynamic>),
+    );
+  } on DioException catch (e) {
+    if (e.response?.data != null) {
+      return ApiResponse<DashboardSummary>.fromJson(
+        e.response!.data,
+        (data) => DashboardSummary.fromJson(data as Map<String, dynamic>),
+      );
+    }
+    return ApiResponse<DashboardSummary>.error(
+        e.message ?? 'Something went wrong');
+  } catch (e) {
+    return ApiResponse<DashboardSummary>.error(e.toString());
+  }
+}
+
+// 8.2 Get Revenue
+Future<ApiResponse<RevenueSummary>> getRevenueSummary() async {
+  try {
+    final response = await _api.get('/owner/dashboard/revenue');
+    return ApiResponse<RevenueSummary>.fromJson(
+      response.data,
+      (data) => RevenueSummary.fromJson(data as Map<String, dynamic>),
+    );
+  } on DioException catch (e) {
+    return ApiResponse<RevenueSummary>.error(
+        e.response?.data?['message'] ?? e.message ?? 'Error');
+  } catch (e) {
+    return ApiResponse<RevenueSummary>.error(e.toString());
+  }
+}
+
+// 8.3 Get Actions Required
+Future<ApiResponse<ActionRequired>> getActionsRequired() async {
+  try {
+    final response = await _api.get('/owner/dashboard/actions-required');
+    return ApiResponse<ActionRequired>.fromJson(
+      response.data,
+      (data) => ActionRequired.fromJson(data as Map<String, dynamic>),
+    );
+  } on DioException catch (e) {
+    return ApiResponse<ActionRequired>.error(
+        e.response?.data?['message'] ?? e.message ?? 'Error');
+  } catch (e) {
+    return ApiResponse<ActionRequired>.error(e.toString());
+  }
+}
+
+// 8.4 Get Recent Activity
+Future<ApiResponse<RecentActivity>> getRecentActivity({int limit = 10}) async {
+  try {
+    final response =
+        await _api.get('/owner/dashboard/activity?limit=$limit');
+    return ApiResponse<RecentActivity>.fromJson(
+      response.data,
+      (data) => RecentActivity.fromJson(data as Map<String, dynamic>),
+    );
+  } on DioException catch (e) {
+    return ApiResponse<RecentActivity>.error(
+        e.response?.data?['message'] ?? e.message ?? 'Error');
+  } catch (e) {
+    return ApiResponse<RecentActivity>.error(e.toString());
+  }
+}
+
+// 8.5 Get Occupancy
+Future<ApiResponse<OccupancyData>> getOccupancy() async {
+  try {
+    final response = await _api.get('/owner/dashboard/occupancy');
+    return ApiResponse<OccupancyData>.fromJson(
+      response.data,
+      (data) => OccupancyData.fromJson(data as Map<String, dynamic>),
+    );
+  } on DioException catch (e) {
+    return ApiResponse<OccupancyData>.error(
+        e.response?.data?['message'] ?? e.message ?? 'Error');
+  } catch (e) {
+    return ApiResponse<OccupancyData>.error(e.toString());
+  }
+}
+
+// 8.6 Get Trends
+Future<ApiResponse<TrendsData>> getTrends() async {
+  try {
+    final response = await _api.get('/owner/dashboard/trends');
+    return ApiResponse<TrendsData>.fromJson(
+      response.data,
+      (data) => TrendsData.fromJson(data as Map<String, dynamic>),
+    );
+  } on DioException catch (e) {
+    return ApiResponse<TrendsData>.error(
+        e.response?.data?['message'] ?? e.message ?? 'Error');
+  } catch (e) {
+    return ApiResponse<TrendsData>.error(e.toString());
+  }
+}
+
+// 8.7 Get Top Property
+Future<ApiResponse<TopProperty>> getTopProperty() async {
+  try {
+    final response = await _api.get('/owner/dashboard/top-property');
+    return ApiResponse<TopProperty>.fromJson(
+      response.data,
+      (data) => TopProperty.fromJson(data as Map<String, dynamic>),
+    );
+  } on DioException catch (e) {
+    return ApiResponse<TopProperty>.error(
+        e.response?.data?['message'] ?? e.message ?? 'Error');
+  } catch (e) {
+    return ApiResponse<TopProperty>.error(e.toString());
+  }
+}
+
+// 8.8 Get Today Schedule
+Future<ApiResponse<TodaySchedule>> getTodaySchedule() async {
+  try {
+    final response = await _api.get('/owner/dashboard/today-schedule');
+    return ApiResponse<TodaySchedule>.fromJson(
+      response.data,
+      (data) => TodaySchedule.fromJson(data as Map<String, dynamic>),
+    );
+  } on DioException catch (e) {
+    return ApiResponse<TodaySchedule>.error(
+        e.response?.data?['message'] ?? e.message ?? 'Error');
+  } catch (e) {
+    return ApiResponse<TodaySchedule>.error(e.toString());
+  }
+}
+
+// ============================================
+// GET PAYOUT STATUS
+// ============================================
+Future<ApiResponse<bool>> getPayoutStatus() async {
+  try {
+    final response = await _api.get('/owner/payout-status');
+    if (response.data['success'] == true) {
+      final data = response.data['data'];
+      final hasPayout = data['hasPayoutUpi'] ?? false;
+      return ApiResponse<bool>(
+        success: true,
+        message: response.data['message'] ?? 'Payout status fetched',
+        data: hasPayout == true,
+      );
+    }
+    return ApiResponse<bool>(
+      success: false,
+      message: response.data['message'] ?? 'Failed',
+    );
+  } on DioException catch (e) {
+    return ApiResponse<bool>(
+      success: false,
+      message: e.response?.data?['message'] ?? e.message ?? 'Error',
+    );
+  } catch (e) {
+    return ApiResponse<bool>.error(e.toString());
+  }
+}
 
   // ==================== STATIC PLANS (NO API CALL) ====================
 

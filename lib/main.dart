@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:yourhome/providers/chat_provider.dart';
+import 'package:yourhome/providers/discount_provider.dart';
 import 'package:yourhome/providers/payment_provider.dart';
 import 'package:yourhome/providers/reel_provider.dart';
 import 'package:yourhome/providers/referral_provider.dart';
@@ -83,6 +84,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ReelProvider()),
         ChangeNotifierProvider(create: (_) => ReferralProvider()),
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
+        ChangeNotifierProvider(create: (_) => DiscountProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {

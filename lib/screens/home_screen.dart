@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:yourhome/models/property_model.dart';
 import 'package:yourhome/screens/admin/admin_profile_screen.dart';
+import 'package:yourhome/screens/booking/first_booking_discount_screen.dart';
 import 'package:yourhome/screens/owner/owner_profile_screen.dart';
 import 'package:yourhome/screens/reels/reels_feed_screen.dart';
 import 'package:yourhome/screens/refer_and_earn_screen.dart';
@@ -275,145 +276,145 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
- Widget _buildNavItem({
-  required IconData icon,
-  required IconData activeIcon,
-  required String label,
-  required int index,
-  required bool isDark,
-  required String userRole,
-}) {
-  final isSelected = _selectedIndex == index;
-  final primaryColor = _getPrimaryColor(userRole);
-  
-  // ✅ For Reels tab (index 2), use special colors
-  final bool isReelsTab = index == 2;
-  final Color selectedColor = isReelsTab ? const Color(0xFFF59E0B) : primaryColor;
-  final Color? unselectedColor = isReelsTab 
-      ? (isDark ? Colors.grey[400]! : Colors.grey[400]!) 
-      : (isDark ? Colors.grey[500] : Colors.grey[400]);
+  Widget _buildNavItem({
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+    required int index,
+    required bool isDark,
+    required String userRole,
+  }) {
+    final isSelected = _selectedIndex == index;
+    final primaryColor = _getPrimaryColor(userRole);
 
-  return GestureDetector(
-    onTap: () {
-      HapticFeedback.lightImpact();
-      setState(() => _selectedIndex = index);
-    },
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: isSelected 
-            ? selectedColor.withOpacity(0.12) 
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(30),
-        border: isSelected
-            ? Border.all(
-                color: selectedColor.withOpacity(0.2),
-                width: 1,
-              )
-            : null,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isSelected ? activeIcon : icon,
-            color: isSelected
-                ? selectedColor
-                : unselectedColor,
-            size: isSelected ? 24 : 22,
-          ),
-          const SizedBox(height: 1),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: isSelected ? 9 : 8,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-              color: isSelected
-                  ? selectedColor
-                  : (isDark ? Colors.grey[500] : Colors.grey[400]),
+    // ✅ For Reels tab (index 2), use special colors
+    final bool isReelsTab = index == 2;
+    final Color selectedColor =
+        isReelsTab ? const Color(0xFFF59E0B) : primaryColor;
+    final Color? unselectedColor = isReelsTab
+        ? (isDark ? Colors.grey[400]! : Colors.grey[400]!)
+        : (isDark ? Colors.grey[500] : Colors.grey[400]);
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        setState(() => _selectedIndex = index);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color:
+              isSelected ? selectedColor.withOpacity(0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(30),
+          border: isSelected
+              ? Border.all(
+                  color: selectedColor.withOpacity(0.2),
+                  width: 1,
+                )
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? selectedColor : unselectedColor,
+              size: isSelected ? 24 : 22,
             ),
-          ),
-        ],
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: isSelected ? 9 : 8,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                color: isSelected
+                    ? selectedColor
+                    : (isDark ? Colors.grey[500] : Colors.grey[400]),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-Widget _buildStudentBottomNav(
-  bool isDark,
-  List<Widget> pages,
-  List<String> labels,
-  List<IconData> icons,
-  List<IconData> activeIcons,
-) {
-  // ✅ Check if current tab is Reels (index 2)
-  final bool isReelsTab = _selectedIndex == 2;
-  
-  // ✅ If Reels tab, force dark mode regardless of theme
-  final bool useDark = isReelsTab ? true : isDark;
+  Widget _buildStudentBottomNav(
+    bool isDark,
+    List<Widget> pages,
+    List<String> labels,
+    List<IconData> icons,
+    List<IconData> activeIcons,
+  ) {
+    // ✅ Check if current tab is Reels (index 2)
+    final bool isReelsTab = _selectedIndex == 2;
 
-  // ✅ CHANGE SYSTEM NAVIGATION BAR COLOR
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (isReelsTab) {
-      // Reels tab - Dark system navigation bar
-      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-        systemNavigationBarColor: Color(0xFF1A1F33), // Dark color
-        systemNavigationBarIconBrightness: Brightness.light, // White icons
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-      ));
-    } else {
-      // Other tabs - Normal based on theme
-      if (isDark) {
+    // ✅ If Reels tab, force dark mode regardless of theme
+    final bool useDark = isReelsTab ? true : isDark;
+
+    // ✅ CHANGE SYSTEM NAVIGATION BAR COLOR
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (isReelsTab) {
+        // Reels tab - Dark system navigation bar
         SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-          systemNavigationBarColor: Color(0xFF0A0E1A),
-          systemNavigationBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: Color(0xFF1A1F33), // Dark color
+          systemNavigationBarIconBrightness: Brightness.light, // White icons
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
         ));
       } else {
-        SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-          systemNavigationBarColor: Colors.white,
-          systemNavigationBarIconBrightness: Brightness.dark,
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-        ));
+        // Other tabs - Normal based on theme
+        if (isDark) {
+          SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+            systemNavigationBarColor: Color(0xFF0A0E1A),
+            systemNavigationBarIconBrightness: Brightness.light,
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+          ));
+        } else {
+          SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+          ));
+        }
       }
-    }
-  });
+    });
 
-  return Container(
-    decoration: BoxDecoration(
-      color: useDark ? const Color(0xFF1A1F33) : (isDark ? _HomePalette.darkSurface : Colors.white),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(useDark ? 0.3 : 0.05),
-          blurRadius: 20,
-          offset: const Offset(0, -8),
-        ),
-      ],
-    ),
-    child: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(pages.length, (index) {
-            return _buildNavItem(
-              icon: icons[index],
-              activeIcon: activeIcons[index],
-              label: labels[index],
-              index: index,
-              isDark: useDark,
-              userRole: 'STUDENT',
-            );
-          }),
+    return Container(
+      decoration: BoxDecoration(
+        color: useDark
+            ? const Color(0xFF1A1F33)
+            : (isDark ? _HomePalette.darkSurface : Colors.white),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(useDark ? 0.3 : 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(pages.length, (index) {
+              return _buildNavItem(
+                icon: icons[index],
+                activeIcon: activeIcons[index],
+                label: labels[index],
+                index: index,
+                isDark: useDark,
+                userRole: 'STUDENT',
+              );
+            }),
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildOwnerBottomNav(
     bool isDark,
@@ -1256,7 +1257,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   color: _HomePalette.studentPrimary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.search_rounded,
                   color: _HomePalette.studentPrimary,
                   size: 20,
@@ -1304,7 +1305,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ========== OFFER BANNER ==========
- Widget _buildOfferBanner(BuildContext context, bool isDark) {
+ // ========== OFFER BANNER ==========
+Widget _buildOfferBanner(BuildContext context, bool isDark) {
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 20),
     child: SizedBox(
@@ -1316,13 +1318,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         itemBuilder: (context, index) {
           final offer = _offers[index];
           
-          // ✅ CHECK if this is the Refer card
           final isReferCard = offer['title'] == '🏠 Refer & Earn ₹19!';
+          final isFirstBookingCard = offer['title'] == '🎉 20% OFF on First Booking!';
           
           return GestureDetector(
             onTap: () {
               if (isReferCard) {
-                // ✅ NAVIGATE to Refer & Earn Screen
                 Navigator.push(
                   context,
                   PageRouteBuilder(
@@ -1340,8 +1341,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     transitionDuration: const Duration(milliseconds: 350),
                   ),
                 );
+              } else if (isFirstBookingCard) {
+                //  CHANGE: Navigate to FirstBookingDiscountScreen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const FirstBookingDiscountScreen(),
+                  ),
+                );
               } else {
-                // Other offers logic
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(offer['title']),
@@ -1423,7 +1431,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      isReferCard ? 'Share' : 'Claim',
+                      isReferCard ? 'Share' : (isFirstBookingCard ? 'View Offer' : 'Claim'),
                       style: GoogleFonts.poppins(
                         color: offer['color'] as Color,
                         fontWeight: FontWeight.w600,
@@ -1564,7 +1572,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ],
           ),
           const SizedBox(height: 12),
-         SizedBox(
+          SizedBox(
             height: 90,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -1680,7 +1688,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             children: [
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.workspace_premium_rounded,
                     color: _HomePalette.gold,
                     size: 20,
@@ -2501,7 +2509,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             children: [
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.location_city_rounded,
                     color: _HomePalette.studentPrimary,
                     size: 20,

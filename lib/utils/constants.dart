@@ -9,32 +9,33 @@ class AppConstants {
       return 'http://localhost:8080';
     }
     if (Platform.isAndroid) {
-      return 'http://192.168.1.10:8080';
+      return 'http://192.168.0.115:8080';
     }
     if (Platform.isIOS) {
-      return 'http://192.168.1.10:8080';
+      return 'http://192.168.0.115:8080';
     }
     return 'http://10.0.2.2:8080';
   }
 
-  // ✅ WEBSOCKET URL - FIXED: http:// → ws://
+  // WEBSOCKET URL - FIXED: http:// → ws://
   static String get wsUrl {
     if (kIsWeb) {
       return 'ws://localhost:8080/ws';
     }
     if (Platform.isAndroid) {
-      return 'ws://192.168.1.10:8080/ws';
+      return 'ws://192.168.0.115:8080/ws';
     }
     if (Platform.isIOS) {
-      return 'ws://192.168.1.10:8080/ws';
+      return 'ws://192.168.0.115:8080/ws';
     }
+    
     return 'ws://10.0.2.2:8080/ws';
   }
-
+  
   static const String appName = 'YourHome';
   static const String appVersion = '1.0.0';
 
-  static const String razorpayKeyId = 'rzp_test_TBkYuLyP4aZkwk';
+  static const String razorpayKeyId = 'rzp_test_TedNqUpifo2RfH';
 
   static const List<String> propertyTypes = ['PG', 'HOSTEL', 'HOTEL', 'FLAT', 'ROOM'];
   static const List<String> genderOptions = ['BOYS', 'GIRLS', 'BOTH'];

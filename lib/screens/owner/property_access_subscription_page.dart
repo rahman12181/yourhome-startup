@@ -25,6 +25,7 @@ class PropertyAccessSubscriptionPage extends StatefulWidget {
 class _PropertyAccessSubscriptionPageState
     extends State<PropertyAccessSubscriptionPage> {
   late Razorpay _razorpay;
+
   bool _isLoading = false;
   String? _selectedPlanCode;
   List<PropertyAccessPlan> _plans = [];
@@ -34,71 +35,149 @@ class _PropertyAccessSubscriptionPageState
   @override
   void initState() {
     super.initState();
+
     _initRazorpay();
     _fetchPlans();
   }
 
+  // ============================================================
+  // FETCH PLANS
+  // ============================================================
+
   Future<void> _fetchPlans() async {
+    if (!mounted) return;
+
     setState(() {
       _isFetching = true;
       _error = null;
     });
 
     try {
-      final provider = Provider.of<OwnerProvider>(context, listen: false);
+      final provider = Provider.of<OwnerProvider>(
+        context,
+        listen: false,
+      );
 
       if (provider.propertyAccessPlans.isNotEmpty) {
+        if (!mounted) return;
+
         setState(() {
           _plans = provider.propertyAccessPlans;
+
           if (_plans.isNotEmpty) {
             _selectedPlanCode = _plans.first.code;
           }
+
           _isFetching = false;
         });
+
         return;
       }
 
       await provider.getPropertyAccessPlans();
 
-      if (mounted) {
-        setState(() {
-          _plans = provider.propertyAccessPlans;
-          if (_plans.isNotEmpty) {
-            _selectedPlanCode = _plans.first.code;
-          }
-          _isFetching = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Failed to load plans. Please try again.';
-          _isFetching = false;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _plans = provider.propertyAccessPlans;
+
+        if (_plans.isNotEmpty) {
+          _selectedPlanCode = _plans.first.code;
+        }
+
+        _isFetching = false;
+      });
+    } catch (e, stack) {
+      debugPrint('❌ FETCH PLANS EXCEPTION: $e');
+      debugPrint('STACK TRACE: $stack');
+
+      if (!mounted) return;
+
+      setState(() {
+        _error = 'Failed to load plans. Please try again.';
+        _isFetching = false;
+      });
     }
   }
 
+  // ============================================================
+  // RAZORPAY INITIALIZATION
+  // ============================================================
+
   void _initRazorpay() {
+    debugPrint('🟣 Initializing Razorpay...');
+
     _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+
+    _razorpay.on(
+      Razorpay.EVENT_PAYMENT_SUCCESS,
+      _handlePaymentSuccess,
+    );
+
+    _razorpay.on(
+      Razorpay.EVENT_PAYMENT_ERROR,
+      _handlePaymentError,
+    );
+
+    _razorpay.on(
+      Razorpay.EVENT_EXTERNAL_WALLET,
+      _handleExternalWallet,
+    );
+
+    debugPrint('✅ Razorpay initialized successfully');
   }
 
   @override
   void dispose() {
+    debugPrint('🧹 Disposing Razorpay...');
+
     _razorpay.clear();
+
     super.dispose();
   }
 
+  // ============================================================
+  // PAYMENT SUCCESS
+  // ============================================================
+
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    setState(() => _isLoading = false);
+    debugPrint('');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('✅ RAZORPAY PAYMENT SUCCESS');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('Payment ID : ${response.paymentId}');
+    debugPrint('Order ID   : ${response.orderId}');
+    debugPrint('Signature  : ${response.signature}');
+    debugPrint('Plan       : $_selectedPlanCode');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('');
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
 
     try {
-      final provider = Provider.of<OwnerProvider>(context, listen: false);
+      final provider = Provider.of<OwnerProvider>(
+        context,
+        listen: false,
+      );
 
-      final success = await provider.confirmPropertyAccessSubscription(
+      if (_selectedPlanCode == null) {
+        debugPrint('❌ CONFIRM FAILED: selected plan is null');
+
+        if (mounted) {
+          _showSnackBar(
+            'Payment Confirmation Failed',
+            'Selected plan information is missing.',
+            Colors.orange,
+          );
+        }
+
+        return;
+      }
+
+      final success =
+          await provider.confirmPropertyAccessSubscription(
         razorpayOrderId: response.orderId ?? '',
         razorpayPaymentId: response.paymentId ?? '',
         razorpaySignature: response.signature ?? '',
@@ -106,20 +185,34 @@ class _PropertyAccessSubscriptionPageState
       );
 
       if (success && mounted) {
+        debugPrint('✅ PAYMENT CONFIRMED BY BACKEND');
+
         _showSnackBar(
-          'Subscription Activated!',
+          'Subscription Activated! 🎉',
           'Your property access subscription is now active.',
           Colors.green,
         );
+
+        await provider.getPropertyAccessStatus();
+
+        if (!mounted) return;
+
         Navigator.pop(context, true);
       } else if (mounted) {
+        debugPrint(
+          '❌ CONFIRM FAILED: ${provider.error}',
+        );
+
         _showSnackBar(
           'Payment Confirmation Failed',
           provider.error ?? 'Please contact support.',
           Colors.orange,
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ CONFIRM EXCEPTION: $e');
+      debugPrint('STACK TRACE: $stack');
+
       if (mounted) {
         _showSnackBar(
           'Error',
@@ -130,17 +223,105 @@ class _PropertyAccessSubscriptionPageState
     }
   }
 
+  // ============================================================
+  // PAYMENT ERROR - DETAILED DEBUGGING
+  // ============================================================
+
   void _handlePaymentError(PaymentFailureResponse response) {
-    setState(() => _isLoading = false);
+    debugPrint('');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('❌ RAZORPAY PAYMENT FAILED');
+    debugPrint('════════════════════════════════════════');
+
+    debugPrint('Error Code    : ${response.code}');
+    debugPrint('Error Message : ${response.message}');
+    debugPrint('Error Details : ${response.error}');
+    debugPrint('Error Details String : ${response.error.toString()}');
+    debugPrint('Selected Plan : $_selectedPlanCode');
+
+    debugPrint('════════════════════════════════════════');
+
+    // ------------------------------------------------------------
+    // Translate Razorpay error code
+    // ------------------------------------------------------------
+
+    String errorType = 'Unknown Razorpay error';
+
+    switch (response.code) {
+      case Razorpay.NETWORK_ERROR:
+        errorType = 'Network error';
+        break;
+
+      case Razorpay.INVALID_OPTIONS:
+        errorType = 'Invalid Razorpay options';
+        break;
+
+      case Razorpay.PAYMENT_CANCELLED:
+        errorType = 'Payment cancelled';
+        break;
+
+      case Razorpay.TLS_ERROR:
+        errorType = 'TLS / device security error';
+        break;
+
+      case Razorpay.UNKNOWN_ERROR:
+        errorType = 'Unknown Razorpay error';
+        break;
+
+      default:
+        errorType = 'Unhandled Razorpay error code';
+        break;
+    }
+
+    debugPrint('Error Type    : $errorType');
+
+    debugPrint('');
+    debugPrint('🔴 FULL RAZORPAY FAILURE RESPONSE');
+    debugPrint('Code          : ${response.code}');
+    debugPrint('Message       : ${response.message}');
+    debugPrint('Error         : ${response.error}');
+    debugPrint('Error String  : ${response.error.toString()}');
+    debugPrint('Error Type    : $errorType');
+    debugPrint('');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('');
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
+
     _showSnackBar(
       'Payment Failed',
-      response.message ?? 'Please try again later.',
+      response.message?.isNotEmpty == true
+          ? response.message!
+          : 'Razorpay payment failed. Check console logs for details.',
       Colors.red,
     );
   }
 
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    setState(() => _isLoading = false);
+  // ============================================================
+  // EXTERNAL WALLET
+  // ============================================================
+
+  void _handleExternalWallet(
+    ExternalWalletResponse response,
+  ) {
+    debugPrint('');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('👛 RAZORPAY EXTERNAL WALLET');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('Wallet Name : ${response.walletName}');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('');
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
+
     _showSnackBar(
       'External Wallet',
       'Payment through external wallet selected.',
@@ -148,34 +329,125 @@ class _PropertyAccessSubscriptionPageState
     );
   }
 
+  // ============================================================
+  // START PAYMENT
+  // ============================================================
+
   void _startPayment() async {
     if (_selectedPlanCode == null) {
-      _showSnackBar('Error', 'Please select a plan first.', Colors.orange);
+      _showSnackBar(
+        'Error',
+        'Please select a plan first.',
+        Colors.orange,
+      );
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (_isLoading) {
+      debugPrint('⚠️ Payment already in progress.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
-      final provider = Provider.of<OwnerProvider>(context, listen: false);
+      final provider = Provider.of<OwnerProvider>(
+        context,
+        listen: false,
+      );
+
+      // --------------------------------------------------------
+      // Find selected plan
+      // --------------------------------------------------------
 
       final selectedPlan = _plans.firstWhere(
         (plan) => plan.code == _selectedPlanCode,
       );
 
+      debugPrint('');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('🟣 STARTING PAYMENT');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('Plan Code    : ${selectedPlan.code}');
+      debugPrint('Plan Name    : ${selectedPlan.name}');
+      debugPrint('Plan Price   : ${selectedPlan.displayPrice}');
+      debugPrint('Property ID  : ${widget.propertyId}');
+      debugPrint('Property     : ${widget.propertyTitle}');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('');
+
+      // --------------------------------------------------------
+      // User information
+      // --------------------------------------------------------
+
+      final user = provider.ownerProfile;
+
+      final phone = user?.phone ?? '9876543210';
+      final email = user?.email ?? 'user@example.com';
+
+      debugPrint('👤 PAYMENT USER');
+      debugPrint('Phone : $phone');
+      debugPrint('Email : $email');
+
+      // --------------------------------------------------------
+      // Create Razorpay order through backend
+      // --------------------------------------------------------
+
+      debugPrint('');
+      debugPrint('🟡 Creating Razorpay order through backend...');
+
       final order = await provider.buyPropertyAccessSubscription(
         selectedPlan.code,
       );
 
+      // --------------------------------------------------------
+      // Order creation failed
+      // --------------------------------------------------------
+
       if (order == null) {
-        setState(() => _isLoading = false);
+        debugPrint('');
+        debugPrint('════════════════════════════════════════');
+        debugPrint('❌ RAZORPAY ORDER CREATION FAILED');
+        debugPrint('════════════════════════════════════════');
+        debugPrint('Provider Error : ${provider.error}');
+        debugPrint('════════════════════════════════════════');
+        debugPrint('');
+
+        if (!mounted) return;
+
+        setState(() {
+          _isLoading = false;
+        });
+
         _showSnackBar(
           'Failed',
-          provider.error ?? 'Could not create order. Please try again.',
+          provider.error ??
+              'Could not create order. Please try again.',
           Colors.red,
         );
+
         return;
       }
+
+      // --------------------------------------------------------
+      // Backend order successfully created
+      // --------------------------------------------------------
+
+      debugPrint('');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('✅ RAZORPAY ORDER CREATED');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('Razorpay Order ID : ${order.razorpayOrderId}');
+      debugPrint('Amount            : ${order.amount}');
+      debugPrint('Currency          : ${order.currency}');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('');
+
+      // --------------------------------------------------------
+      // Razorpay Checkout Options
+      // --------------------------------------------------------
 
       final options = {
         'key': AppConstants.razorpayKeyId,
@@ -183,19 +455,92 @@ class _PropertyAccessSubscriptionPageState
         'currency': order.currency,
         'order_id': order.razorpayOrderId,
         'name': AppConstants.appName,
-        'description': 'Property Access Subscription - ${widget.propertyTitle}',
+        'description':
+            'Property Access Subscription - ${widget.propertyTitle}',
         'prefill': {
-          'contact': provider.ownerProfile?.phone ?? '9876543210',
-          'email': provider.ownerProfile?.email ?? 'user@example.com',
+          'contact': phone,
+          'email': email,
         },
         'theme': {
           'color': '#7C3AED',
         },
+        'retry': {
+          'enabled': true,
+          'max_count': 2,
+        },
+        'timeout': 300,
       };
 
-      _razorpay.open(options);
-    } catch (e) {
-      setState(() => _isLoading = false);
+      // --------------------------------------------------------
+      // Log COMPLETE Razorpay configuration
+      // --------------------------------------------------------
+
+      debugPrint('');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('🟣 RAZORPAY CHECKOUT OPTIONS');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('Key        : ${AppConstants.razorpayKeyId}');
+      debugPrint('Amount     : ${order.amount}');
+      debugPrint('Currency   : ${order.currency}');
+      debugPrint('Order ID   : ${order.razorpayOrderId}');
+      debugPrint('Name       : ${AppConstants.appName}');
+      debugPrint('Property   : ${widget.propertyTitle}');
+      debugPrint('Phone      : $phone');
+      debugPrint('Email      : $email');
+      debugPrint('Retry      : enabled');
+      debugPrint('Timeout    : 300 seconds');
+      debugPrint('Options    : $options');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('');
+
+      // --------------------------------------------------------
+      // Open Razorpay Checkout
+      // --------------------------------------------------------
+
+      debugPrint('🚀 Opening Razorpay Checkout...');
+
+      try {
+        _razorpay.open(options);
+
+        debugPrint('✅ Razorpay.open() called successfully');
+      } catch (e, stack) {
+        debugPrint('');
+        debugPrint('════════════════════════════════════════');
+        debugPrint('❌ RAZORPAY OPEN EXCEPTION');
+        debugPrint('════════════════════════════════════════');
+        debugPrint('Exception : $e');
+        debugPrint('Stack     : $stack');
+        debugPrint('════════════════════════════════════════');
+        debugPrint('');
+
+        if (!mounted) return;
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        _showSnackBar(
+          'Razorpay Error',
+          'Unable to open payment checkout.',
+          Colors.red,
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('❌ _startPayment EXCEPTION');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('Exception : $e');
+      debugPrint('Stack     : $stack');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('');
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
       _showSnackBar(
         'Error',
         'Something went wrong. Please try again.',
@@ -204,43 +549,64 @@ class _PropertyAccessSubscriptionPageState
     }
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+      backgroundColor: isDark
+          ? const Color(0xFF0A0E1A)
+          : const Color(0xFFF5F7FA),
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+        backgroundColor: isDark
+            ? const Color(0xFF0A0E1A)
+            : const Color(0xFFF5F7FA),
         title: Text(
           'Property Access',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w600,
             fontSize: 18,
-            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            color: isDark
+                ? Colors.white
+                : const Color(0xFF1A1A2E),
           ),
         ),
         centerTitle: true,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_rounded,
-            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            color: isDark
+                ? Colors.white
+                : const Color(0xFF1A1A2E),
           ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
-        child:_isFetching
-          ? const Center(child: CustomLoadingWidget(message: 'Loading plans...'))
-          : _error != null
-              ? _buildErrorWidget(isDark)
-              : _plans.isEmpty
-                  ? _buildEmptyWidget(isDark)
-                  : _buildBody(isDark),
-    ),
+        child: _isFetching
+            ? const Center(
+                child: CustomLoadingWidget(
+                  message: 'Loading plans...',
+                ),
+              )
+            : _error != null
+                ? _buildErrorWidget(isDark)
+                : _plans.isEmpty
+                    ? _buildEmptyWidget(isDark)
+                    : _buildBody(isDark),
+      ),
     );
   }
+
+  // ============================================================
+  // ERROR WIDGET
+  // ============================================================
 
   Widget _buildErrorWidget(bool isDark) {
     return Center(
@@ -249,13 +615,19 @@ class _PropertyAccessSubscriptionPageState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline_rounded, size: 64, color: Colors.orange[400]),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: Colors.orange[400],
+            ),
             const SizedBox(height: 16),
             Text(
               _error!,
               style: GoogleFonts.poppins(
                 fontSize: 16,
-                color: isDark ? Colors.white : Colors.black87,
+                color: isDark
+                    ? Colors.white
+                    : Colors.black87,
               ),
               textAlign: TextAlign.center,
             ),
@@ -264,7 +636,10 @@ class _PropertyAccessSubscriptionPageState
               onPressed: _fetchPlans,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF7C3AED),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -283,6 +658,10 @@ class _PropertyAccessSubscriptionPageState
     );
   }
 
+  // ============================================================
+  // EMPTY WIDGET
+  // ============================================================
+
   Widget _buildEmptyWidget(bool isDark) {
     return Center(
       child: Padding(
@@ -290,14 +669,20 @@ class _PropertyAccessSubscriptionPageState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.shopping_bag_outlined,
+              size: 64,
+              color: Colors.grey[400],
+            ),
             const SizedBox(height: 16),
             Text(
               'No Plans Available',
               style: GoogleFonts.poppins(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87,
+                color: isDark
+                    ? Colors.white
+                    : Colors.black87,
               ),
             ),
             const SizedBox(height: 8),
@@ -305,7 +690,9 @@ class _PropertyAccessSubscriptionPageState
               'Please try again later.',
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                color: isDark
+                    ? Colors.grey[400]
+                    : Colors.grey[600],
               ),
             ),
           ],
@@ -314,13 +701,18 @@ class _PropertyAccessSubscriptionPageState
     );
   }
 
+  // ============================================================
+  // BODY
+  // ============================================================
+
   Widget _buildBody(bool isDark) {
     return Stack(
       children: [
         SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
               _buildPropertyInfo(isDark),
               const SizedBox(height: 20),
@@ -329,11 +721,18 @@ class _PropertyAccessSubscriptionPageState
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  color: isDark
+                      ? Colors.white
+                      : const Color(0xFF1A1A2E),
                 ),
               ),
               const SizedBox(height: 12),
-              ..._plans.map((plan) => _buildPlanCard(plan, isDark)),
+              ..._plans.map(
+                (plan) => _buildPlanCard(
+                  plan,
+                  isDark,
+                ),
+              ),
               const SizedBox(height: 20),
               _buildFeatures(isDark),
               const SizedBox(height: 24),
@@ -342,19 +741,30 @@ class _PropertyAccessSubscriptionPageState
             ],
           ),
         ),
-        if (_isLoading) const CustomLoadingWidget(message: 'Processing payment...'),
+        if (_isLoading)
+          const CustomLoadingWidget(
+            message: 'Processing payment...',
+          ),
       ],
     );
   }
+
+  // ============================================================
+  // PROPERTY INFO
+  // ============================================================
 
   Widget _buildPropertyInfo(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141A2C) : Colors.white,
+        color: isDark
+            ? const Color(0xFF141A2C)
+            : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+          color: isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05),
         ),
         boxShadow: [
           BoxShadow(
@@ -370,23 +780,33 @@ class _PropertyAccessSubscriptionPageState
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFF9F67F5)],
+                colors: [
+                  Color(0xFF7C3AED),
+                  Color(0xFF9F67F5),
+                ],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.apartment_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.apartment_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   widget.propertyTitle,
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: isDark
+                        ? Colors.white
+                        : const Color(0xFF1A1A2E),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -395,18 +815,27 @@ class _PropertyAccessSubscriptionPageState
                   'Property ID: #${widget.propertyId}',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    color: isDark
+                        ? Colors.grey[400]
+                        : Colors.grey[600],
                   ),
                 ),
               ],
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 4,
+            ),
             decoration: BoxDecoration(
-              color: const Color(0xFF7C3AED).withOpacity(0.1),
+              color: const Color(0xFF7C3AED)
+                  .withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.2)),
+              border: Border.all(
+                color: const Color(0xFF7C3AED)
+                    .withOpacity(0.2),
+              ),
             ),
             child: Text(
               'Access',
@@ -422,20 +851,32 @@ class _PropertyAccessSubscriptionPageState
     );
   }
 
-  Widget _buildPlanCard(PropertyAccessPlan plan, bool isDark) {
-    final isSelected = _selectedPlanCode == plan.code;
+  // ============================================================
+  // PLAN CARD
+  // ============================================================
+
+  Widget _buildPlanCard(
+    PropertyAccessPlan plan,
+    bool isDark,
+  ) {
+    final isSelected =
+        _selectedPlanCode == plan.code;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: isSelected
             ? plan.color.withOpacity(0.05)
-            : (isDark ? const Color(0xFF141A2C) : Colors.white),
+            : (isDark
+                ? const Color(0xFF141A2C)
+                : Colors.white),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isSelected
               ? plan.color
-              : (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)),
+              : (isDark
+                  ? Colors.white.withOpacity(0.06)
+                  : Colors.black.withOpacity(0.05)),
           width: isSelected ? 2 : 1,
         ),
         boxShadow: [
@@ -451,62 +892,86 @@ class _PropertyAccessSubscriptionPageState
         value: plan.code,
         groupValue: _selectedPlanCode,
         onChanged: (value) {
+          if (value == null) return;
+
           setState(() {
-            _selectedPlanCode = value!;
+            _selectedPlanCode = value;
           });
         },
         activeColor: plan.color,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 2,
+        ),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: plan.color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius:
+                    BorderRadius.circular(8),
               ),
-              child: Icon(plan.icon, color: plan.color, size: 18),
+              child: Icon(
+                plan.icon,
+                color: plan.color,
+                size: 18,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   Text(
                     plan.name,
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      color: isDark
+                          ? Colors.white
+                          : const Color(0xFF1A1A2E),
                     ),
                   ),
                   Text(
                     plan.displayDuration,
                     style: GoogleFonts.poppins(
                       fontSize: 11,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      color: isDark
+                          ? Colors.grey[400]
+                          : Colors.grey[600],
                     ),
                   ),
                 ],
               ),
             ),
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment:
+                  CrossAxisAlignment.end,
               children: [
                 Text(
                   plan.displayPrice,
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: isDark
+                        ? Colors.white
+                        : const Color(0xFF1A1A2E),
                   ),
                 ),
                 if (plan.isBestValue)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
+                      color: Colors.green
+                          .withOpacity(0.1),
+                      borderRadius:
+                          BorderRadius.circular(4),
                     ),
                     child: Text(
                       'Best Value',
@@ -523,10 +988,15 @@ class _PropertyAccessSubscriptionPageState
         ),
         subtitle: isSelected
             ? Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding:
+                    const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, color: plan.color, size: 12),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: plan.color,
+                      size: 12,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Selected plan',
@@ -544,51 +1014,88 @@ class _PropertyAccessSubscriptionPageState
     );
   }
 
+  // ============================================================
+  // FEATURES
+  // ============================================================
+
   Widget _buildFeatures(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141A2C) : Colors.white,
+        color: isDark
+            ? const Color(0xFF141A2C)
+            : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+          color: isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05),
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Text(
             'What you get:',
             style: GoogleFonts.poppins(
               fontWeight: FontWeight.w600,
               fontSize: 13,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              color: isDark
+                  ? Colors.white
+                  : const Color(0xFF1A1A2E),
             ),
           ),
           const SizedBox(height: 8),
-          _buildFeatureItem('Full access to property details', isDark),
-          _buildFeatureItem('View all room information', isDark),
-          _buildFeatureItem('Contact owner directly', isDark),
-          _buildFeatureItem('Schedule property visits', isDark),
-          _buildFeatureItem('Get notified about updates', isDark),
+          _buildFeatureItem(
+            'Full access to property details',
+            isDark,
+          ),
+          _buildFeatureItem(
+            'View all room information',
+            isDark,
+          ),
+          _buildFeatureItem(
+            'Contact owner directly',
+            isDark,
+          ),
+          _buildFeatureItem(
+            'Schedule property visits',
+            isDark,
+          ),
+          _buildFeatureItem(
+            'Get notified about updates',
+            isDark,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildFeatureItem(String text, bool isDark) {
+  Widget _buildFeatureItem(
+    String text,
+    bool isDark,
+  ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        vertical: 3,
+      ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle_rounded, color: Color(0xFF7C3AED), size: 14),
+          const Icon(
+            Icons.check_circle_rounded,
+            color: Color(0xFF7C3AED),
+            size: 14,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
               style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: isDark ? Colors.grey[300] : Colors.grey[700],
+                color: isDark
+                    ? Colors.grey[300]
+                    : Colors.grey[700],
               ),
             ),
           ),
@@ -596,6 +1103,10 @@ class _PropertyAccessSubscriptionPageState
       ),
     );
   }
+
+  // ============================================================
+  // PAYMENT BUTTON
+  // ============================================================
 
   Widget _buildPaymentButton(bool isDark) {
     final selectedPlan = _plans.firstWhere(
@@ -608,28 +1119,41 @@ class _PropertyAccessSubscriptionPageState
       height: 54,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF7C3AED), Color(0xFF9F67F5)],
+          colors: [
+            Color(0xFF7C3AED),
+            Color(0xFF9F67F5),
+          ],
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withOpacity(0.35),
+            color: const Color(0xFF7C3AED)
+                .withOpacity(0.35),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
         ],
       ),
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _startPayment,
+        onPressed:
+            _isLoading ? null : _startPayment,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(14),
+          ),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment:
+              MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
+            const Icon(
+              Icons.lock_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
             const SizedBox(width: 10),
             Text(
               'Pay ${selectedPlan.displayPrice} & Subscribe',
@@ -645,11 +1169,25 @@ class _PropertyAccessSubscriptionPageState
     );
   }
 
-  void _showSnackBar(String title, String message, Color color) {
+  // ============================================================
+  // SNACKBAR
+  // ============================================================
+
+  void _showSnackBar(
+    String title,
+    String message,
+    Color color,
+  ) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
@@ -664,16 +1202,23 @@ class _PropertyAccessSubscriptionPageState
               message,
               style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: Colors.white.withOpacity(0.9),
+                color:
+                    Colors.white.withOpacity(0.9),
               ),
             ),
           ],
         ),
         backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-        margin: const EdgeInsets.all(12),
+        behavior:
+            SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.circular(12),
+        ),
+        duration:
+            const Duration(seconds: 3),
+        margin:
+            const EdgeInsets.all(12),
       ),
     );
   }

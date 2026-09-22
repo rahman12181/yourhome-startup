@@ -1,64 +1,99 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/owner_model.dart';
 import '../models/property_model.dart';
 import '../models/room_model.dart';
 import '../models/booking_model.dart';
+import '../models/booking_stats_model.dart';
+import '../models/dashboard_model.dart';
 import '../services/owner_service.dart';
+import '../services/booking_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class OwnerProvider extends ChangeNotifier {
   final OwnerService _service = OwnerService();
+  final BookingService _bookingService = BookingService();
   bool _isDisposed = false;
 
-  // Profile / Verification
   OwnerProfile? _ownerProfile;
   VerificationStatus? _verificationStatus;
 
-  // Dashboard
   DashboardStats? _dashboardStats;
 
-  // Listing subscription
   SubscriptionDetails? _listingSubscription;
 
-  // Property Access subscription
   PropertyAccessStatus? _propertyAccessStatus;
   List<PropertyAccessSubscription> _propertyAccessHistory = [];
 
-  // Plans
   List<PropertyAccessPlan> _propertyAccessPlans = [];
   List<ListingPlan> _listingPlans = [];
 
-  // Properties
   List<Property> _myProperties = [];
   Property? _selectedProperty;
 
-  // Rooms
   List<Room> _rooms = [];
 
-  // Bookings
   List<BookingRequest> _bookingRequests = [];
+  BookingStats? _bookingStats;
+  int _unreadBookingCount = 0;
+  bool _isStatsLoading = false;
+
+  String _bookingSortBy = 'newest';
+  String? _bookingFilterStatus;
+  int? _bookingFilterPropertyId;
+  String? _bookingSearchQuery;
+  bool _bookingOnlyNew = false;
+  bool _bookingOnlyUrgent = false;
 
   bool _isLoading = false;
   bool _isSubmitting = false;
   String? _error;
 
-  // ---- Getters ----
+  bool _hasInternet = true;
+  bool get hasInternet => _hasInternet;
+
+  bool _hasPayoutUpi = false;
+  bool get hasPayoutUpi => _hasPayoutUpi;
+
+  // ============================================
+  // DASHBOARD ANALYTICS STATE
+  // ============================================
+  DashboardSummary? _dashboardSummary;
+  bool _isDashboardLoading = false;
+
   OwnerProfile? get ownerProfile => _ownerProfile;
   VerificationStatus? get verificationStatus => _verificationStatus;
   DashboardStats? get dashboardStats => _dashboardStats;
   SubscriptionDetails? get listingSubscription => _listingSubscription;
   PropertyAccessStatus? get propertyAccessStatus => _propertyAccessStatus;
-  List<PropertyAccessSubscription> get propertyAccessHistory => _propertyAccessHistory;
+  List<PropertyAccessSubscription> get propertyAccessHistory =>
+      _propertyAccessHistory;
   List<PropertyAccessPlan> get propertyAccessPlans => _propertyAccessPlans;
   List<ListingPlan> get listingPlans => _listingPlans;
   List<Property> get myProperties => _myProperties;
   Property? get selectedProperty => _selectedProperty;
   List<Room> get rooms => _rooms;
   List<BookingRequest> get bookingRequests => _bookingRequests;
+  BookingStats? get bookingStats => _bookingStats;
+  int get unreadBookingCount => _unreadBookingCount;
+  bool get isStatsLoading => _isStatsLoading;
+  String get bookingSortBy => _bookingSortBy;
+  String? get bookingFilterStatus => _bookingFilterStatus;
+  int? get bookingFilterPropertyId => _bookingFilterPropertyId;
+  String? get bookingSearchQuery => _bookingSearchQuery;
+  bool get bookingOnlyNew => _bookingOnlyNew;
+  bool get bookingOnlyUrgent => _bookingOnlyUrgent;
   bool get isLoading => _isLoading;
   bool get isSubmitting => _isSubmitting;
   String? get error => _error;
+
+  // ============================================
+  // DASHBOARD GETTERS
+  // ============================================
+  DashboardSummary? get dashboardSummary => _dashboardSummary;
+  bool get isDashboardLoading => _isDashboardLoading;
 
   List<BookingRequest> get pendingRequests =>
       _bookingRequests.where((b) => b.status == 'PENDING').toList();
@@ -67,7 +102,8 @@ class OwnerProvider extends ChangeNotifier {
   List<BookingRequest> get rejectedRequests =>
       _bookingRequests.where((b) => b.status == 'REJECTED').toList();
 
-  bool get canAddProperty => _propertyAccessStatus?.hasActiveSubscription ?? false;
+  bool get canAddProperty =>
+      _propertyAccessStatus?.hasActiveSubscription ?? false;
 
   @override
   void dispose() {
@@ -95,28 +131,38 @@ class OwnerProvider extends ChangeNotifier {
 
   void clearError() => _setError(null);
 
-  // ============ LOAD ALL DASHBOARD DATA ============
-  Future<void> loadAllOwnerData() async {
-    if (_isDisposed) return;
-    _setLoading(true);
-    _setError(null);
+ Future<void> loadAllOwnerData() async {
+  if (_isDisposed) return;
 
-    await Future.wait([
-      getOwnerProfile(),
-      getVerificationStatus(),
-      getDashboardStats(),
-      getPropertyAccessStatus(),
-      getPropertyAccessPlans(),
-      getListingPlans(),
-      getListingSubscriptionDetails(),
-      getMyProperties(),
-      getIncomingBookingRequests(),
-    ]);
-
-    if (!_isDisposed) _setLoading(false);
+  // ✅ Check internet first
+  final hasNet = await checkConnectivity();
+  if (!hasNet) {
+    _setLoading(false);
+    return;
   }
 
-  // ============ PROFILE / VERIFICATION ============
+  _setLoading(true);
+  _setError(null);
+
+  await Future.wait([
+    getOwnerProfile(),
+    getVerificationStatus(),
+    getDashboardStats(),
+    getPropertyAccessStatus(),
+    getPropertyAccessPlans(),
+    getListingPlans(),
+    getListingSubscriptionDetails(),
+    getMyProperties(),
+    getIncomingBookingRequests(),
+    loadBookingStats(),
+    loadUnreadBookingCount(),
+    loadDashboardSummary(showLoader: false),
+    loadPayoutStatus()
+  ]);
+
+  if (!_isDisposed) _setLoading(false);
+}
+
   Future<void> getOwnerProfile() async {
     final res = await _service.getOwnerProfile();
     if (_isDisposed) return;
@@ -126,12 +172,62 @@ class OwnerProvider extends ChangeNotifier {
     }
   }
 
+  // ============================================
+// PAYOUT UPI STATUS
+// ===========================================
+
+Future<void> loadPayoutStatus() async {
+  try {
+    // 1. Pehle local se check karo (fast)
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool('has_payout_upi') ?? false;
+    if (_hasPayoutUpi != saved) {
+      _hasPayoutUpi = saved;
+      if (!_isDisposed) notifyListeners();
+    }
+
+    // 2. Phir backend se fresh check karo
+    final res = await _service.getPayoutStatus();
+    if (_isDisposed) return;
+    if (res.success && res.data != null) {
+      final has = res.data!;
+      if (has != _hasPayoutUpi) {
+        _hasPayoutUpi = has;
+        await prefs.setBool('has_payout_upi', has);
+        notifyListeners();
+      }
+    }
+  } catch (_) {}
+}
+
+// Set manually when UPI is saved
+Future<void> setPayoutUpiSaved() async {
+  _hasPayoutUpi = true;
+  if (!_isDisposed) notifyListeners();
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('has_payout_upi', true);
+}
+
   Future<void> getVerificationStatus() async {
     final res = await _service.getVerificationStatus();
     if (_isDisposed) return;
     if (res.success && res.data != null) {
       _verificationStatus = res.data;
       notifyListeners();
+    }
+  }
+
+  Future<bool> checkConnectivity() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      final hasNet = result != ConnectivityResult.none;
+      if (_hasInternet != hasNet) {
+        _hasInternet = hasNet;
+        if (!_isDisposed) notifyListeners();
+      }
+      return hasNet;
+    } catch (_) {
+      return true;
     }
   }
 
@@ -167,7 +263,6 @@ class OwnerProvider extends ChangeNotifier {
     }
   }
 
-  // ============ DASHBOARD ============
   Future<void> getDashboardStats() async {
     final res = await _service.getDashboardStats();
     if (_isDisposed) return;
@@ -177,7 +272,27 @@ class OwnerProvider extends ChangeNotifier {
     }
   }
 
-  // ============ PLANS (STATIC — NO API CALL) ============
+  // ============================================
+  // NEW — DASHBOARD SUMMARY LOADER
+  // ============================================
+  Future<void> loadDashboardSummary({bool showLoader = true}) async {
+    if (_isDisposed) return;
+    if (showLoader) {
+      _isDashboardLoading = true;
+      notifyListeners();
+    }
+
+    final res = await _service.getDashboardSummary();
+    if (_isDisposed) return;
+
+    if (res.success && res.data != null) {
+      _dashboardSummary = res.data;
+    }
+
+    _isDashboardLoading = false;
+    notifyListeners();
+  }
+
   Future<void> getPropertyAccessPlans() async {
     if (_isDisposed) return;
     _propertyAccessPlans = _service.getPropertyAccessPlans();
@@ -190,7 +305,6 @@ class OwnerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ============ LISTING SUBSCRIPTION ============
   Future<void> getListingSubscriptionDetails() async {
     final res = await _service.getListingSubscriptionDetails();
     if (_isDisposed) return;
@@ -240,7 +354,6 @@ class OwnerProvider extends ChangeNotifier {
     return res.success;
   }
 
-  // ============ PROPERTY ACCESS SUBSCRIPTION ============
   Future<void> getPropertyAccessStatus() async {
     final res = await _service.getPropertyAccessStatus();
     if (_isDisposed) return;
@@ -291,7 +404,8 @@ class OwnerProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<SubscriptionOrder?> renewPropertyAccessSubscription(String plan) async {
+  Future<SubscriptionOrder?> renewPropertyAccessSubscription(
+      String plan) async {
     _setSubmitting(true);
     _setError(null);
     final res = await _service.renewPropertyAccessSubscription(plan);
@@ -301,7 +415,6 @@ class OwnerProvider extends ChangeNotifier {
     return null;
   }
 
-  // ============ PROPERTY CRUD ============
   Future<void> getMyProperties() async {
     final res = await _service.getMyProperties();
     if (_isDisposed) return;
@@ -409,7 +522,6 @@ class OwnerProvider extends ChangeNotifier {
     return false;
   }
 
-  // ============ ROOM CRUD ============
   Future<void> getRooms(int propertyId) async {
     _setLoading(true);
     final res = await _service.getOwnerRooms(propertyId);
@@ -437,7 +549,8 @@ class OwnerProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> updateRoom(int propertyId, int roomId, Map<String, dynamic> body) async {
+  Future<bool> updateRoom(
+      int propertyId, int roomId, Map<String, dynamic> body) async {
     _setSubmitting(true);
     final res = await _service.updateRoom(propertyId, roomId, body);
     _setSubmitting(false);
@@ -451,7 +564,8 @@ class OwnerProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> updateRoomStatus(int propertyId, int roomId, String status) async {
+  Future<bool> updateRoomStatus(
+      int propertyId, int roomId, String status) async {
     final res = await _service.updateRoomStatus(propertyId, roomId, status);
     if (res.success && res.data != null) {
       final idx = _rooms.indexWhere((r) => r.roomId == roomId);
@@ -476,27 +590,106 @@ class OwnerProvider extends ChangeNotifier {
     return false;
   }
 
-  // ============ BOOKING REQUESTS ============
-  Future<void> getIncomingBookingRequests() async {
-    final res = await _service.getIncomingBookingRequests();
+  Future<void> checkAndRefreshSubscriptionStatus() async {
+    await getPropertyAccessStatus();
+    await getListingSubscriptionDetails();
+  }
+
+  Future<void> getIncomingBookingRequests({bool showLoader = true}) async {
+    if (showLoader) _setLoading(true);
+    final res = await _bookingService.getOwnerBookingRequests(
+      status: _bookingFilterStatus,
+      propertyId: _bookingFilterPropertyId,
+      searchQuery: _bookingSearchQuery,
+      sortBy: _bookingSortBy,
+      onlyNew: _bookingOnlyNew,
+      onlyUrgent: _bookingOnlyUrgent,
+    );
     if (_isDisposed) return;
     if (res.success && res.data != null) {
       _bookingRequests = res.data!;
-      notifyListeners();
     } else {
       _setError(res.message);
     }
+    if (showLoader) _setLoading(false);
+  }
+
+  Future<void> loadBookingStats() async {
+    _isStatsLoading = true;
+    notifyListeners();
+    final res = await _bookingService.getBookingStats();
+    if (_isDisposed) return;
+    if (res.success && res.data != null) {
+      _bookingStats = res.data;
+    }
+    _isStatsLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadUnreadBookingCount() async {
+    final res = await _bookingService.getUnreadCount();
+    if (_isDisposed) return;
+    if (res.success && res.data != null) {
+      _unreadBookingCount = res.data!;
+      notifyListeners();
+    }
+  }
+
+  void updateBookingFilters({
+    String? sortBy,
+    String? filterStatus,
+    int? filterPropertyId,
+    String? searchQuery,
+    bool? onlyNew,
+    bool? onlyUrgent,
+    bool clearStatus = false,
+    bool clearProperty = false,
+    bool clearSearch = false,
+  }) {
+    if (sortBy != null) _bookingSortBy = sortBy;
+    if (clearStatus) {
+      _bookingFilterStatus = null;
+    } else if (filterStatus != null) {
+      _bookingFilterStatus = filterStatus;
+    }
+    if (clearProperty) {
+      _bookingFilterPropertyId = null;
+    } else if (filterPropertyId != null) {
+      _bookingFilterPropertyId = filterPropertyId;
+    }
+    if (clearSearch) {
+      _bookingSearchQuery = null;
+    } else if (searchQuery != null) {
+      _bookingSearchQuery = searchQuery;
+    }
+    if (onlyNew != null) _bookingOnlyNew = onlyNew;
+    if (onlyUrgent != null) _bookingOnlyUrgent = onlyUrgent;
+    notifyListeners();
+    getIncomingBookingRequests();
+  }
+
+  void resetBookingFilters() {
+    _bookingSortBy = 'newest';
+    _bookingFilterStatus = null;
+    _bookingFilterPropertyId = null;
+    _bookingSearchQuery = null;
+    _bookingOnlyNew = false;
+    _bookingOnlyUrgent = false;
+    notifyListeners();
+    getIncomingBookingRequests();
   }
 
   Future<bool> acceptBookingRequest(int requestId, String responseMsg) async {
     _setSubmitting(true);
     _setError(null);
-    final res = await _service.acceptBookingRequest(requestId, responseMsg);
+    final res =
+        await _bookingService.acceptBookingRequest(requestId, responseMsg);
     _setSubmitting(false);
     if (res.success && res.data != null) {
       final idx = _bookingRequests.indexWhere((b) => b.requestId == requestId);
       if (idx != -1) _bookingRequests[idx] = res.data!;
       notifyListeners();
+      loadBookingStats();
       return true;
     }
     _setError(res.message);
@@ -506,16 +699,39 @@ class OwnerProvider extends ChangeNotifier {
   Future<bool> rejectBookingRequest(int requestId, String responseMsg) async {
     _setSubmitting(true);
     _setError(null);
-    final res = await _service.rejectBookingRequest(requestId, responseMsg);
+    final res =
+        await _bookingService.rejectBookingRequest(requestId, responseMsg);
     _setSubmitting(false);
     if (res.success && res.data != null) {
       final idx = _bookingRequests.indexWhere((b) => b.requestId == requestId);
       if (idx != -1) _bookingRequests[idx] = res.data!;
       notifyListeners();
+      loadBookingStats();
       return true;
     }
     _setError(res.message);
     return false;
+  }
+
+  Future<bool> undoBookingResponse(int requestId) async {
+    _setSubmitting(true);
+    final res = await _bookingService.undoBookingResponse(requestId);
+    _setSubmitting(false);
+    if (res.success && res.data != null) {
+      final idx = _bookingRequests.indexWhere((b) => b.requestId == requestId);
+      if (idx != -1) _bookingRequests[idx] = res.data!;
+      notifyListeners();
+      loadBookingStats();
+      return true;
+    }
+    _setError(res.message);
+    return false;
+  }
+
+  Future<List<BookingTimelineEvent>> getBookingTimeline(int requestId) async {
+    final res = await _bookingService.getBookingTimeline(requestId);
+    if (res.success && res.data != null) return res.data!;
+    return [];
   }
 
   void clearSelectedProperty() {
@@ -537,9 +753,22 @@ class OwnerProvider extends ChangeNotifier {
     _selectedProperty = null;
     _rooms = [];
     _bookingRequests = [];
+    _bookingStats = null;
+    _unreadBookingCount = 0;
+    _isStatsLoading = false;
+    _bookingSortBy = 'newest';
+    _bookingFilterStatus = null;
+    _bookingFilterPropertyId = null;
+    _bookingSearchQuery = null;
+    _bookingOnlyNew = false;
+    _bookingOnlyUrgent = false;
     _isLoading = false;
     _isSubmitting = false;
     _error = null;
+    // Dashboard reset
+    _dashboardSummary = null;
+    _isDashboardLoading = false;
+    _hasInternet = true;
     notifyListeners();
   }
 }

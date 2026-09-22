@@ -17,9 +17,7 @@ class BookingListScreen extends StatefulWidget {
 
 class _BookingListScreenState extends State<BookingListScreen>
     with SingleTickerProviderStateMixin {
-  bool _isFirstLoad = true;
   String _selectedFilter = 'All';
-  bool _isLoadingMore = false;
 
   late AnimationController _animationController;
   late Animation<double> _fadeIn;
@@ -77,7 +75,9 @@ class _BookingListScreenState extends State<BookingListScreen>
     if (_selectedFilter == 'All') {
       return bookings;
     }
-    return bookings.where((b) => b.status == _selectedFilter.toUpperCase()).toList();
+    return bookings
+        .where((b) => (b.status ?? 'PENDING') == _selectedFilter.toUpperCase())
+        .toList();
   }
 
   Future<void> _cancelBooking(int requestId) async {
@@ -188,49 +188,48 @@ class _BookingListScreenState extends State<BookingListScreen>
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+        backgroundColor:
+            isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
         body: SafeArea(
           child: Column(
             children: [
-              // Premium App Bar
               _buildPremiumAppBar(context, isDark, totalCount, filteredCount),
-              
-              // Filter Tabs
               _buildFilterTabs(context, isDark),
-              
-              // Content
               Expanded(
-                child: profileProvider.isLoading && profileProvider.bookings.isEmpty
-                    ? _buildLoadingState(isDark)
-                    : filteredBookings.isEmpty
-                        ? _buildEmptyState(context, isDark)
-                        : FadeTransition(
-                            opacity: _fadeIn,
-                            child: SlideTransition(
-                              position: _slideUp,
-                              child: ScaleTransition(
-                                scale: _scaleIn,
-                                child: RefreshIndicator(
-                                  onRefresh: _loadBookings,
-                                  color: const Color(0xFF2563EB),
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.all(16),
-                                    physics: const BouncingScrollPhysics(),
-                                    itemCount: filteredBookings.length,
-                                    itemBuilder: (context, index) {
-                                      final booking = filteredBookings[index];
-                                      return _buildBookingCard(
-                                        context,
-                                        booking,
-                                        isDark,
-                                        index,
-                                      );
-                                    },
+                child:
+                    profileProvider.isLoading && profileProvider.bookings.isEmpty
+                        ? _buildLoadingState(isDark)
+                        : filteredBookings.isEmpty
+                            ? _buildEmptyState(context, isDark)
+                            : FadeTransition(
+                                opacity: _fadeIn,
+                                child: SlideTransition(
+                                  position: _slideUp,
+                                  child: ScaleTransition(
+                                    scale: _scaleIn,
+                                    child: RefreshIndicator(
+                                      onRefresh: _loadBookings,
+                                      color: const Color(0xFF2563EB),
+                                      child: ListView.builder(
+                                        padding: const EdgeInsets.all(16),
+                                        physics:
+                                            const BouncingScrollPhysics(),
+                                        itemCount: filteredBookings.length,
+                                        itemBuilder: (context, index) {
+                                          final booking =
+                                              filteredBookings[index];
+                                          return _buildBookingCard(
+                                            context,
+                                            booking,
+                                            isDark,
+                                            index,
+                                          );
+                                        },
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
               ),
             ],
           ),
@@ -250,7 +249,6 @@ class _BookingListScreenState extends State<BookingListScreen>
       padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
       child: Row(
         children: [
-          // Back Button
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
@@ -298,9 +296,7 @@ class _BookingListScreenState extends State<BookingListScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  total > 0 
-                      ? '$filtered of $total bookings' 
-                      : 'No bookings yet',
+                  total > 0 ? '$filtered of $total bookings' : 'No bookings yet',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: isDark ? Colors.grey[400] : Colors.grey[500],
@@ -309,7 +305,6 @@ class _BookingListScreenState extends State<BookingListScreen>
               ],
             ),
           ),
-          // Theme Toggle
           Container(
             decoration: BoxDecoration(
               color: isDark
@@ -325,8 +320,11 @@ class _BookingListScreenState extends State<BookingListScreen>
             ),
             child: IconButton(
               icon: Icon(
-                isDark ? Icons.wb_sunny_outlined : Icons.nightlight_round_outlined,
-                color: isDark ? const Color(0xFF2563EB) : const Color(0xFF4B5563),
+                isDark
+                    ? Icons.wb_sunny_outlined
+                    : Icons.nightlight_round_outlined,
+                color:
+                    isDark ? const Color(0xFF2563EB) : const Color(0xFF4B5563),
                 size: 22,
               ),
               onPressed: () {
@@ -358,8 +356,7 @@ class _BookingListScreenState extends State<BookingListScreen>
           final tab = _filterTabs[index];
           final isSelected = _selectedFilter == tab;
           final icon = _getTabIcon(tab);
-          final color = _getTabColor(tab);
-          
+
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: GestureDetector(
@@ -372,7 +369,8 @@ class _BookingListScreenState extends State<BookingListScreen>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: isSelected
                       ? const LinearGradient(
@@ -423,7 +421,8 @@ class _BookingListScreenState extends State<BookingListScreen>
                       tab,
                       style: GoogleFonts.poppins(
                         fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
                         color: isSelected
                             ? Colors.white
                             : (isDark ? Colors.white70 : Colors.grey[600]),
@@ -432,7 +431,8 @@ class _BookingListScreenState extends State<BookingListScreen>
                     if (isSelected)
                       Container(
                         margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(10),
@@ -473,23 +473,6 @@ class _BookingListScreenState extends State<BookingListScreen>
     }
   }
 
-  Color _getTabColor(String tab) {
-    switch (tab) {
-      case 'All':
-        return const Color(0xFF2563EB);
-      case 'Pending':
-        return Colors.orange;
-      case 'Accepted':
-        return Colors.green;
-      case 'Rejected':
-        return Colors.red;
-      case 'Cancelled':
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
-  }
-
   // ========== BOOKING CARD ==========
   Widget _buildBookingCard(
     BuildContext context,
@@ -497,9 +480,10 @@ class _BookingListScreenState extends State<BookingListScreen>
     bool isDark,
     int index,
   ) {
-    final statusColor = _getStatusColor(booking.status);
-    final statusText = _getStatusText(booking.status);
-    final statusIcon = _getStatusIcon(booking.status);
+    final status = booking.status ?? 'PENDING';
+    final statusColor = _getStatusColor(status);
+    final statusText = _getStatusText(status);
+    final statusIcon = _getStatusIcon(status);
 
     return AnimatedContainer(
       duration: Duration(milliseconds: 400 + (index * 50)),
@@ -541,11 +525,13 @@ class _BookingListScreenState extends State<BookingListScreen>
                   children: [
                     Expanded(
                       child: Text(
-                        booking.propertyTitle,
+                        booking.propertyTitle ?? 'Property',
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF1A1A2E),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -587,7 +573,7 @@ class _BookingListScreenState extends State<BookingListScreen>
                   ],
                 ),
                 const SizedBox(height: 10),
-                
+
                 // Details Grid
                 Row(
                   children: [
@@ -595,7 +581,7 @@ class _BookingListScreenState extends State<BookingListScreen>
                       child: _buildInfoItem(
                         icon: Icons.location_on_rounded,
                         label: 'Location',
-                        value: booking.propertyCity,
+                        value: booking.propertyCity ?? 'N/A',
                         isDark: isDark,
                       ),
                     ),
@@ -610,7 +596,7 @@ class _BookingListScreenState extends State<BookingListScreen>
                   ],
                 ),
                 const SizedBox(height: 6),
-                
+
                 if (booking.durationMonths != null)
                   _buildInfoItem(
                     icon: Icons.access_time_rounded,
@@ -618,9 +604,10 @@ class _BookingListScreenState extends State<BookingListScreen>
                     value: '${booking.durationMonths} months',
                     isDark: isDark,
                   ),
-                
+
                 // Owner Response
-                if (booking.ownerResponse != null) ...[
+                if (booking.ownerResponse != null &&
+                    booking.ownerResponse!.trim().isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -653,9 +640,9 @@ class _BookingListScreenState extends State<BookingListScreen>
                     ),
                   ),
                 ],
-                
+
                 // Cancel Button (only for PENDING)
-                if (booking.status == 'PENDING') ...[
+                if (status == 'PENDING') ...[
                   const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
@@ -705,26 +692,30 @@ class _BookingListScreenState extends State<BookingListScreen>
             color: isDark ? Colors.grey[500] : Colors.grey[500],
           ),
           const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 9,
-                  color: isDark ? Colors.grey[500] : Colors.grey[500],
-                  fontWeight: FontWeight.w500,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 9,
+                    color: isDark ? Colors.grey[500] : Colors.grey[500],
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: isDark ? Colors.white70 : const Color(0xFF4B5563),
-                  fontWeight: FontWeight.w500,
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -777,7 +768,9 @@ class _BookingListScreenState extends State<BookingListScreen>
     }
   }
 
-  String _formatDate(DateTime date) {
+  // Null-safe date formatter
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'N/A';
     final months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -845,7 +838,8 @@ class _BookingListScreenState extends State<BookingListScreen>
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey[100],
+                color:
+                    isDark ? Colors.white.withOpacity(0.04) : Colors.grey[100],
                 shape: BoxShape.circle,
               ),
               child: Icon(

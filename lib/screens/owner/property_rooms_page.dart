@@ -15,23 +15,23 @@ class PropertyRoomsPage extends StatefulWidget {
 }
 
 class _PropertyRoomsPageState extends State<PropertyRoomsPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   bool _isFirstLoad = true;
   late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
+  late AnimationController _staggerController;
 
   @override
   void initState() {
     super.initState();
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 450),
+      vsync: this,
+    )..forward();
+
+    _staggerController = AnimationController(
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOutCubic,
-    );
-    _fadeController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isFirstLoad && mounted) {
@@ -44,18 +44,23 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
   @override
   void dispose() {
     _fadeController.dispose();
+    _staggerController.dispose();
     super.dispose();
   }
 
   Future<void> _loadRooms() async {
     await Provider.of<OwnerProvider>(context, listen: false)
         .getRooms(widget.property.propertyId);
+    if (mounted) _staggerController.forward(from: 0);
   }
 
-  void _showAddEditRoomDialog({Room? room}) {
-    showDialog(
+  // ================= ADD/EDIT SHEET =================
+  void _openRoomSheet({Room? room}) {
+    showModalBottomSheet(
       context: context,
-      builder: (_) => _RoomFormDialog(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RoomFormSheet(
         propertyId: widget.property.propertyId,
         room: room,
       ),
@@ -64,233 +69,588 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
     });
   }
 
-  Future<void> _handleDeleteRoom(int roomId) async {
-    final confirm = await showDialog<bool>(
+  // ================= STATUS SHEET =================
+  Future<void> _openStatusSheet(Room room) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selected = await showModalBottomSheet<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Room'),
-        content: const Text('Are you sure you want to delete this room?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF121729) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : const Color(0xFFE0E0E8),
+                borderRadius: BorderRadius.circular(100),
               ),
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(
+              'Change Room Status',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700,
+                fontSize: 17,
+                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Room ${room.roomNumber ?? room.roomId}',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ...[
+              _statusOption(
+                value: 'AVAILABLE',
+                label: 'Available',
+                subtitle: 'Room is ready for booking',
+                icon: Icons.check_circle_rounded,
+                color: const Color(0xFF22C55E),
+                isSelected: room.status == 'AVAILABLE',
+                isDark: isDark,
+              ),
+              _statusOption(
+                value: 'OCCUPIED',
+                label: 'Occupied',
+                subtitle: 'Room is currently booked',
+                icon: Icons.person_rounded,
+                color: const Color(0xFFEF4444),
+                isSelected: room.status == 'OCCUPIED',
+                isDark: isDark,
+              ),
+              _statusOption(
+                value: 'MAINTENANCE',
+                label: 'Maintenance',
+                subtitle: 'Room is under repair',
+                icon: Icons.build_rounded,
+                color: const Color(0xFFF59E0B),
+                isSelected: room.status == 'MAINTENANCE',
+                isDark: isDark,
+              ),
+            ],
+          ],
+        ),
       ),
     );
 
-    if (confirm == true) {
+    if (selected != null && selected != room.status && mounted) {
       final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
-      await ownerProvider.deleteRoom(widget.property.propertyId, roomId);
-      if (mounted) _loadRooms();
+      final ok = await ownerProvider.updateRoomStatus(
+        widget.property.propertyId,
+        room.roomId,
+        selected,
+      );
+      if (ok && mounted) {
+        _showSnack('Status updated successfully');
+        _loadRooms();
+      }
     }
   }
 
+  Widget _statusOption({
+    required String value,
+    required String label,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: () => Navigator.pop(context, value),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withOpacity(0.08)
+              : (isDark ? const Color(0xFF1A1F33) : const Color(0xFFF8F9FC)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? color
+                : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
+            width: isSelected ? 1.8 : 1.2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.5,
+                      color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle_rounded, color: color, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ================= DELETE =================
+  Future<void> _confirmDelete(Room room) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: isDark ? const Color(0xFF121729) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Color(0xFFEF4444),
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Delete Room?',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Room ${room.roomNumber ?? room.roomId} will be permanently removed. This action cannot be undone.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 12.5,
+                  color: isDark ? Colors.white60 : const Color(0xFF8A8FA3),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.white12
+                                : const Color(0xFFE8E8F0),
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: isDark ? Colors.white70 : const Color(0xFF666680),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'Delete',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed == true) {
+      final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
+      final ok = await ownerProvider.deleteRoom(
+        widget.property.propertyId,
+        room.roomId,
+      );
+      if (ok && mounted) {
+        _showSnack('Room deleted');
+        _loadRooms();
+      }
+    }
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
+        backgroundColor: const Color(0xFF22C55E),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  // ================= BUILD =================
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final ownerProvider = Provider.of<OwnerProvider>(context);
-    final rooms = ownerProvider.rooms;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    final totalRooms = rooms.length;
-    final available = rooms.where((r) => r.status == 'AVAILABLE').length;
-    final occupied = rooms.where((r) => r.status == 'OCCUPIED').length;
-    final maintenance = rooms.where((r) => r.status == 'MAINTENANCE').length;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.property.title,
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              '${rooms.length} rooms • $available available • $occupied occupied',
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                color: isDark ? Colors.grey[400] : Colors.grey[500],
-              ),
-            ),
-          ],
+      backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF7F8FC),
+      body: SafeArea(
+        child: Consumer<OwnerProvider>(
+          builder: (context, provider, _) {
+            final rooms = provider.rooms;
+
+            final total = rooms.length;
+            final available =
+                rooms.where((r) => r.status == 'AVAILABLE').length;
+            final occupied = rooms.where((r) => r.status == 'OCCUPIED').length;
+            final maintenance =
+                rooms.where((r) => r.status == 'MAINTENANCE').length;
+
+            return Column(
+              children: [
+                _buildHeader(isDark, total, available, occupied),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadRooms,
+                    color: const Color(0xFF7C3AED),
+                    backgroundColor:
+                        isDark ? const Color(0xFF1A1F33) : Colors.white,
+                    child: provider.isLoading && rooms.isEmpty
+                        ? _buildSkeleton(isDark)
+                        : rooms.isEmpty
+                            ? _buildEmptyState(isDark)
+                            : FadeTransition(
+                                opacity: _fadeController,
+                                child: ListView(
+                                  physics: const BouncingScrollPhysics(
+                                    parent: AlwaysScrollableScrollPhysics(),
+                                  ),
+                                  padding: const EdgeInsets.fromLTRB(
+                                      16, 6, 16, 100),
+                                  children: [
+                                    _buildStatsRow(
+                                      isDark,
+                                      total,
+                                      available,
+                                      occupied,
+                                      maintenance,
+                                    ),
+                                    const SizedBox(height: 18),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'All Rooms',
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                            color: isDark
+                                                ? Colors.white
+                                                : const Color(0xFF1A1A2E),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF7C3AED)
+                                                .withOpacity(0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(100),
+                                          ),
+                                          child: Text(
+                                            '${rooms.length}',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF7C3AED),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ...List.generate(rooms.length, (i) {
+                                      final delay = i * 0.06;
+                                      return AnimatedBuilder(
+                                        animation: _staggerController,
+                                        builder: (context, child) {
+                                          final t = Curves.easeOutCubic.transform(
+                                            ((_staggerController.value - delay)
+                                                    .clamp(0.0, 1.0))
+                                                .toDouble(),
+                                          );
+                                          return Transform.translate(
+                                            offset: Offset(0, 20 * (1 - t)),
+                                            child: Opacity(opacity: t, child: child),
+                                          );
+                                        },
+                                        child: _buildRoomCard(
+                                            context, rooms[i], isDark),
+                                      );
+                                    }),
+                                  ],
+                                ),
+                              ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_rounded,
-            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED).withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Color(0xFF7C3AED),
-                size: 24,
-              ),
-            ),
-            onPressed: () => _showAddEditRoomDialog(),
-          ),
-        ],
       ),
-      body: ownerProvider.isLoading && rooms.isEmpty
-          ? _buildLoadingState(isDark)
-          : RefreshIndicator(
-              onRefresh: _loadRooms,
-              color: const Color(0xFF7C3AED),
-              backgroundColor: isDark ? const Color(0xFF1A1F33) : Colors.white,
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: rooms.isEmpty
-                    ? _buildEmptyState(isDark)
-                    : SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          top: 12,
-                          bottom: 16 + bottomPadding,
-                        ),
-                        child: Column(
-                          children: [
-                            // Stats Row
-                            _buildStatsRow(isDark, totalRooms, available, occupied, maintenance),
-                            const SizedBox(height: 14),
-                            ...rooms.map((room) =>
-                                _buildRoomCard(context, room, isDark)),
-                          ],
-                        ),
-                      ),
-              ),
-            ),
+      floatingActionButton: _buildFab(isDark),
     );
   }
 
-  // ============== LOADING STATE ==============
-  Widget _buildLoadingState(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  // ================= HEADER =================
+  Widget _buildHeader(
+      bool isDark, int total, int available, int occupied) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFF9F67F5)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF7C3AED).withOpacity(0.3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
+          _circleIconBtn(
+            icon: Icons.arrow_back_rounded,
+            onTap: () => Navigator.pop(context),
+            isDark: isDark,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Room Management',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 19,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.property.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.5,
+                    color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                  ),
                 ),
               ],
             ),
-            child: const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Loading rooms...',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-            ),
           ),
         ],
       ),
     );
   }
 
-  // ============== STATS ROW ==============
-  Widget _buildStatsRow(bool isDark, int total, int available, int occupied, int maintenance) {
+  Widget _circleIconBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(50),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : const Color(0xFFE8E8F0),
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 20,
+          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+        ),
+      ),
+    );
+  }
+
+  // ================= FAB =================
+  Widget _buildFab(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C3AED), Color(0xFF4ECDC4)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C3AED).withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openRoomSheet(),
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 6),
+                Text(
+                  'Add Room',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ================= STATS ROW =================
+  Widget _buildStatsRow(bool isDark, int total, int available, int occupied,
+      int maintenance) {
     return Row(
       children: [
-        _statBox('Total Rooms', total.toString(), Icons.meeting_room_rounded, const Color(0xFF7C3AED), isDark),
+        _statCard('Total', total, Icons.meeting_room_rounded,
+            const Color(0xFF7C3AED), isDark),
         const SizedBox(width: 8),
-        _statBox('Available', available.toString(), Icons.check_circle_rounded, Colors.green, isDark),
+        _statCard('Free', available, Icons.check_circle_rounded,
+            const Color(0xFF22C55E), isDark),
         const SizedBox(width: 8),
-        _statBox('Occupied', occupied.toString(), Icons.person_rounded, Colors.blue, isDark),
+        _statCard('Booked', occupied, Icons.person_rounded,
+            const Color(0xFFEF4444), isDark),
         const SizedBox(width: 8),
-        _statBox('Maintenance', maintenance.toString(), Icons.build_rounded, Colors.orange, isDark),
+        _statCard('Repair', maintenance, Icons.build_rounded,
+            const Color(0xFFF59E0B), isDark),
       ],
     );
   }
 
-  Widget _statBox(String label, String value, IconData icon, Color color, bool isDark) {
+  Widget _statCard(
+      String label, int value, IconData icon, Color color, bool isDark) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          color: isDark ? const Color(0xFF121729) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDark ? Colors.white.withOpacity(0.06) : Colors.grey[200]!,
-            width: 1,
+            color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF0F0F8),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 16),
-            const SizedBox(height: 2),
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 15),
+            ),
+            const SizedBox(height: 6),
             Text(
-              value,
+              '$value',
               style: GoogleFonts.poppins(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
                 color: isDark ? Colors.white : const Color(0xFF1A1A2E),
               ),
             ),
             Text(
               label,
               style: GoogleFonts.poppins(
-                fontSize: 7,
-                color: isDark ? Colors.grey[400] : Colors.grey[500],
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -298,157 +658,262 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
     );
   }
 
-  // ============== ROOM CARD ==============
+  // ================= ROOM CARD =================
   Widget _buildRoomCard(BuildContext context, Room room, bool isDark) {
-    final statusColors = {
-      'AVAILABLE': Colors.green,
-      'OCCUPIED': Colors.blue,
-      'MAINTENANCE': Colors.orange,
+    final statusConfig = {
+      'AVAILABLE': {
+        'color': const Color(0xFF22C55E),
+        'label': 'Available',
+        'icon': Icons.check_circle_rounded,
+      },
+      'OCCUPIED': {
+        'color': const Color(0xFFEF4444),
+        'label': 'Occupied',
+        'icon': Icons.person_rounded,
+      },
+      'MAINTENANCE': {
+        'color': const Color(0xFFF59E0B),
+        'label': 'Maintenance',
+        'icon': Icons.build_rounded,
+      },
     };
-    final statusIcons = {
-      'AVAILABLE': Icons.check_circle_rounded,
-      'OCCUPIED': Icons.person_rounded,
-      'MAINTENANCE': Icons.build_rounded,
-    };
-    final color = statusColors[room.status] ?? Colors.grey;
-    final icon = statusIcons[room.status] ?? Icons.help_rounded;
+
+    final cfg = statusConfig[room.status] ?? statusConfig['AVAILABLE']!;
+    final color = cfg['color'] as Color;
+    final label = cfg['label'] as String;
+    final icon = cfg['icon'] as IconData;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: isDark ? const Color(0xFF121729) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1.5,
+          color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF0F0F8),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      room.roomNumber!.isNotEmpty ? 'Room ${room.roomNumber}' : 'Room ${room.roomId}',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top row
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [color.withOpacity(0.15), color.withOpacity(0.05)],
                     ),
-                    Text(
-                      '${room.roomTypeDisplay} • ${room.floorNumber != null ? 'Floor ${room.floorNumber}' : 'N/A'}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        color: isDark ? Colors.grey[400] : Colors.grey[500],
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: color, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Room ${room.roomNumber ?? room.roomId}',
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF1A1A2E),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF7C3AED).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              room.roomType,
+                              style: GoogleFonts.poppins(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF7C3AED),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  room.statusDisplay,
-                  style: GoogleFonts.poppins(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: color,
+                      const SizedBox(height: 3),
+                      Text(
+                        'Floor ${room.floorNumber ?? 0} • Capacity ${room.capacity}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11.5,
+                          color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _roomInfoItem('₹${room.monthlyRent.toStringAsFixed(0)}/mo', Icons.currency_rupee_rounded, isDark),
-              const SizedBox(width: 14),
-              _roomInfoItem('Cap: ${room.capacity}', Icons.people_rounded, isDark),
-              const SizedBox(width: 14),
-              if (room.hasAc) _roomInfoItem('AC', Icons.ac_unit_rounded, isDark),
-              if (room.hasAttachedBathroom) _roomInfoItem('Bath', Icons.bathtub_rounded, isDark),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: _roomActionButton(
-                  icon: Icons.edit_rounded,
-                  label: 'Edit',
-                  color: const Color(0xFF3B82F6),
-                  isDark: isDark,
-                  onTap: () => _showAddEditRoomDialog(room: room),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(color: color.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        label,
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // Tags row
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _miniTag(
+                  '₹${room.monthlyRent.toStringAsFixed(0)}/mo',
+                  Icons.currency_rupee_rounded,
+                  const Color(0xFF7C3AED),
+                  isDark,
+                ),
+                if (room.hasAc)
+                  _miniTag(
+                    'AC',
+                    Icons.ac_unit_rounded,
+                    const Color(0xFF3B82F6),
+                    isDark,
+                  ),
+                if (room.hasAttachedBathroom)
+                  _miniTag(
+                    'Attached Bath',
+                    Icons.bathtub_rounded,
+                    const Color(0xFF8B5CF6),
+                    isDark,
+                  ),
+              ],
+            ),
+
+            if (room.description != null && room.description!.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                room.description!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 11.5,
+                  color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                  height: 1.4,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _roomStatusButton(
-                  room: room,
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _roomActionButton(
-                  icon: Icons.delete_rounded,
-                  label: 'Delete',
-                  color: Colors.red,
-                  isDark: isDark,
-                  onTap: () => _handleDeleteRoom(room.roomId),
-                ),
-              ),
             ],
+
+            const SizedBox(height: 14),
+
+            // Action row
+            Row(
+              children: [
+                Expanded(
+                  child: _actionBtn(
+                    icon: Icons.edit_rounded,
+                    label: 'Edit',
+                    color: const Color(0xFF3B82F6),
+                    isDark: isDark,
+                    onTap: () => _openRoomSheet(room: room),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _actionBtn(
+                    icon: Icons.swap_horiz_rounded,
+                    label: 'Status',
+                    color: const Color(0xFF7C3AED),
+                    isDark: isDark,
+                    onTap: () => _openStatusSheet(room),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _actionBtn(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Delete',
+                    color: const Color(0xFFEF4444),
+                    isDark: isDark,
+                    onTap: () => _confirmDelete(room),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniTag(String label, IconData icon, Color color, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _roomInfoItem(String label, IconData icon, bool isDark) {
-    return Row(
-      children: [
-        Icon(icon, size: 12, color: isDark ? Colors.grey[400] : Colors.grey[500]),
-        const SizedBox(width: 2),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 10,
-            color: isDark ? Colors.grey[400] : Colors.grey[500],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _roomActionButton({
+  Widget _actionBtn({
     required IconData icon,
     required String label,
     required Color color,
@@ -459,26 +924,23 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
             color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: color.withOpacity(0.15),
-              width: 1,
-            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.2), width: 1.2),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 14),
-              const SizedBox(width: 4),
+              Icon(icon, color: color, size: 15),
+              const SizedBox(width: 5),
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  fontSize: 10,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                   color: color,
                 ),
@@ -490,171 +952,147 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
     );
   }
 
-  Widget _roomStatusButton({
-    required Room room,
-    required bool isDark,
-  }) {
-    final statuses = [
-      {'value': 'AVAILABLE', 'label': 'Available', 'color': Colors.green},
-      {'value': 'OCCUPIED', 'label': 'Occupied', 'color': Colors.blue},
-      {'value': 'MAINTENANCE', 'label': 'Maintenance', 'color': Colors.orange},
-    ];
-
-    return PopupMenuButton<String>(
-      onSelected: (value) async {
-        final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
-        await ownerProvider.updateRoomStatus(widget.property.propertyId, room.roomId, value);
-        if (mounted) _loadRooms();
-      },
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFF7C3AED).withOpacity(0.08),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: const Color(0xFF7C3AED).withOpacity(0.15),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.swap_horiz_rounded,
-              color: const Color(0xFF7C3AED),
-              size: 14,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Status',
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF7C3AED),
+  // ================= SKELETON =================
+  Widget _buildSkeleton(bool isDark) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+      children: [
+        Row(
+          children: List.generate(
+            4,
+            (i) => Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: i < 3 ? 8 : 0),
+                height: 86,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF121729) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.arrow_drop_down_rounded,
-              color: Color(0xFF7C3AED),
-              size: 16,
+          ),
+        ),
+        const SizedBox(height: 18),
+        ...List.generate(
+          3,
+          (i) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            height: 170,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF121729) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ================= EMPTY =================
+  Widget _buildEmptyState(bool isDark) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF7C3AED).withOpacity(0.15),
+                    const Color(0xFF4ECDC4).withOpacity(0.08),
+                  ],
+                ),
+              ),
+              child: const Icon(
+                Icons.meeting_room_outlined,
+                size: 56,
+                color: Color(0xFF7C3AED),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Rooms Yet',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Start adding rooms to this property\nso students can book them.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 12.5,
+                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 28),
+            GestureDetector(
+              onTap: () => _openRoomSheet(),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF7C3AED), Color(0xFF4ECDC4)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF7C3AED).withOpacity(0.35),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add_rounded,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Add First Room',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
       ),
-      itemBuilder: (context) => statuses.map((status) {
-        final statusValue = status['value'] as String;
-        final isSelected = room.status == statusValue;
-        return PopupMenuItem<String>(
-          value: statusValue,
-          child: Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: (status['color'] as Color).withOpacity(0.2),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: status['color'] as Color,
-                    width: isSelected ? 3 : 1,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                status['label'] as String,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                ),
-              ),
-              if (isSelected) ...[
-                const Spacer(),
-                const Icon(
-                  Icons.check_rounded,
-                  color: Color(0xFF7C3AED),
-                  size: 16,
-                ),
-              ],
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // ============== EMPTY STATE ==============
-  Widget _buildEmptyState(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7C3AED).withOpacity(0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.meeting_room_outlined,
-              size: 64,
-              color: isDark ? Colors.grey[600] : Colors.grey[400],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Rooms Added',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Add rooms to this property',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => _showAddEditRoomDialog(),
-            icon: const Icon(Icons.add, size: 20),
-            label: const Text('Add Room'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
-// ===================== ROOM FORM DIALOG =====================
-class _RoomFormDialog extends StatefulWidget {
+// ===================================================================
+// ==================== ROOM FORM BOTTOM SHEET ======================
+// ===================================================================
+class _RoomFormSheet extends StatefulWidget {
   final int propertyId;
   final Room? room;
-  const _RoomFormDialog({required this.propertyId, this.room});
+  const _RoomFormSheet({required this.propertyId, this.room});
 
   @override
-  State<_RoomFormDialog> createState() => _RoomFormDialogState();
+  State<_RoomFormSheet> createState() => _RoomFormSheetState();
 }
 
-class _RoomFormDialogState extends State<_RoomFormDialog> {
+class _RoomFormSheetState extends State<_RoomFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _roomNumberCtrl;
   late TextEditingController _rentCtrl;
@@ -664,6 +1102,9 @@ class _RoomFormDialogState extends State<_RoomFormDialog> {
   String _roomType = 'SINGLE';
   bool _hasAc = false;
   bool _hasBathroom = false;
+  bool _loading = false;
+
+  final List<String> _roomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'DORMITORY'];
 
   bool get _isEdit => widget.room != null;
 
@@ -672,9 +1113,12 @@ class _RoomFormDialogState extends State<_RoomFormDialog> {
     super.initState();
     final r = widget.room;
     _roomNumberCtrl = TextEditingController(text: r?.roomNumber ?? '');
-    _rentCtrl = TextEditingController(text: r?.monthlyRent.toStringAsFixed(0) ?? '');
-    _capacityCtrl = TextEditingController(text: r?.capacity.toString() ?? '1');
-    _floorCtrl = TextEditingController(text: r?.floorNumber?.toString() ?? '');
+    _rentCtrl = TextEditingController(
+        text: r?.monthlyRent.toStringAsFixed(0) ?? '');
+    _capacityCtrl =
+        TextEditingController(text: r?.capacity.toString() ?? '1');
+    _floorCtrl =
+        TextEditingController(text: r?.floorNumber?.toString() ?? '');
     _descCtrl = TextEditingController(text: r?.description ?? '');
     if (r != null) {
       _roomType = r.roomType;
@@ -696,292 +1140,590 @@ class _RoomFormDialogState extends State<_RoomFormDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    setState(() => _loading = true);
+
     final body = <String, dynamic>{
-      if (_roomNumberCtrl.text.isNotEmpty) 'roomNumber': _roomNumberCtrl.text.trim(),
+      'roomNumber': _roomNumberCtrl.text.trim(),
       'monthlyRent': double.tryParse(_rentCtrl.text) ?? 0,
       'capacity': int.tryParse(_capacityCtrl.text) ?? 1,
-      if (_floorCtrl.text.isNotEmpty) 'floorNumber': int.tryParse(_floorCtrl.text),
       'hasAc': _hasAc,
       'hasAttachedBathroom': _hasBathroom,
+      if (_floorCtrl.text.isNotEmpty)
+        'floorNumber': int.tryParse(_floorCtrl.text),
       if (_descCtrl.text.isNotEmpty) 'description': _descCtrl.text.trim(),
+      'roomType': _roomType,
     };
-    if (!_isEdit) body['roomType'] = _roomType;
 
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
+
     final success = _isEdit
-        ? await ownerProvider.updateRoom(widget.propertyId, widget.room!.roomId, body)
+        ? await ownerProvider.updateRoom(
+            widget.propertyId, widget.room!.roomId, body)
         : await ownerProvider.addRoom(widget.propertyId, body);
 
-    if (mounted) Navigator.pop(context, success);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isEdit ? 'Room updated successfully' : 'Room added successfully',
+            style: GoogleFonts.poppins(fontSize: 13),
+          ),
+          backgroundColor: const Color(0xFF22C55E),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      Navigator.pop(context, true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ownerProvider.error ?? 'Something went wrong',
+            style: GoogleFonts.poppins(fontSize: 13),
+          ),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: isDark ? const Color(0xFF1A1F33) : Colors.white,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        width: 400,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+    return Container(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F1320) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : const Color(0xFFE0E0E8),
+                borderRadius: BorderRadius.circular(100),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 12, 16),
+              child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withOpacity(0.1),
-                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
                       _isEdit ? Icons.edit_rounded : Icons.add_rounded,
-                      color: const Color(0xFF7C3AED),
+                      color: Colors.white,
                       size: 22,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    _isEdit ? 'Edit Room' : 'Add Room',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 18,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isEdit ? 'Edit Room' : 'Add New Room',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18,
+                            color:
+                                isDark ? Colors.white : const Color(0xFF1A1A2E),
+                          ),
+                        ),
+                        Text(
+                          'Fill room details below',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.5,
+                            color:
+                                isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
+                    onPressed: () => Navigator.pop(context, false),
                     icon: Icon(
                       Icons.close_rounded,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      size: 22,
+                      color: isDark ? Colors.white70 : const Color(0xFF666680),
                     ),
-                    onPressed: () => Navigator.pop(context, false),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              _formField(
-                _roomNumberCtrl,
-                'Room Number',
-                Icons.numbers_rounded,
-                isDark,
-                validator: (v) => v!.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              if (!_isEdit)
-                _dropdownField(
-                  'Room Type',
-                  _roomType,
-                  ['SINGLE', 'DOUBLE', 'TRIPLE', 'DORMITORY'],
-                  (v) => setState(() => _roomType = v!),
-                  isDark,
+            ),
+            // Content
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    _sectionTitle('Basic Details', isDark),
+                    const SizedBox(height: 12),
+                    _textField(
+                      controller: _roomNumberCtrl,
+                      label: 'Room Number',
+                      hint: 'e.g. 101',
+                      icon: Icons.numbers_rounded,
+                      isDark: isDark,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _roomTypeSelector(isDark),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _textField(
+                            controller: _rentCtrl,
+                            label: 'Monthly Rent (₹)',
+                            hint: '6000',
+                            icon: Icons.currency_rupee_rounded,
+                            isDark: isDark,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _textField(
+                            controller: _capacityCtrl,
+                            label: 'Capacity',
+                            hint: '1',
+                            icon: Icons.people_rounded,
+                            isDark: isDark,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _textField(
+                      controller: _floorCtrl,
+                      label: 'Floor Number',
+                      hint: 'e.g. 0',
+                      icon: Icons.stairs_rounded,
+                      isDark: isDark,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionTitle('Features', isDark),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _featureToggle(
+                            icon: Icons.ac_unit_rounded,
+                            label: 'AC',
+                            value: _hasAc,
+                            onChanged: (v) => setState(() => _hasAc = v),
+                            color: const Color(0xFF3B82F6),
+                            isDark: isDark,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _featureToggle(
+                            icon: Icons.bathtub_rounded,
+                            label: 'Attached Bath',
+                            value: _hasBathroom,
+                            onChanged: (v) => setState(() => _hasBathroom = v),
+                            color: const Color(0xFF8B5CF6),
+                            isDark: isDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionTitle('Additional Info', isDark),
+                    const SizedBox(height: 12),
+                    _textField(
+                      controller: _descCtrl,
+                      label: 'Description',
+                      hint: 'e.g. Corner room with good ventilation',
+                      icon: Icons.description_outlined,
+                      isDark: isDark,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _loading
+                                ? null
+                                : () => Navigator.pop(context, false),
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: BorderSide(
+                                  color: isDark
+                                      ? Colors.white12
+                                      : const Color(0xFFE8E8F0),
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13.5,
+                                color: isDark
+                                    ? Colors.white70
+                                    : const Color(0xFF666680),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: _loading
+                                  ? const LinearGradient(colors: [
+                                      Color(0xFFBBBBBB),
+                                      Color(0xFFCCCCCC)
+                                    ])
+                                  : const LinearGradient(colors: [
+                                      Color(0xFF7C3AED),
+                                      Color(0xFF4ECDC4)
+                                    ]),
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: _loading
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: const Color(0xFF7C3AED)
+                                            .withOpacity(0.35),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _loading ? null : _submit,
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 15),
+                                  alignment: Alignment.center,
+                                  child: _loading
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2.4,
+                                          ),
+                                        )
+                                      : Text(
+                                          _isEdit ? 'Update Room' : 'Add Room',
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13.5,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                 ),
-              if (!_isEdit) const SizedBox(height: 12),
-              _formField(
-                _rentCtrl,
-                'Monthly Rent *',
-                Icons.currency_rupee_rounded,
-                isDark,
-                keyboardType: TextInputType.number,
-                validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
-              const SizedBox(height: 12),
-              _formField(
-                _capacityCtrl,
-                'Capacity *',
-                Icons.people_rounded,
-                isDark,
-                keyboardType: TextInputType.number,
-                validator: (v) => v!.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              _formField(
-                _floorCtrl,
-                'Floor Number',
-                Icons.air_rounded,
-                isDark,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              _formField(
-                _descCtrl,
-                'Description',
-                Icons.description_rounded,
-                isDark,
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _switchTile('Has AC', _hasAc, (v) => setState(() => _hasAc = v), isDark),
-                  ),
-                  Expanded(
-                    child: _switchTile('Attached Bath', _hasBathroom, (v) => setState(() => _hasBathroom = v), isDark),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C3AED),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        _isEdit ? 'Update' : 'Add',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _formField(
-    TextEditingController ctrl,
-    String label,
-    IconData icon,
-    bool isDark, {
-    int maxLines = 1,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: ctrl,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      validator: validator,
+  Widget _sectionTitle(String text, bool isDark) {
+    return Text(
+      text,
       style: GoogleFonts.poppins(
-        fontSize: 13,
-        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-      ),
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon, size: 18, color: Colors.grey),
-        labelText: label,
-        labelStyle: GoogleFonts.poppins(
-          fontSize: 12,
-          color: isDark ? Colors.grey[400] : Colors.grey[600],
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.grey[300]!,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.grey[300]!,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 2),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        fontWeight: FontWeight.w700,
+        fontSize: 12,
+        letterSpacing: 0.4,
+        color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
       ),
     );
   }
 
-  Widget _dropdownField(String label, String value, List<String> items, Function(String?) onChanged, bool isDark) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        prefixIcon: Icon(Icons.category_rounded, size: 18, color: Colors.grey),
-        labelText: label,
-        labelStyle: GoogleFonts.poppins(
-          fontSize: 12,
-          color: isDark ? Colors.grey[400] : Colors.grey[600],
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.grey[300]!,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.grey[300]!,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 2),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      ),
-      items: items.map((item) {
-        return DropdownMenuItem<String>(
-          value: item,
+  Widget _roomTypeSelector(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            item,
+            'Room Type',
             style: GoogleFonts.poppins(
-              fontSize: 13,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : const Color(0xFF666680),
             ),
           ),
-        );
-      }).toList(),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _roomTypes.map((t) {
+            final isSel = _roomType == t;
+            return GestureDetector(
+              onTap: () => setState(() => _roomType = t),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: isSel
+                      ? const LinearGradient(
+                          colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                        )
+                      : null,
+                  color: isSel
+                      ? null
+                      : (isDark
+                          ? const Color(0xFF1A1F33)
+                          : const Color(0xFFF8F9FC)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSel
+                        ? Colors.transparent
+                        : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
+                    width: 1.4,
+                  ),
+                  boxShadow: isSel
+                      ? [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF7C3AED).withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  t,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isSel
+                        ? Colors.white
+                        : (isDark ? Colors.white70 : const Color(0xFF666680)),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
-  Widget _switchTile(String label, bool value, Function(bool) onChanged, bool isDark) {
-    return Row(
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 11,
-            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+  Widget _featureToggle({
+    required IconData icon,
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required Color color,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: value
+              ? color.withOpacity(0.08)
+              : (isDark ? const Color(0xFF1A1F33) : const Color(0xFFF8F9FC)),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: value
+                ? color
+                : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
+            width: value ? 1.8 : 1.2,
           ),
         ),
-        const Spacer(),
-        Switch(
-          value: value,
-          onChanged: onChanged,
-          activeColor: const Color(0xFF7C3AED),
+        child: Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: value ? color : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: value
+                      ? color
+                      : (isDark ? Colors.white24 : const Color(0xFFCCCCDD)),
+                  width: 2,
+                ),
+              ),
+              child: value
+                  ? const Icon(Icons.check_rounded,
+                      size: 14, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Icon(icon,
+                size: 16,
+                color: value ? color : (isDark ? Colors.white54 : Colors.grey)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: value
+                      ? color
+                      : (isDark ? Colors.white70 : const Color(0xFF666680)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _textField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    required bool isDark,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : const Color(0xFF666680),
+            ),
+          ),
+        ),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          validator: validator,
+          style: GoogleFonts.poppins(
+            fontSize: 13.5,
+            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.poppins(
+              fontSize: 13,
+              color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+            ),
+            prefixIcon: Icon(
+              icon,
+              size: 18,
+              color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+            ),
+            filled: true,
+            fillColor:
+                isDark ? const Color(0xFF1A1F33) : const Color(0xFFF8F9FC),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: isDark ? Colors.white12 : const Color(0xFFE8E8F0),
+                width: 1.4,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: isDark ? Colors.white12 : const Color(0xFFE8E8F0),
+                width: 1.4,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  const BorderSide(color: Color(0xFF7C3AED), width: 1.8),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+            ),
+          ),
         ),
       ],
     );
