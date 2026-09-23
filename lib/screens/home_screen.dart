@@ -1,25 +1,33 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: deprecated_member_use, prefer_const_constructors, use_build_context_synchronously
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import 'package:yourhome/models/property_model.dart';
+import 'package:yourhome/providers/notification_provider.dart';
 import 'package:yourhome/screens/admin/admin_profile_screen.dart';
 import 'package:yourhome/screens/booking/first_booking_discount_screen.dart';
 import 'package:yourhome/screens/owner/owner_profile_screen.dart';
 import 'package:yourhome/screens/reels/reels_feed_screen.dart';
 import 'package:yourhome/screens/refer_and_earn_screen.dart';
+
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/property_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/chat_provider.dart';
+import '../providers/referral_provider.dart';
+import '../providers/user_dashboard_provider.dart';
 
-// ==================== STUDENT PANEL (USER) ====================
+// ==================== STUDENT PANEL ====================
 import 'properties_screen.dart';
 import 'favorites_screen.dart';
 import 'profile_screen.dart';
@@ -38,36 +46,34 @@ import 'admin/admin_user_management_page.dart';
 import 'admin/admin_property_management_page.dart';
 
 // ==================== DESIGN TOKENS ====================
-class _HomePalette {
-  // Student Panel Colors (Blue)
+class _HP {
   static const studentPrimary = Color(0xFF2563EB);
   static const studentPrimaryLight = Color(0xFF3B82F6);
   static const studentPrimarySoft = Color(0xFF60A5FA);
-
-  // Owner Panel Colors (Orange/Gold)
   static const ownerPrimary = Color(0xFFF59E0B);
   static const ownerPrimaryLight = Color(0xFFFBBF24);
   static const ownerGold = Color(0xFFD4AF37);
-
-  // Admin Panel Colors (Purple)
   static const adminPrimary = Color(0xFF7C3AED);
   static const adminPrimaryLight = Color(0xFF8B5CF6);
-
   static const success = Color(0xFF16A34A);
+  static const successLight = Color(0xFF22C55E);
   static const danger = Color(0xFFDC2626);
+  static const dangerLight = Color(0xFFEF4444);
   static const gold = Color(0xFFD4AF37);
   static const purple = Color(0xFF8B5CF6);
+  static const purpleLight = Color(0xFF9F7AEA);
   static const pink = Color(0xFFEC4899);
   static const orange = Color(0xFFF59E0B);
-
+  static const teal = Color(0xFF14B8A6);
   static const darkBg = Color(0xFF0A0E1A);
   static const darkSurface = Color(0xFF141A2C);
   static const darkSurfaceElevated = Color(0xFF1B2338);
+  static const darkCard = Color(0xFF1A1F33);
   static const lightBg = Color(0xFFF7F8FC);
   static const lightSurface = Color(0xFFFFFFFF);
 }
 
-// ==================== HOME SCREEN WITH BOTTOM NAV ====================
+// ==================== HOME SCREEN (Bottom Nav) ====================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -85,17 +91,9 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AnimationController _navAnimationController;
   late Animation<double> _navAnimation;
 
-  // ✅ NEW: Pulse animation for Owner panel's raised "Add Property" button
-  late AnimationController _addPulseController;
-  late Animation<double> _addPulseAnimation;
-
   @override
   void initState() {
     super.initState();
-    _setupAnimations();
-  }
-
-  void _setupAnimations() {
     _navAnimationController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
@@ -105,28 +103,16 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       curve: Curves.easeOutCubic,
     );
     _navAnimationController.forward();
-
-    // ✅ NEW: Owner Add-Property button pulse
-    _addPulseController = AnimationController(
-      duration: const Duration(milliseconds: 1100),
-      vsync: this,
-    )..repeat(reverse: true);
-    _addPulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _addPulseController, curve: Curves.easeInOut),
-    );
   }
 
   @override
   void dispose() {
     _navAnimationController.dispose();
-    _addPulseController.dispose(); // ✅ NEW
     super.dispose();
   }
 
   void changeTab(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
   Future<bool> _onWillPop() async {
@@ -140,18 +126,13 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             children: [
               const Icon(Icons.info_outline, color: Colors.white),
               const SizedBox(width: 12),
-              Text(
-                'Press back again to exit',
-                style: GoogleFonts.poppins(),
-              ),
+              Text('Press back again to exit', style: GoogleFonts.poppins()),
             ],
           ),
           duration: const Duration(seconds: 2),
           backgroundColor: Colors.grey[800],
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -160,53 +141,40 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return true;
   }
 
-  // ✅ GET PRIMARY COLOR BASED ON ROLE
   Color _getPrimaryColor(String role) {
     switch (role) {
       case 'ADMIN':
-        return _HomePalette.adminPrimary;
+        return _HP.adminPrimary;
       case 'OWNER':
-        return _HomePalette.ownerPrimary;
+        return _HP.ownerPrimary;
       default:
-        return _HomePalette.studentPrimary;
+        return _HP.studentPrimary;
     }
   }
 
-  Color _getPrimaryLightColor(String role) {
-    switch (role) {
-      case 'ADMIN':
-        return _HomePalette.adminPrimaryLight;
-      case 'OWNER':
-        return _HomePalette.ownerPrimaryLight;
-      default:
-        return _HomePalette.studentPrimaryLight;
-    }
-  }
-
-  // ✅ ROLE-BASED PAGES
   List<Widget> _getPages(String role) {
     switch (role) {
       case 'ADMIN':
-        return [
-          const AdminDashboardPage(),
-          const AdminUserManagementPage(),
-          const AdminPropertyManagementPage(),
-          const AdminProfileScreen(),
+        return const [
+          AdminDashboardPage(),
+          AdminUserManagementPage(),
+          AdminPropertyManagementPage(),
+          AdminProfileScreen(),
         ];
       case 'OWNER':
-        return [
-          const OwnerDashboardPage(),
-          const OwnerPropertyManagementPage(),
-          const OwnerBookingManagementPage(),
-          const ChatListScreen(),
+        return const [
+          OwnerDashboardPage(),
+          OwnerPropertyManagementPage(),
+          OwnerBookingManagementPage(),
+          ChatListScreen(),
         ];
       default:
-        return [
-          const HomePage(),
-          const PropertiesScreen(),
-          const ReelsFeedScreen(),
-          const FavoritesScreen(),
-          const ChatListScreen(),
+        return const [
+          HomePage(),
+          PropertiesScreen(),
+          ReelsFeedScreen(),
+          FavoritesScreen(),
+          ChatListScreen(),
         ];
     }
   }
@@ -286,11 +254,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }) {
     final isSelected = _selectedIndex == index;
     final primaryColor = _getPrimaryColor(userRole);
-
-    // ✅ For Reels tab (index 2), use special colors
     final bool isReelsTab = index == 2;
-    final Color selectedColor =
-        isReelsTab ? const Color(0xFFF59E0B) : primaryColor;
+    final Color selectedColor = isReelsTab ? _HP.orange : primaryColor;
     final Color? unselectedColor = isReelsTab
         ? (isDark ? Colors.grey[400]! : Colors.grey[400]!)
         : (isDark ? Colors.grey[500] : Colors.grey[400]);
@@ -308,10 +273,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               isSelected ? selectedColor.withOpacity(0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(30),
           border: isSelected
-              ? Border.all(
-                  color: selectedColor.withOpacity(0.2),
-                  width: 1,
-                )
+              ? Border.all(color: selectedColor.withOpacity(0.2), width: 1)
               : null,
         ),
         child: Column(
@@ -346,24 +308,18 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<IconData> icons,
     List<IconData> activeIcons,
   ) {
-    // ✅ Check if current tab is Reels (index 2)
     final bool isReelsTab = _selectedIndex == 2;
-
-    // ✅ If Reels tab, force dark mode regardless of theme
     final bool useDark = isReelsTab ? true : isDark;
 
-    // ✅ CHANGE SYSTEM NAVIGATION BAR COLOR
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (isReelsTab) {
-        // Reels tab - Dark system navigation bar
         SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-          systemNavigationBarColor: Color(0xFF1A1F33), // Dark color
-          systemNavigationBarIconBrightness: Brightness.light, // White icons
+          systemNavigationBarColor: Color(0xFF1A1F33),
+          systemNavigationBarIconBrightness: Brightness.light,
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
         ));
       } else {
-        // Other tabs - Normal based on theme
         if (isDark) {
           SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
             systemNavigationBarColor: Color(0xFF0A0E1A),
@@ -386,7 +342,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         color: useDark
             ? const Color(0xFF1A1F33)
-            : (isDark ? _HomePalette.darkSurface : Colors.white),
+            : (isDark ? _HP.darkSurface : Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(useDark ? 0.3 : 0.05),
@@ -434,16 +390,16 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Container(
             height: 68,
             decoration: BoxDecoration(
-              color: (isDark ? _HomePalette.darkSurfaceElevated : Colors.white)
+              color: (isDark ? _HP.darkSurfaceElevated : Colors.white)
                   .withOpacity(isDark ? 0.78 : 0.92),
               borderRadius: BorderRadius.circular(26),
               border: Border.all(
-                color: _HomePalette.ownerPrimary.withOpacity(0.18),
+                color: _HP.ownerPrimary.withOpacity(0.18),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _HomePalette.ownerPrimary.withOpacity(0.2),
+                  color: _HP.ownerPrimary.withOpacity(0.2),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),
@@ -464,17 +420,14 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Container(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [
-                              _HomePalette.ownerPrimary,
-                              _HomePalette.ownerGold,
-                            ],
+                            colors: [_HP.ownerPrimary, _HP.ownerGold],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: _HomePalette.ownerPrimary.withOpacity(0.4),
+                              color: _HP.ownerPrimary.withOpacity(0.4),
                               blurRadius: 14,
                               offset: const Offset(0, 4),
                             ),
@@ -510,7 +463,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                   const SizedBox(height: 3),
                                   AnimatedDefaultTextStyle(
-                                    duration: const Duration(milliseconds: 200),
+                                    duration:
+                                        const Duration(milliseconds: 200),
                                     style: GoogleFonts.poppins(
                                       fontSize: 9.5,
                                       fontWeight: isSelected
@@ -548,11 +502,9 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<IconData> icons,
     List<IconData> activeIcons,
   ) {
-    final bottomInset =
-        MediaQuery.of(context).padding.bottom; // ✅ system nav bar height
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Padding(
-      // ✅ bottom margin now includes system inset so the floating bar clears it
       padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomInset),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(26),
@@ -561,16 +513,16 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Container(
             height: 68,
             decoration: BoxDecoration(
-              color: (isDark ? _HomePalette.darkSurfaceElevated : Colors.white)
+              color: (isDark ? _HP.darkSurfaceElevated : Colors.white)
                   .withOpacity(isDark ? 0.78 : 0.92),
               borderRadius: BorderRadius.circular(26),
               border: Border.all(
-                color: _HomePalette.adminPrimary.withOpacity(0.18),
+                color: _HP.adminPrimary.withOpacity(0.18),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _HomePalette.adminPrimary.withOpacity(0.2),
+                  color: _HP.adminPrimary.withOpacity(0.2),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),
@@ -592,8 +544,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [
-                              _HomePalette.adminPrimary,
-                              _HomePalette.adminPrimaryLight
+                              _HP.adminPrimary,
+                              _HP.adminPrimaryLight
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -601,7 +553,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: _HomePalette.adminPrimary.withOpacity(0.4),
+                              color: _HP.adminPrimary.withOpacity(0.4),
                               blurRadius: 14,
                               offset: const Offset(0, 4),
                             ),
@@ -637,7 +589,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                   const SizedBox(height: 3),
                                   AnimatedDefaultTextStyle(
-                                    duration: const Duration(milliseconds: 200),
+                                    duration:
+                                        const Duration(milliseconds: 200),
                                     style: GoogleFonts.poppins(
                                       fontSize: 9.5,
                                       fontWeight: isSelected
@@ -671,19 +624,14 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // ✅ GET USER ROLE
     final authProvider = Provider.of<AuthProvider>(context);
     final userRole = authProvider.user?.role ?? 'STUDENT';
-
-    print('🔴 Current User Role: $userRole');
 
     final pages = _getPages(userRole);
     final labels = _getLabels(userRole);
     final icons = _getIcons(userRole);
     final activeIcons = _getActiveIcons(userRole);
 
-    // ✅ Pick a completely different bottom nav per role
     Widget bottomNav;
     switch (userRole) {
       case 'OWNER':
@@ -703,8 +651,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       onWillPop: _onWillPop,
       child: Scaffold(
         key: HomeScreen.navigatorKey,
-        extendBody: userRole ==
-            'OWNER', // lets the raised Add button float over content
+        extendBody: userRole == 'OWNER',
         body: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: pages[_selectedIndex],
@@ -718,7 +665,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
-// ==================== HOME PAGE (STUDENT) ====================
+// ==================== HOME PAGE (STUDENT) — PRODUCTION READY ====================
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -727,162 +674,60 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
-  bool _isFirstLoad = true;
-
-  late AnimationController _mainController;
-  late Animation<double> _fadeIn;
-  late Animation<Offset> _slideUp;
-  late Animation<double> _scaleIn;
-
-  late AnimationController _greetingController;
-  late Animation<double> _greetingAnimation;
+  late AnimationController _staggerController;
 
   final List<Map<String, dynamic>> _categories = [
-    {
-      'name': 'PG',
-      'image': 'assets/images/pg.jpg',
-      'color': _HomePalette.studentPrimary
-    },
-    {
-      'name': 'Hostel',
-      'image': 'assets/images/hostel.jpg',
-      'color': _HomePalette.purple
-    },
-    {
-      'name': 'Hotel',
-      'image': 'assets/images/hotel.jpg',
-      'color': _HomePalette.orange
-    },
-    {
-      'name': 'Flat',
-      'image': 'assets/images/flats.png',
-      'color': _HomePalette.success
-    },
-    {
-      'name': 'Villa',
-      'image': 'assets/images/villa.png',
-      'color': const Color(0xFF06B6D4)
-    },
-    {
-      'name': 'Resort',
-      'image': 'assets/images/restourent.png',
-      'color': _HomePalette.pink
-    },
-  ];
-
-  final List<Map<String, dynamic>> _quickActions = [
-    {
-      'name': 'Top Rated',
-      'icon': Icons.star_rounded,
-      'color': _HomePalette.gold
-    },
-    {
-      'name': 'Nearby',
-      'icon': Icons.location_on_rounded,
-      'color': _HomePalette.studentPrimary
-    },
-    {
-      'name': 'Budget',
-      'icon': Icons.attach_money_rounded,
-      'color': _HomePalette.success
-    },
-    {
-      'name': 'Luxury',
-      'icon': Icons.workspace_premium_rounded,
-      'color': _HomePalette.purple
-    },
+    {'name': 'PG', 'image': 'assets/images/pg.jpg', 'color': _HP.studentPrimary},
+    {'name': 'Hostel', 'image': 'assets/images/hostel.jpg', 'color': _HP.purple},
+    {'name': 'Hotel', 'image': 'assets/images/hotel.jpg', 'color': _HP.orange},
+    {'name': 'Flat', 'image': 'assets/images/flats.png', 'color': _HP.success},
+    {'name': 'Villa', 'image': 'assets/images/villa.png', 'color': const Color(0xFF06B6D4)},
+    {'name': 'Resort', 'image': 'assets/images/restourent.png', 'color': _HP.pink},
   ];
 
   final List<Map<String, dynamic>> _popularCities = [
-    {'name': 'Delhi', 'emoji': '🏛️'},
-    {'name': 'Noida', 'emoji': '🏙️'},
-    {'name': 'Gurgaon', 'emoji': '🌆'},
-    {'name': 'Mumbai', 'emoji': '🌊'},
-    {'name': 'Bangalore', 'emoji': '🌴'},
-  ];
-
-  final List<Map<String, dynamic>> _offers = [
-    {
-      'title': '🎉 20% OFF on First Booking!',
-      'subtitle': 'Use code: FIRST20',
-      'color': _HomePalette.purple,
-      'icon': Icons.local_offer_rounded,
-    },
-    {
-      'title': '🏠 Refer & Earn ₹19!',
-      'subtitle': 'Share with friends and earn rewards',
-      'color': _HomePalette.studentPrimary,
-      'icon': Icons.share_rounded,
-    },
-    {
-      'title': '🌟 Premium Properties at 10% OFF',
-      'subtitle': 'Limited time offer',
-      'color': _HomePalette.orange,
-      'icon': Icons.workspace_premium_rounded,
-    },
+    {'name': 'Delhi', 'emoji': '🏛️', 'count': '240+ PGs'},
+    {'name': 'Noida', 'emoji': '🏙️', 'count': '180+ PGs'},
+    {'name': 'Gurgaon', 'emoji': '🌆', 'count': '210+ PGs'},
+    {'name': 'Mumbai', 'emoji': '🌊', 'count': '320+ PGs'},
+    {'name': 'Bangalore', 'emoji': '🌴', 'count': '450+ PGs'},
   ];
 
   @override
   void initState() {
     super.initState();
-    _setupAnimations();
-    _loadProperties();
-  }
-
-  void _setupAnimations() {
-    _mainController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+    _staggerController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-
-    _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainController, curve: Curves.easeInOutCubic),
-    );
-
-    _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.05),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _mainController, curve: Curves.easeOutCubic),
-    );
-
-    _scaleIn = Tween<double>(begin: 0.95, end: 1.0).animate(
-      CurvedAnimation(parent: _mainController, curve: Curves.easeOutBack),
-    );
-
-    _greetingController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _greetingAnimation = CurvedAnimation(
-      parent: _greetingController,
-      curve: Curves.easeOutCubic,
-    );
-
-    _mainController.forward();
-    _greetingController.forward();
+    _loadAll();
   }
 
-  void _loadProperties() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_isFirstLoad && mounted) {
-        _isFirstLoad = false;
-        final propertyProvider = Provider.of<PropertyProvider>(
-          context,
-          listen: false,
-        );
-        if (propertyProvider.properties.isEmpty &&
-            propertyProvider.error == null) {
-          propertyProvider.searchProperties();
-        }
+  Future<void> _loadAll() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      final propertyProvider = Provider.of<PropertyProvider>(context, listen: false);
+      if (propertyProvider.properties.isEmpty) {
+        propertyProvider.searchProperties();
       }
+
+      final userDashboard = Provider.of<UserDashboardProvider>(context, listen: false);
+      await userDashboard.loadSummary(showLoader: false);
+
+      final notifProvider = Provider.of<NotificationProvider>(context, listen: false);
+      await notifProvider.loadUnreadCount();
+
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      await chatProvider.loadUnreadCount();
+
+      if (mounted) _staggerController.forward(from: 0);
     });
   }
 
   @override
   void dispose() {
-    _mainController.dispose();
-    _greetingController.dispose();
+    _staggerController.dispose();
     super.dispose();
   }
 
@@ -895,17 +740,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   void _navigateToTab(int index) {
     final homeState = HomeScreen.navigatorKey.currentState;
-    if (homeState != null) {
-      homeState.changeTab(index);
-    }
+    if (homeState != null) homeState.changeTab(index);
   }
 
   void _navigateToScreen(Widget screen) {
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => screen,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        pageBuilder: (_, __, ___) => screen,
+        transitionsBuilder: (_, animation, __, child) {
           return FadeTransition(
             opacity: animation,
             child: ScaleTransition(
@@ -919,6 +762,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
+  Widget _animated(int index, Widget child) {
+    final delay = index * 0.05;
+    return AnimatedBuilder(
+      animation: _staggerController,
+      builder: (_, __) {
+        final raw = _staggerController.value - delay;
+        final t = Curves.easeOutCubic.transform(raw.clamp(0.0, 1.0).toDouble());
+        return Transform.translate(
+          offset: Offset(0, 20 * (1 - t)),
+          child: Opacity(opacity: t, child: child),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -926,128 +784,125 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final user = authProvider.user;
     final profileProvider = Provider.of<ProfileProvider>(context);
     final profileImage = profileProvider.profile?.profilePic;
+    final dashboard = Provider.of<UserDashboardProvider>(context);
 
-    return Consumer<PropertyProvider>(
-      builder: (context, propertyProvider, child) {
-        return Scaffold(
-          backgroundColor: isDark ? _HomePalette.darkBg : _HomePalette.lightBg,
-          body: SafeArea(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await propertyProvider.searchProperties();
-              },
-              color: _HomePalette.studentPrimary,
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ========== PREMIUM HEADER ==========
-                    FadeTransition(
-                      opacity: _greetingAnimation,
-                      child: _buildPremiumHeader(
-                        context,
-                        isDark,
-                        user,
-                        profileImage,
-                      ),
-                    ),
+    return Scaffold(
+      backgroundColor: isDark ? _HP.darkBg : _HP.lightBg,
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () async {
+            final pp = Provider.of<PropertyProvider>(context, listen: false);
+            await pp.searchProperties();
+            await dashboard.loadSummary(showLoader: false);
+          },
+          color: _HP.studentPrimary,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            padding: const EdgeInsets.only(bottom: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _animated(0, _buildHeader(context, isDark, user, profileImage, dashboard)),
+                const SizedBox(height: 12),
+                _animated(1, _buildSearchBar(context, isDark)),
 
-                    const SizedBox(height: 12),
+                if (dashboard.hasActiveTenancy) ...[
+                  const SizedBox(height: 16),
+                  _animated(2, _buildActiveRentalCard(context, isDark, dashboard)),
+                ],
 
-                    // ========== SEARCH BAR ==========
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: SlideTransition(
-                        position: _slideUp,
-                        child: _buildSearchBar(context, isDark),
-                      ),
-                    ),
+                const SizedBox(height: 16),
+                _animated(3, _buildWalletCard(context, isDark, dashboard)),
 
-                    const SizedBox(height: 16),
+                const SizedBox(height: 16),
+                _animated(4, _buildOfferBanner(context, isDark)),
 
-                    // ========== 🎉 OFFER BANNER ==========
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: _buildOfferBanner(context, isDark),
-                    ),
+                const SizedBox(height: 20),
+                _animated(5, _buildAnalyticsCard(context, isDark, dashboard)),
 
-                    const SizedBox(height: 20),
+                const SizedBox(height: 24),
+                _animated(6, _buildCategories(context, isDark)),
 
-                    // ========== QUICK ACTIONS ==========
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: _buildQuickActions(context, isDark),
-                    ),
+                const SizedBox(height: 24),
+                _animated(7, _buildTrendingSection(context, isDark)),
 
-                    const SizedBox(height: 24),
+                const SizedBox(height: 24),
+                _animated(8, _buildRecentActivity(context, isDark, dashboard)),
 
-                    // ========== CATEGORIES ==========
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: _buildCategories(context, isDark),
-                    ),
+                const SizedBox(height: 24),
+                _animated(9, _buildPopularCities(context, isDark)),
 
-                    const SizedBox(height: 24),
+                const SizedBox(height: 24),
+                _animated(10, _buildTrustBadges(context, isDark)),
 
-                    // ========== ⭐ FEATURED PROPERTIES ==========
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: _buildFeaturedSection(
-                          context, propertyProvider, isDark),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // ========== 🔥 TRENDING SECTION ==========
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: _buildTrendingSection(
-                          context, propertyProvider, isDark),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // ========== POPULAR PROPERTIES ==========
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: _buildPopularSection(
-                          context, propertyProvider, isDark),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // ========== 🏙️ POPULAR CITIES ==========
-                    FadeTransition(
-                      opacity: _fadeIn,
-                      child: _buildPopularCities(context, isDark),
-                    ),
-                  ],
-                ),
-              ),
+                const SizedBox(height: 24),
+                _animated(11, _buildSupportCTA(context, isDark)),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  // ========== PREMIUM HEADER ==========
-  Widget _buildPremiumHeader(
+  // ============================================================
+  // HEADER
+  // ============================================================
+  Widget _buildHeader(
     BuildContext context,
     bool isDark,
     dynamic user,
     String? profileImage,
+    UserDashboardProvider dashboard,
   ) {
     final hasImage = profileImage != null && profileImage.isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Row(
         children: [
-          _buildProfileAvatar(isDark, user, profileImage),
-          const SizedBox(width: 14),
+          GestureDetector(
+            onTap: () => _navigateToScreen(const ProfileScreen()),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: hasImage
+                    ? null
+                    : const LinearGradient(
+                        colors: [_HP.studentPrimary, _HP.studentPrimaryLight],
+                      ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _HP.studentPrimary.withOpacity(0.25),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 26,
+                backgroundColor: Colors.transparent,
+                backgroundImage:
+                    hasImage ? CachedNetworkImageProvider(profileImage!) : null,
+                child: hasImage
+                    ? null
+                    : Text(
+                        user?.name?.isNotEmpty == true
+                            ? user!.name[0].toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1055,191 +910,127 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 Text(
                   _greeting(),
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: isDark ? Colors.grey[400] : Colors.grey[500],
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  user?.name.isNotEmpty == true ? user!.name : 'Guest',
+                  user?.name?.isNotEmpty == true ? user!.name : 'Guest',
                   style: GoogleFonts.playfairDisplay(
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _HomePalette.success.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: _HomePalette.success,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Active',
-                            style: GoogleFonts.poppins(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: _HomePalette.success,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '🏠 Explorer',
-                      style: GoogleFonts.poppins(
-                        fontSize: 10,
-                        color: isDark ? Colors.grey[500] : Colors.grey[400],
-                      ),
-                    ),
-                  ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          _buildNotificationBell(isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileAvatar(bool isDark, dynamic user, String? profileImage) {
-    final hasImage = profileImage != null && profileImage.isNotEmpty;
-
-    return GestureDetector(
-      onTap: () => _navigateToScreen(const ProfileScreen()),
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: hasImage
-              ? null
-              : const LinearGradient(
-                  colors: [
-                    _HomePalette.studentPrimary,
-                    _HomePalette.studentPrimaryLight
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-          boxShadow: [
-            BoxShadow(
-              color: _HomePalette.studentPrimary.withOpacity(0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: CircleAvatar(
-          radius: 26,
-          backgroundColor: Colors.transparent,
-          backgroundImage:
-              hasImage ? CachedNetworkImageProvider(profileImage!) : null,
-          child: hasImage
-              ? null
-              : Text(
-                  user?.name.isNotEmpty == true
-                      ? user.name[0].toUpperCase()
-                      : 'U',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationBell(bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? _HomePalette.darkSurface : Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+          _iconBtn(
+            icon: Icons.chat_bubble_outline_rounded,
+            badge: dashboard.unreadMessages,
+            badgeColor: _HP.success,
+            isDark: isDark,
+            onTap: () => _navigateToTab(4),
+          ),
+          const SizedBox(width: 8),
+          _iconBtn(
+            icon: Icons.notifications_outlined,
+            badge: dashboard.unreadNotifications,
+            badgeColor: _HP.danger,
+            isDark: isDark,
+            onTap: () => _navigateToScreen(const NotificationScreen()),
           ),
         ],
       ),
-      child: IconButton(
-        icon: Stack(
-          children: [
-            Icon(
-              Icons.notifications_outlined,
-              color: isDark ? Colors.white70 : const Color(0xFF4B5563),
-              size: 26,
-            ),
-            Positioned(
-              right: 0,
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: _HomePalette.danger,
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 12,
-                  minHeight: 12,
-                ),
-                child: Text(
-                  '3',
-                  style: GoogleFonts.poppins(
-                    fontSize: 7,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+    );
+  }
+
+  Widget _iconBtn({
+    required IconData icon,
+    required int badge,
+    required Color badgeColor,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isDark ? _HP.darkSurface : Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        onPressed: () {
-          _navigateToScreen(const NotificationScreen());
-        },
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Center(
+              child: Icon(
+                icon,
+                color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+                size: 21,
+              ),
+            ),
+            if (badge > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: badgeColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDark ? _HP.darkBg : _HP.lightBg,
+                      width: 2,
+                    ),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 18),
+                  child: Text(
+                    badge > 99 ? '99+' : badge.toString(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  // ========== SEARCH BAR ==========
+  // ============================================================
+  // SEARCH BAR
+  // ============================================================
   Widget _buildSearchBar(BuildContext context, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
         onTap: () => _navigateToTab(1),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           decoration: BoxDecoration(
-            color: isDark ? _HomePalette.darkSurface : Colors.white,
+            color: isDark ? _HP.darkSurface : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isDark
                   ? Colors.white.withOpacity(0.06)
                   : Colors.black.withOpacity(0.06),
-              width: 1,
             ),
             boxShadow: [
               BoxShadow(
@@ -1254,19 +1045,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _HomePalette.studentPrimary.withOpacity(0.1),
+                  color: _HP.studentPrimary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.search_rounded,
-                  color: _HomePalette.studentPrimary,
-                  size: 20,
-                ),
+                child: const Icon(Icons.search_rounded,
+                    color: _HP.studentPrimary, size: 20),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'Where are you going?',
+                  'Search PG, Hostel, Flat...',
                   style: GoogleFonts.poppins(
                     color: isDark ? Colors.grey[400] : Colors.grey[500],
                     fontSize: 14,
@@ -1275,26 +1063,325 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      _HomePalette.studentPrimary,
-                      _HomePalette.studentPrimaryLight
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(30),
+                  color: _HP.studentPrimary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  'Search',
-                  style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+                child: const Icon(Icons.tune_rounded,
+                    color: _HP.studentPrimary, size: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // ACTIVE RENTAL CARD
+  // ============================================================
+  Widget _buildActiveRentalCard(
+    BuildContext context,
+    bool isDark,
+    UserDashboardProvider dashboard,
+  ) {
+    final tenancy = dashboard.currentTenancy!;
+    final daysUntilDue = tenancy['daysUntilDue'] as int? ?? 0;
+    final rentDue = tenancy['rentDue'] == true;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: rentDue
+                ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                : [const Color(0xFF7C3AED), const Color(0xFF9F7AEA)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: (rentDue ? _HP.danger : _HP.purple).withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Icon(
+                    rentDue ? Icons.warning_amber_rounded : Icons.home_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    rentDue ? '⚠️ Rent Overdue' : '🏠 Your Active Room',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    tenancy['status'] ?? 'ACTIVE',
+                    style: GoogleFonts.poppins(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              tenancy['propertyTitle'] ?? 'Property',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.location_on_rounded,
+                    color: Colors.white70, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  tenancy['propertyCity'] ?? '',
+                  style: GoogleFonts.poppins(
+                      fontSize: 11, color: Colors.white70),
+                ),
+                const SizedBox(width: 12),
+                const Icon(Icons.meeting_room_rounded,
+                    color: Colors.white70, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  'Room ${tenancy['roomNumber'] ?? 'N/A'}',
+                  style: GoogleFonts.poppins(
+                      fontSize: 11, color: Colors.white70),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Next Rent',
+                            style: GoogleFonts.poppins(
+                                fontSize: 10, color: Colors.white70)),
+                        const SizedBox(height: 2),
+                        Text(
+                          '₹${(tenancy['nextRentAmount'] ?? 0)}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                      width: 1,
+                      height: 36,
+                      color: Colors.white.withOpacity(0.2)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('Due',
+                            style: GoogleFonts.poppins(
+                                fontSize: 10, color: Colors.white70)),
+                        const SizedBox(height: 2),
+                        Text(
+                          daysUntilDue < 0
+                              ? '${daysUntilDue.abs()} days late'
+                              : daysUntilDue == 0
+                                  ? 'Today'
+                                  : 'in $daysUntilDue days',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (dashboard.upcomingPayments.isNotEmpty) {
+                    final invoiceId =
+                        dashboard.upcomingPayments.first['invoiceId'];
+                    _showRentPaymentSheet(context, invoiceId);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: rentDue ? _HP.danger : _HP.purple,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.payment_rounded, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Pay Rent Now',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // WALLET CARD
+  // ============================================================
+  Widget _buildWalletCard(
+    BuildContext context,
+    bool isDark,
+    UserDashboardProvider dashboard,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        onTap: () => _navigateToScreen(const ReferAndEarnScreen()),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: _HP.purple.withOpacity(0.3),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.account_balance_wallet_rounded,
+                    color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Wallet Balance',
+                        style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white70)),
+                    const SizedBox(height: 2),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('₹',
+                            style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white70)),
+                        const SizedBox(width: 2),
+                        Text(
+                          dashboard.walletBalance.toStringAsFixed(2),
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.share_rounded,
+                        color: _HP.purple, size: 14),
+                    const SizedBox(width: 4),
+                    Text('Refer',
+                        style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _HP.purple)),
+                  ],
                 ),
               ),
             ],
@@ -1304,84 +1391,327 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  // ========== OFFER BANNER ==========
- // ========== OFFER BANNER ==========
-Widget _buildOfferBanner(BuildContext context, bool isDark) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: SizedBox(
+  // ============================================================
+  // ANALYTICS CARD
+  // ============================================================
+  Widget _buildAnalyticsCard(
+    BuildContext context,
+    bool isDark,
+    UserDashboardProvider dashboard,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? _HP.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : const Color(0xFFF0F0F8),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _HP.studentPrimary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.insights_rounded,
+                      color: _HP.studentPrimary, size: 14),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Your Activity',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                ),
+                const Spacer(),
+                if (dashboard.monthlyGrowthPercent != 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: (dashboard.monthlyGrowthPercent > 0
+                              ? _HP.success
+                              : _HP.danger)
+                          .withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          dashboard.monthlyGrowthPercent > 0
+                              ? Icons.trending_up
+                              : Icons.trending_down,
+                          size: 11,
+                          color: dashboard.monthlyGrowthPercent > 0
+                              ? _HP.success
+                              : _HP.danger,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${dashboard.monthlyGrowthPercent.toStringAsFixed(0)}%',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: dashboard.monthlyGrowthPercent > 0
+                                ? _HP.success
+                                : _HP.danger,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _statTile(
+                    label: 'Bookings',
+                    value: '${dashboard.totalBookings}',
+                    icon: Icons.book_online_rounded,
+                    color: _HP.studentPrimary,
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _statTile(
+                    label: 'Active',
+                    value: '${dashboard.activeBookings}',
+                    icon: Icons.check_circle_rounded,
+                    color: _HP.success,
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _statTile(
+                    label: 'Saved',
+                    value: '${dashboard.savedProperties}',
+                    icon: Icons.favorite_rounded,
+                    color: _HP.pink,
+                    isDark: isDark,
+                  ),
+                ),
+              ],
+            ),
+            if (dashboard.monthlyTrend.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Text(
+                    'Monthly Spend',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          isDark ? Colors.white70 : const Color(0xFF666680),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '₹${dashboard.totalPaid.toStringAsFixed(0)} total',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _HP.studentPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 70,
+                child: _buildMiniBarChart(dashboard, isDark),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniBarChart(UserDashboardProvider dashboard, bool isDark) {
+    final trend = dashboard.monthlyTrend;
+    if (trend.isEmpty) return const SizedBox();
+
+    final values =
+        trend.map((e) => (e['amount'] as num? ?? 0).toDouble()).toList();
+    final maxVal = values.reduce((a, b) => a > b ? a : b);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(trend.length, (i) {
+        final amount = values[i];
+        final ratio = maxVal > 0 ? amount / maxVal : 0.0;
+        final monthLabel = trend[i]['month']?.toString().substring(0, 3) ?? '';
+
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Container(
+                    width: double.infinity,
+                    height: (55 * ratio).clamp(4.0, 55.0),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [_HP.studentPrimary, _HP.studentPrimaryLight],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  monthLabel,
+                  style: GoogleFonts.poppins(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  // ============================================================
+  // OFFER BANNER
+  // ============================================================
+  Widget _buildOfferBanner(BuildContext context, bool isDark) {
+    final offers = [
+      {
+        'title': '🎉 20% OFF First Booking!',
+        'subtitle': 'Use code: FIRST20',
+        'color': _HP.purple,
+        'icon': Icons.local_offer_rounded,
+        'type': 'FIRST',
+      },
+      {
+        'title': '🏠 Refer & Earn ₹19!',
+        'subtitle': 'Share with friends',
+        'color': _HP.studentPrimary,
+        'icon': Icons.share_rounded,
+        'type': 'REFER',
+      },
+      {
+        'title': '🌟 Premium at 10% OFF',
+        'subtitle': 'Limited time offer',
+        'color': _HP.orange,
+        'icon': Icons.workspace_premium_rounded,
+        'type': 'PREMIUM',
+      },
+    ];
+
+    return SizedBox(
       height: 100,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: _offers.length,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: offers.length,
         itemBuilder: (context, index) {
-          final offer = _offers[index];
-          
-          final isReferCard = offer['title'] == '🏠 Refer & Earn ₹19!';
-          final isFirstBookingCard = offer['title'] == '🎉 20% OFF on First Booking!';
-          
+          final offer = offers[index];
           return GestureDetector(
             onTap: () {
-              if (isReferCard) {
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) => 
-                      const ReferAndEarnScreen(),
-                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: animation,
-                        child: ScaleTransition(
-                          scale: Tween<double>(begin: 0.95, end: 1.0).animate(animation),
-                          child: child,
-                        ),
-                      );
-                    },
-                    transitionDuration: const Duration(milliseconds: 350),
-                  ),
-                );
-              } else if (isFirstBookingCard) {
-                //  CHANGE: Navigate to FirstBookingDiscountScreen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const FirstBookingDiscountScreen(),
-                  ),
-                );
+              final type = offer['type'];
+              if (type == 'REFER') {
+                _navigateToScreen(const ReferAndEarnScreen());
+              } else if (type == 'FIRST') {
+                _navigateToScreen(const FirstBookingDiscountScreen());
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(offer['title']),
-                    duration: const Duration(seconds: 2),
-                    backgroundColor: Colors.grey[800],
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
+                _navigateToTab(1);
               }
             },
             child: Container(
               width: MediaQuery.of(context).size.width - 80,
               margin: const EdgeInsets.only(right: 12),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
                     offer['color'] as Color,
-                    (offer['color'] as Color).withOpacity(0.7)
+                    (offer['color'] as Color).withOpacity(0.75),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: (offer['color'] as Color).withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                    color: (offer['color'] as Color).withOpacity(0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
@@ -1393,11 +1723,8 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      offer['icon'],
-                      color: Colors.white,
-                      size: 24,
-                    ),
+                    child: Icon(offer['icon'] as IconData,
+                        color: Colors.white, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1406,137 +1733,36 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          offer['title'],
+                          offer['title'] as String,
                           style: GoogleFonts.poppins(
                             color: Colors.white,
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          offer['subtitle'],
+                          offer['subtitle'] as String,
                           style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 11,
-                          ),
+                              color: Colors.white70, fontSize: 10.5),
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      isReferCard ? 'Share' : (isFirstBookingCard ? 'View Offer' : 'Claim'),
-                      style: GoogleFonts.poppins(
-                        color: offer['color'] as Color,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded,
+                      color: Colors.white70, size: 14),
                 ],
               ),
             ),
           );
         },
       ),
-    ),
-  );
-}
-
-  // ========== QUICK ACTIONS ==========
-  Widget _buildQuickActions(BuildContext context, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Quick Actions',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: _quickActions.map((action) {
-              return Expanded(
-                child: _buildQuickActionItem(
-                  context,
-                  action['name'],
-                  action['icon'],
-                  action['color'],
-                  isDark,
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildQuickActionItem(
-    BuildContext context,
-    String name,
-    IconData icon,
-    Color color,
-    bool isDark,
-  ) {
-    return GestureDetector(
-      onTap: () => _navigateToTab(1),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? _HomePalette.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 22,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              name,
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ========== CATEGORIES ==========
+  // ============================================================
+  // CATEGORIES
+  // ============================================================
   Widget _buildCategories(BuildContext context, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1547,7 +1773,7 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Categories',
+                'Browse by Type',
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -1563,7 +1789,7 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
                 child: Text(
                   'See All',
                   style: GoogleFonts.poppins(
-                    color: const Color.fromRGBO(37, 99, 235, 1),
+                    color: _HP.studentPrimary,
                     fontWeight: FontWeight.w500,
                     fontSize: 12,
                   ),
@@ -1579,14 +1805,9 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
               physics: const BouncingScrollPhysics(),
               itemCount: _categories.length,
               itemBuilder: (context, index) {
-                final category = _categories[index];
-                return _buildCategoryItem(
-                  context,
-                  category['name'],
-                  category['image'],
-                  category['color'],
-                  isDark,
-                );
+                final c = _categories[index];
+                return _categoryItem(
+                    context, c['name'], c['image'], c['color'], isDark);
               },
             ),
           ),
@@ -1595,7 +1816,7 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
     );
   }
 
-  Widget _buildCategoryItem(
+  Widget _categoryItem(
     BuildContext context,
     String name,
     String imagePath,
@@ -1604,19 +1825,11 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
   ) {
     return GestureDetector(
       onTap: () {
-        try {
-          final propertyProvider = Provider.of<PropertyProvider>(
-            context,
-            listen: false,
-          );
-          propertyProvider.searchProperties(type: name);
-          _navigateToTab(1);
-        } catch (e) {
-          print('❌ Error: $e');
-        }
+        Provider.of<PropertyProvider>(context, listen: false)
+            .searchProperties(type: name);
+        _navigateToTab(1);
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Container(
         width: 72,
         margin: const EdgeInsets.only(right: 12),
         child: Column(
@@ -1627,10 +1840,7 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: color.withOpacity(0.25),
-                  width: 1.5,
-                ),
+                border: Border.all(color: color.withOpacity(0.25), width: 1.5),
                 boxShadow: [
                   BoxShadow(
                     color: color.withOpacity(0.15),
@@ -1644,13 +1854,9 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
                 child: Image.asset(
                   imagePath,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
+                  errorBuilder: (_, __, ___) => Container(
                     color: color.withOpacity(0.1),
-                    child: Icon(
-                      Icons.home_rounded,
-                      color: color,
-                      size: 24,
-                    ),
+                    child: Icon(Icons.home_rounded, color: color, size: 24),
                   ),
                 ),
               ),
@@ -1670,314 +1876,13 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
     );
   }
 
-  // ========== FEATURED PROPERTIES ==========
-  Widget _buildFeaturedSection(
-    BuildContext context,
-    PropertyProvider provider,
-    bool isDark,
-  ) {
-    final featured = provider.properties.where((p) => p.isFeatured).toList();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.workspace_premium_rounded,
-                    color: _HomePalette.gold,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '⭐ Featured Stays',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                    ),
-                  ),
-                ],
-              ),
-              TextButton(
-                onPressed: () => _navigateToTab(1),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                ),
-                child: Text(
-                  'See All',
-                  style: GoogleFonts.poppins(
-                    color: _HomePalette.studentPrimary,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (provider.isLoading)
-            _buildLoadingShimmer(isDark)
-          else if (provider.error != null)
-            _buildErrorWidget(context, provider, isDark)
-          else if (featured.isEmpty)
-            _buildEmptyWidget(isDark, 'No featured properties')
-          else
-            SizedBox(
-              height: 280,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: featured.length > 6 ? 6 : featured.length,
-                itemBuilder: (context, index) {
-                  final property = featured[index];
-                  return _buildFeaturedCard(
-                    context,
-                    property,
-                    isDark,
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeaturedCard(
-    BuildContext context,
-    Property property,
-    bool isDark,
-  ) {
-    return GestureDetector(
-      onTap: () {
-        _navigateToScreen(
-            PropertyDetailScreen(propertyId: property.propertyId));
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: 180,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: isDark ? _HomePalette.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
-                  child: Container(
-                    height: 150,
-                    width: double.infinity,
-                    color: isDark ? Colors.grey[800] : Colors.grey[200],
-                    child: property.coverImage.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: property.coverImage,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color:
-                                  isDark ? Colors.grey[800] : Colors.grey[200],
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Icon(
-                              Icons.home_rounded,
-                              size: 40,
-                              color:
-                                  isDark ? Colors.grey[600] : Colors.grey[400],
-                            ),
-                          )
-                        : Icon(
-                            Icons.home_rounded,
-                            size: 40,
-                            color: isDark ? Colors.grey[600] : Colors.grey[400],
-                          ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star_rounded,
-                            color: Colors.white, size: 10),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Premium',
-                          style: GoogleFonts.poppins(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      property.monthlyRentMin != null
-                          ? '₹${property.monthlyRentMin!.toStringAsFixed(0)}'
-                          : 'Contact',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 8,
-                  left: 8,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star_rounded,
-                            color: Color(0xFFFFD700), size: 10),
-                        const SizedBox(width: 2),
-                        Text(
-                          property.averageRating?.toStringAsFixed(1) ?? '4.5',
-                          style: GoogleFonts.poppins(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    property.title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_rounded,
-                        size: 12,
-                        color: isDark ? Colors.grey[500] : Colors.grey[500],
-                      ),
-                      const SizedBox(width: 2),
-                      Expanded(
-                        child: Text(
-                          property.city,
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _HomePalette.success.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${property.availableRooms} rooms left',
-                          style: GoogleFonts.poppins(
-                            fontSize: 8,
-                            color: _HomePalette.success,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      if (property.isVerifiedOwner)
-                        const Icon(Icons.verified,
-                            color: Colors.blue, size: 12),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ========== TRENDING SECTION ==========
-  Widget _buildTrendingSection(
-    BuildContext context,
-    PropertyProvider provider,
-    bool isDark,
-  ) {
+  // ============================================================
+  // TRENDING — SQUARE BOXES
+  // ============================================================
+  Widget _buildTrendingSection(BuildContext context, bool isDark) {
+    final provider = Provider.of<PropertyProvider>(context);
     final trending =
-        provider.properties.where((p) => p.viewCount > 50).take(5).toList();
+        provider.properties.where((p) => p.viewCount > 50).take(6).toList();
 
     if (trending.isEmpty) return const SizedBox.shrink();
 
@@ -1991,14 +1896,11 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.local_fire_department_rounded,
-                    color: Colors.orange[600],
-                    size: 20,
-                  ),
+                  Icon(Icons.local_fire_department_rounded,
+                      color: Colors.orange[600], size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    '🔥 Trending Now',
+                    'Trending Now',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -2010,349 +1912,173 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
               TextButton(
                 onPressed: () => _navigateToTab(1),
                 style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                ),
-                child: Text(
-                  'See All',
-                  style: GoogleFonts.poppins(
-                    color: _HomePalette.studentPrimary,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                  ),
-                ),
+                    padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+                child: Text('See All',
+                    style: GoogleFonts.poppins(
+                        color: _HP.studentPrimary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ...trending
-              .map((property) => _buildTrendingCard(
-                    context,
-                    property,
-                    isDark,
-                  ))
-              .toList(),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: trending.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.78,
+            ),
+            itemBuilder: (context, i) =>
+                _trendingSquareCard(context, trending[i], isDark),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTrendingCard(
-    BuildContext context,
-    Property property,
-    bool isDark,
-  ) {
+  Widget _trendingSquareCard(
+      BuildContext context, Property property, bool isDark) {
     return GestureDetector(
-      onTap: () {
-        _navigateToScreen(
-            PropertyDetailScreen(propertyId: property.propertyId));
-      },
+      onTap: () => _navigateToScreen(
+          PropertyDetailScreen(propertyId: property.propertyId)),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isDark ? _HomePalette.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.orange.withOpacity(0.2),
-            width: 1,
-          ),
+          color: isDark ? _HP.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.orange.withOpacity(0.2), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 60,
-                height: 60,
-                color: isDark ? Colors.grey[800] : Colors.grey[200],
-                child: property.coverImage.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: property.coverImage,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: isDark ? Colors.grey[800] : Colors.grey[200],
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Icon(
-                          Icons.home_rounded,
-                          size: 30,
-                          color: isDark ? Colors.grey[600] : Colors.grey[400],
-                        ),
-                      )
-                    : Icon(
-                        Icons.home_rounded,
-                        size: 30,
-                        color: isDark ? Colors.grey[600] : Colors.grey[400],
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(18)),
+                  child: Container(
+                    height: 110,
+                    width: double.infinity,
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    child: property.coverImage.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: property.coverImage,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Icon(
+                                Icons.home_rounded,
+                                size: 32,
+                                color: isDark
+                                    ? Colors.grey[600]
+                                    : Colors.grey[400]),
+                          )
+                        : Icon(Icons.home_rounded,
+                            size: 32,
+                            color:
+                                isDark ? Colors.grey[600] : Colors.grey[400]),
+                  ),
+                ),
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
                       ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    property.title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_rounded,
-                        size: 12,
-                        color: isDark ? Colors.grey[500] : Colors.grey[500],
-                      ),
-                      const SizedBox(width: 2),
-                      Expanded(
-                        child: Text(
-                          property.city,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.local_fire_department_rounded,
+                            color: Colors.white, size: 9),
+                        const SizedBox(width: 2),
+                        Text(
+                          'TRENDING',
                           style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            fontSize: 7,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.local_fire_department_rounded,
-                              color: Colors.orange,
-                              size: 10,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${property.viewCount} views',
-                              style: GoogleFonts.poppins(
-                                fontSize: 8,
-                                color: Colors.orange,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _HomePalette.studentPrimary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '₹${property.monthlyRentMin?.toStringAsFixed(0)}/mo',
+                ),
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.visibility_rounded,
+                            color: Colors.white, size: 9),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${property.viewCount}',
                           style: GoogleFonts.poppins(
                             fontSize: 8,
-                            color: _HomePalette.studentPrimary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: Colors.grey,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ========== POPULAR PROPERTIES ==========
-  Widget _buildPopularSection(
-    BuildContext context,
-    PropertyProvider provider,
-    bool isDark,
-  ) {
-    final popular =
-        provider.properties.where((p) => !p.isFeatured).take(4).toList();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Popular Properties',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                ),
-              ),
-              TextButton(
-                onPressed: () => _navigateToTab(1),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                ),
-                child: Text(
-                  'See All',
-                  style: GoogleFonts.poppins(
-                    color: _HomePalette.studentPrimary,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (provider.isLoading)
-            _buildLoadingShimmer(isDark)
-          else if (provider.error != null)
-            _buildErrorWidget(context, provider, isDark)
-          else if (popular.isEmpty)
-            _buildEmptyWidget(isDark, 'No properties available')
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: popular.length,
-              itemBuilder: (context, index) {
-                final property = popular[index];
-                return _buildPopularCard(
-                  context,
-                  property,
-                  isDark,
-                );
-              },
+              ],
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPopularCard(
-    BuildContext context,
-    Property property,
-    bool isDark,
-  ) {
-    return GestureDetector(
-      onTap: () {
-        _navigateToScreen(
-            PropertyDetailScreen(propertyId: property.propertyId));
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isDark ? _HomePalette.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 80,
-                height: 80,
-                color: isDark ? Colors.grey[800] : Colors.grey[200],
-                child: property.coverImage.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: property.coverImage,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: isDark ? Colors.grey[800] : Colors.grey[200],
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Icon(
-                          Icons.home_rounded,
-                          size: 30,
-                          color: isDark ? Colors.grey[600] : Colors.grey[400],
-                        ),
-                      )
-                    : Icon(
-                        Icons.home_rounded,
-                        size: 30,
-                        color: isDark ? Colors.grey[600] : Colors.grey[400],
-                      ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     property.title,
                     style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      height: 1.2,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(
-                        Icons.location_on_rounded,
-                        size: 13,
-                        color: isDark ? Colors.grey[500] : Colors.grey[500],
-                      ),
+                      Icon(Icons.location_on_rounded,
+                          size: 10,
+                          color:
+                              isDark ? Colors.grey[500] : Colors.grey[500]),
                       const SizedBox(width: 2),
                       Expanded(
                         child: Text(
                           property.city,
                           style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            fontSize: 9.5,
+                            color:
+                                isDark ? Colors.grey[400] : Colors.grey[600],
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -2364,132 +2090,28 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _HomePalette.studentPrimary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          property.propertyType,
-                          style: GoogleFonts.poppins(
-                            fontSize: 9,
-                            color: _HomePalette.studentPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      Text(
+                        property.monthlyRentMin != null
+                            ? '₹${property.monthlyRentMin!.toStringAsFixed(0)}'
+                            : 'Contact',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: _HP.studentPrimary,
                         ),
                       ),
                       Text(
-                        property.monthlyRentMin != null
-                            ? '₹${property.monthlyRentMin!.toStringAsFixed(0)}/mo'
-                            : 'Contact',
+                        '/mo',
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: _HomePalette.studentPrimary,
+                          fontSize: 9,
+                          color:
+                              isDark ? Colors.grey[500] : Colors.grey[500],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.star_rounded,
-                                color: Colors.amber, size: 10),
-                            const SizedBox(width: 2),
-                            Text(
-                              property.averageRating?.toStringAsFixed(1) ??
-                                  '4.5',
-                              style: GoogleFonts.poppins(
-                                fontSize: 8,
-                                color: Colors.amber,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      if (property.isVerifiedOwner)
-                        const Icon(Icons.verified,
-                            color: Colors.blue, size: 12),
                     ],
                   ),
                 ],
               ),
-            ),
-            Consumer<PropertyProvider>(
-              builder: (context, propertyProvider, child) {
-                final isSaved = propertyProvider.savedProperties
-                    .any((p) => p.propertyId == property.propertyId);
-                return GestureDetector(
-                  onTap: () async {
-                    HapticFeedback.lightImpact();
-                    try {
-                      if (isSaved) {
-                        await propertyProvider
-                            .removeSavedProperty(property.propertyId);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Removed from favorites'),
-                            duration: const Duration(seconds: 1),
-                            backgroundColor: Colors.grey[800],
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        );
-                      } else {
-                        await propertyProvider
-                            .saveProperty(property.propertyId);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Added to favorites ❤️'),
-                            duration: const Duration(seconds: 1),
-                            backgroundColor: _HomePalette.success,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      print('❌ Error: $e');
-                    }
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: isSaved
-                          ? _HomePalette.danger.withOpacity(0.1)
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isSaved
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      color: isSaved
-                          ? _HomePalette.danger
-                          : (isDark ? Colors.grey[500] : Colors.grey[400]),
-                      size: 22,
-                    ),
-                  ),
-                );
-              },
             ),
           ],
         ),
@@ -2497,7 +2119,165 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
     );
   }
 
-  // ========== POPULAR CITIES ==========
+  // ============================================================
+  // RECENT ACTIVITY
+  // ============================================================
+  Widget _buildRecentActivity(
+    BuildContext context,
+    bool isDark,
+    UserDashboardProvider dashboard,
+  ) {
+    final activities = dashboard.recentActivity;
+    if (activities.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? _HP.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : const Color(0xFFF0F0F8),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _HP.teal.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.history_rounded,
+                      color: _HP.teal, size: 14),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Recent Activity',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...activities.take(5).map((a) => _activityTile(a, isDark)).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _activityTile(Map<String, dynamic> item, bool isDark) {
+    final color = _hex(item['color']?.toString() ?? '#7C3AED');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              _iconFromName(item['icon']?.toString() ?? 'info'),
+              color: color,
+              size: 15,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['title']?.toString() ?? '',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  item['description']?.toString() ?? '',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            item['timeAgo']?.toString() ?? '',
+            style: GoogleFonts.poppins(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconFromName(String name) {
+    switch (name) {
+      case 'payment':
+        return Icons.payment_rounded;
+      case 'booking':
+        return Icons.book_online_rounded;
+      case 'check':
+        return Icons.check_circle_rounded;
+      case 'cancel':
+        return Icons.cancel_rounded;
+      case 'home':
+        return Icons.home_rounded;
+      case 'star':
+        return Icons.star_rounded;
+      case 'visibility':
+        return Icons.visibility_rounded;
+      case 'contract':
+        return Icons.description_rounded;
+      default:
+        return Icons.info_rounded;
+    }
+  }
+
+  Color _hex(String hex) {
+    try {
+      final h = hex.replaceAll('#', '');
+      return Color(int.parse('FF$h', radix: 16));
+    } catch (_) {
+      return _HP.purple;
+    }
+  }
+
+  // ============================================================
+  // POPULAR CITIES
+  // ============================================================
   Widget _buildPopularCities(BuildContext context, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -2505,39 +2285,16 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.location_city_rounded,
-                    color: _HomePalette.studentPrimary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '🏙️ Popular Cities',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                    ),
-                  ),
-                ],
-              ),
-              TextButton(
-                onPressed: () => _navigateToTab(1),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                ),
-                child: Text(
-                  'See All',
-                  style: GoogleFonts.poppins(
-                    color: _HomePalette.studentPrimary,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                  ),
+              const Icon(Icons.location_city_rounded,
+                  color: _HP.studentPrimary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Popular Cities',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                 ),
               ),
             ],
@@ -2546,35 +2303,32 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: _popularCities.map((city) {
-              return _buildCityChip(
-                  context, city['name'], city['emoji'], isDark);
-            }).toList(),
+            children: _popularCities
+                .map((city) => _cityChip(context, city, isDark))
+                .toList(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCityChip(
-      BuildContext context, String city, String emoji, bool isDark) {
+  Widget _cityChip(
+      BuildContext context, Map<String, dynamic> city, bool isDark) {
     return GestureDetector(
       onTap: () {
-        final propertyProvider = Provider.of<PropertyProvider>(
-          context,
-          listen: false,
-        );
-        propertyProvider.searchProperties(city: city);
+        Provider.of<PropertyProvider>(context, listen: false)
+            .searchProperties(city: city['name']);
         _navigateToTab(1);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isDark ? _HomePalette.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(30),
+          color: isDark ? _HP.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey[200]!,
-            width: 1,
+            color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : const Color(0xFFF0F0F8),
           ),
           boxShadow: [
             BoxShadow(
@@ -2587,18 +2341,27 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              emoji,
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text(city['emoji'], style: const TextStyle(fontSize: 16)),
             const SizedBox(width: 6),
-            Text(
-              city,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  city['name'],
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                ),
+                Text(
+                  city['count'],
+                  style: GoogleFonts.poppins(
+                    fontSize: 9,
+                    color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -2606,15 +2369,165 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
     );
   }
 
-  // ========== LOADING SHIMMER ==========
-  Widget _buildLoadingShimmer(bool isDark) {
+  // ============================================================
+  // TRUST BADGES
+  // ============================================================
+  Widget _buildTrustBadges(BuildContext context, bool isDark) {
+    final badges = [
+      {'icon': Icons.verified_user_rounded, 'title': 'Verified Owners', 'color': _HP.success},
+      {'icon': Icons.lock_rounded, 'title': 'Secure Payments', 'color': _HP.studentPrimary},
+      {'icon': Icons.support_agent_rounded, 'title': '24x7 Support', 'color': _HP.purple},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? _HP.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : const Color(0xFFF0F0F8),
+          ),
+        ),
+        child: Row(
+          children: badges.map((b) {
+            return Expanded(
+              child: Column(
+                children: [
+                  Icon(b['icon'] as IconData,
+                      color: b['color'] as Color, size: 22),
+                  const SizedBox(height: 6),
+                  Text(
+                    b['title'] as String,
+                    style: GoogleFonts.poppins(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : const Color(0xFF666680),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // SUPPORT CTA
+  // ============================================================
+  Widget _buildSupportCTA(BuildContext context, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        onTap: () => _navigateToTab(4),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [const Color(0xFF1A1F33), const Color(0xFF141A2C)]
+                  : [const Color(0xFFF0F4FF), const Color(0xFFE0E7FF)],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: _HP.studentPrimary.withOpacity(0.15),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _HP.studentPrimary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.support_agent_rounded,
+                    color: _HP.studentPrimary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Need help?',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      ),
+                    ),
+                    Text(
+                      'Chat with our support team 24x7',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.5,
+                        color:
+                            isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _HP.studentPrimary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.chat_rounded,
+                        color: Colors.white, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Chat',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // RENT PAYMENT SHEET
+  // ============================================================
+  void _showRentPaymentSheet(BuildContext context, int invoiceId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _RentPaymentSheet(invoiceId: invoiceId),
+    );
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  Widget _loadingShimmer(bool isDark) {
     return Column(
-      children: List.generate(2, (index) {
+      children: List.generate(2, (_) {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDark ? _HomePalette.darkSurface : Colors.white,
+            color: isDark ? _HP.darkSurface : Colors.white,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -2649,28 +2562,6 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.grey[800] : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          width: 50,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.grey[800] : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -2681,79 +2572,17 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
     );
   }
 
-  // ========== ERROR WIDGET ==========
-  Widget _buildErrorWidget(
-    BuildContext context,
-    PropertyProvider provider,
-    bool isDark,
-  ) {
+  Widget _emptyWidget(bool isDark, String message) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? _HomePalette.darkSurface : Colors.white,
+        color: isDark ? _HP.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.error_outline_rounded,
-            size: 40,
-            color: _HomePalette.danger.withOpacity(0.6),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Failed to load properties',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            provider.error ?? 'Something went wrong',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: () => provider.searchProperties(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _HomePalette.studentPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Retry',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ========== EMPTY WIDGET ==========
-  Widget _buildEmptyWidget(bool isDark, String message) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? _HomePalette.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.home_outlined,
-            size: 40,
-            color: isDark ? Colors.grey[600] : Colors.grey[400],
-          ),
+          Icon(Icons.home_outlined,
+              size: 40, color: isDark ? Colors.grey[600] : Colors.grey[400]),
           const SizedBox(height: 12),
           Text(
             message,
@@ -2766,5 +2595,157 @@ Widget _buildOfferBanner(BuildContext context, bool isDark) {
         ],
       ),
     );
+  }
+}
+
+// ==================== RENT PAYMENT SHEET ====================
+class _RentPaymentSheet extends StatefulWidget {
+  final int invoiceId;
+  const _RentPaymentSheet({required this.invoiceId});
+
+  @override
+  State<_RentPaymentSheet> createState() => _RentPaymentSheetState();
+}
+
+class _RentPaymentSheetState extends State<_RentPaymentSheet> {
+  bool _isInitiating = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? _HP.darkSurface : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : const Color(0xFFE0E0E8),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.payment_rounded,
+                      color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Pay Rent',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'You will be redirected to Razorpay secure checkout to complete the payment.',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isInitiating ? null : _initiatePayment,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _HP.purple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: _isInitiating
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        'Proceed to Payment',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _initiatePayment() async {
+    setState(() => _isInitiating = true);
+
+    try {
+      final provider = Provider.of<UserDashboardProvider>(context, listen: false);
+      final result = await provider.initiateRentPayment(widget.invoiceId);
+
+      if (mounted && result != null) {
+        // TODO: Open Razorpay checkout with result['razorpayOrderId']
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Order created: ${result['razorpayOrderId']}',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: _HP.purple,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {}
+
+    if (mounted) setState(() => _isInitiating = false);
   }
 }

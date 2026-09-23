@@ -18,12 +18,18 @@ class ChatProvider extends ChangeNotifier {
   final Map<int, bool> _typingByConversation = {};
   final Map<int, Timer> _typingTimers = {};
 
+  // ✅ NEW — Unread count
+  int _unreadCount = 0;
+
   List<Conversation> get conversations => _conversations;
   List<Message> get messages => _messages;
   bool get isLoading => _isLoading;
   String? get error => _error;
   WebSocketManager get wsManager => _wsManager;
   int? get activeConversationId => _activeConversationId;
+
+  // ✅ NEW — Getter
+  int get unreadCount => _unreadCount;
 
   bool isOtherUserTyping(int conversationId) =>
       _typingByConversation[conversationId] ?? false;
@@ -51,6 +57,9 @@ class ChatProvider extends ChangeNotifier {
   void initWebSocket({required String token, required int userId}) {
     _wsManager.onMessageReceived = (message) {
       _addMessage(message);
+      // ✅ NEW — Increment unread count on new message
+      _unreadCount += 1;
+      notifyListeners();
     };
 
     _wsManager.onMessageEdited = (message) {
@@ -91,6 +100,7 @@ class ChatProvider extends ChangeNotifier {
       final response = await _chatService.getConversations();
       if (response.success && response.data != null) {
         _conversations = response.data!;
+        _recalculateUnread();  // ✅ NEW
       }
     } catch (e) {
       _error = e.toString();
@@ -109,6 +119,29 @@ class ChatProvider extends ChangeNotifier {
       _error = e.toString();
     }
     _setLoading(false);
+  }
+
+  // ============================================
+  // ✅ NEW — Load unread count
+  // ============================================
+  Future<void> loadUnreadCount() async {
+    try {
+      final response = await _chatService.getConversations();
+      if (response.success && response.data != null) {
+        _conversations = response.data!;
+        _recalculateUnread();
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  // ✅ NEW — Helper to calculate total unread
+  void _recalculateUnread() {
+    int total = 0;
+    for (final c in _conversations) {
+      total += c.unreadCount;
+    }
+    _unreadCount = total;
   }
 
   void addOptimisticMessage(Message message) {
@@ -196,6 +229,16 @@ class ChatProvider extends ChangeNotifier {
   Future<void> markAsRead(int conversationId) async {
     try {
       await _chatService.markAsRead(conversationId);
+
+      // ✅ NEW — Reset unread count for this conversation
+      final index = _conversations.indexWhere(
+        (c) => c.conversationId == conversationId,
+      );
+      if (index != -1) {
+        _conversations[index] = _conversations[index].copyWith(unreadCount: 0);
+        _recalculateUnread();
+        notifyListeners();
+      }
     } catch (e) {}
   }
 
@@ -227,12 +270,11 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // ✅ FIXED: Directly add message without checking activeConversationId
   void _addMessage(Message message) {
     final exists = _messages.any((m) => m.messageId == message.messageId);
     if (!exists) {
       _messages.add(message);
-      print('✅ Provider: Message added: ${message.content}');
+      // ✅ Removed print statement
     }
     _typingByConversation[message.conversationId] = false;
     notifyListeners();
@@ -272,6 +314,7 @@ class ChatProvider extends ChangeNotifier {
       if (bTime == null) return -1;
       return bTime.compareTo(aTime);
     });
+    _recalculateUnread();  // ✅ NEW
     notifyListeners();
   }
 
