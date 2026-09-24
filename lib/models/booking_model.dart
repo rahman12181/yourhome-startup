@@ -1,5 +1,3 @@
-// lib/models/booking_model.dart
-
 class BookingRequest {
   final int requestId;
   final int propertyId;
@@ -20,7 +18,6 @@ class BookingRequest {
   final DateTime? requestedAt;
   final DateTime? respondedAt;
 
-  // ============ STUDENT DETAILS ============
   final int? studentId;
   final String? studentName;
   final String? studentDisplayId;
@@ -33,7 +30,6 @@ class BookingRequest {
   final bool studentHasActiveBooking;
   final bool isRepeatStudent;
 
-  // ============ PAYMENT ============
   final bool isPaid;
   final double? paidAmount;
   final String? paymentStatus;
@@ -44,14 +40,12 @@ class BookingRequest {
   final String? payoutTransactionRef;
   final DateTime? paidAt;
 
-  // ============ UI FLAGS ============
   final bool isNew;
   final bool isUrgent;
   final bool hasUnreadMessages;
   final String? conversationId;
   final int daysSinceRequested;
 
-  // ============ PROPERTY CONTEXT ============
   final int availableRooms;
   final bool isPropertyPublished;
 
@@ -104,6 +98,12 @@ class BookingRequest {
   });
 
   factory BookingRequest.fromJson(Map<String, dynamic> json) {
+    final bool derivedIsPaid =
+        json['isPaid'] == true ||
+        json['paymentStatus'] == 'PAID' ||
+        json['status'] == 'COMPLETED' ||
+        json['paidAt'] != null;
+
     return BookingRequest(
       requestId: _parseInt(json['requestId']),
       propertyId: _parseInt(json['propertyId']),
@@ -125,8 +125,6 @@ class BookingRequest {
       ownerResponse: _parseString(json['ownerResponse']),
       requestedAt: _parseDateTime(json['requestedAt']),
       respondedAt: _parseDateTime(json['respondedAt']),
-
-      // Student
       studentId: json['studentId'] != null ? _parseInt(json['studentId']) : null,
       studentName: _parseString(json['studentName']),
       studentDisplayId: _parseString(json['studentDisplayId']),
@@ -142,32 +140,26 @@ class BookingRequest {
           : null,
       studentHasActiveBooking: json['studentHasActiveBooking'] ?? false,
       isRepeatStudent: json['isRepeatStudent'] ?? false,
-
-      // Payment
-      isPaid: json['isPaid'] ?? false,
+      isPaid: derivedIsPaid,
       paidAmount: _parseDouble(json['paidAmount']),
-      paymentStatus: _parseString(json['paymentStatus']),
+      paymentStatus: _parseString(json['paymentStatus']) ??
+          (derivedIsPaid ? 'PAID' : 'CREATED'),
       couponCode: _parseString(json['couponCode']),
       discountAmount: _parseDouble(json['discountAmount']),
       ownerPayoutAmount: _parseDouble(json['ownerPayoutAmount']),
       payoutStatus: _parseString(json['payoutStatus']),
       payoutTransactionRef: _parseString(json['payoutTransactionRef']),
       paidAt: _parseDateTime(json['paidAt']),
-
-      // UI Flags
       isNew: json['isNew'] ?? false,
       isUrgent: json['isUrgent'] ?? false,
       hasUnreadMessages: json['hasUnreadMessages'] ?? false,
       conversationId: _parseString(json['conversationId']),
       daysSinceRequested: _parseInt(json['daysSinceRequested']),
-
-      // Property context
       availableRooms: _parseInt(json['availableRooms']),
       isPropertyPublished: json['isPropertyPublished'] ?? false,
     );
   }
 
-  // ============ SAFE PARSERS ============
   static int _parseInt(dynamic v) {
     if (v == null) return 0;
     if (v is int) return v;
@@ -204,9 +196,6 @@ class BookingRequest {
   }
 }
 
-// ============================================
-// CREATE BOOKING REQUEST (User side)
-// ============================================
 class CreateBookingRequest {
   final int propertyId;
   final int? roomId;

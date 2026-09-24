@@ -23,9 +23,6 @@ import 'notifications/notification_screen.dart';
 import 'bookings/booking_list_screen.dart';
 import 'home_screen.dart';
 
-// ============================================================
-// DESIGN TOKENS
-// ============================================================
 class _Palette {
   static const primary = Color(0xFF2563EB);
   static const primaryDeep = Color(0xFF1D4ED8);
@@ -70,11 +67,18 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isLoadingOtherUser = false;
   String? _otherUserError;
 
+  bool _hasLoadedProfile = false;
+
   @override
   void initState() {
     super.initState();
     _setupAnimations();
-    _loadProfileData();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadProfileData();
+      }
+    });
   }
 
   void _setupAnimations() {
@@ -125,20 +129,27 @@ class _ProfileScreenState extends State<ProfileScreen>
     _staggerController.forward();
   }
 
-  void _loadProfileData() {
+  Future<void> _loadProfileData() async {
+    if (!mounted) return;
+    if (_hasLoadedProfile) return;
+    
+    _hasLoadedProfile = true;
+
     final profileProvider = Provider.of<ProfileProvider>(
       context,
       listen: false,
     );
 
     if (widget.isOwner && widget.userId != null) {
-      _loadOtherUserProfile(widget.userId!);
+      await _loadOtherUserProfile(widget.userId!);
     } else {
-      profileProvider.loadAllData();
+      await profileProvider.loadAllData();
     }
   }
 
   Future<void> _loadOtherUserProfile(int userId) async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoadingOtherUser = true;
       _otherUserError = null;
@@ -149,8 +160,12 @@ class _ProfileScreenState extends State<ProfileScreen>
       final token = await authProvider.getAccessToken();
 
       if (token == null) {
-        _otherUserError = 'Please login again';
-        setState(() => _isLoadingOtherUser = false);
+        if (mounted) {
+          setState(() {
+            _otherUserError = 'Please login again';
+            _isLoadingOtherUser = false;
+          });
+        }
         return;
       }
 
@@ -185,9 +200,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       _fallbackUserProfile(userId);
     }
 
-    setState(() {
-      _isLoadingOtherUser = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoadingOtherUser = false;
+      });
+    }
   }
 
   void _fallbackUserProfile(int userId) {
@@ -256,6 +273,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -312,7 +331,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         context, isDark, user, profileProvider, authProvider);
   }
 
-  // ========== BACKGROUND DECORATION ==========
   Widget _buildBackgroundDecor(bool isDark) {
     return Positioned.fill(
       child: IgnorePointer(
@@ -364,7 +382,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== OWNER PROFILE VIEW ==========
   Widget _buildOwnerProfileView(BuildContext context, bool isDark) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -401,7 +418,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== USER PROFILE VIEW ==========
   Widget _buildUserProfileView(
     BuildContext context,
     bool isDark,
@@ -427,7 +443,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ? _buildErrorState(isDark, provider.error!)
                     : RefreshIndicator(
                         onRefresh: () async {
+                          _hasLoadedProfile = false;
                           await provider.loadAllData();
+                          _hasLoadedProfile = true;
                         },
                         color: _Palette.primary,
                         backgroundColor:
@@ -512,7 +530,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== PREMIUM APP BAR ==========
   PreferredSizeWidget _buildPremiumAppBar(
     BuildContext context,
     bool isDark, {
@@ -590,7 +607,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== PREMIUM HEADER ==========
   Widget _buildPremiumHeader(
     BuildContext context,
     dynamic user,
@@ -628,7 +644,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Decorative ring pattern
           Positioned(
             top: -30,
             right: -30,
@@ -817,7 +832,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== PREMIUM STATS ==========
   Widget _buildPremiumStats(
       BuildContext context, ProfileProvider provider, bool isDark) {
     final stats = [
@@ -922,7 +936,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== PREMIUM MENU ==========
   Widget _buildPremiumMenu(BuildContext context, bool isDark) {
     final bookingsCount =
         Provider.of<ProfileProvider>(context).bookings.length.toString();
@@ -1034,11 +1047,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                         context,
                         MaterialPageRoute(builder: (_) => screen),
                       ).then((_) {
-                        final provider = Provider.of<ProfileProvider>(
-                          context,
-                          listen: false,
-                        );
-                        provider.loadAllData();
+                        if (mounted) {
+                          final provider = Provider.of<ProfileProvider>(
+                            context,
+                            listen: false,
+                          );
+                          provider.loadAllData();
+                        }
                       });
                     }
                   },
@@ -1135,7 +1150,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  //PREMIUM LOGOUT 
   Widget _buildPremiumLogout(
     BuildContext context,
     AuthProvider authProvider,
@@ -1190,20 +1204,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== OTHER USER CONTENT ==========
   static const List<String> _monthShort = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
   void _copyToClipboard(String value, String label) {
@@ -1223,7 +1226,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       child: Column(
         children: [
-          // ---------- COVER + AVATAR ----------
           FadeTransition(
             opacity: _staggerAnimations[0],
             child: Stack(
@@ -1334,7 +1336,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           const SizedBox(height: 58),
 
-          // ---------- NAME + META ----------
           FadeTransition(
             opacity: _staggerAnimations[1],
             child: Column(
@@ -1387,7 +1388,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           const SizedBox(height: 22),
 
-          // ---------- QUICK CONTACT ACTIONS ----------
           FadeTransition(
             opacity: _staggerAnimations[2],
             child: Row(
@@ -1428,7 +1428,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           const SizedBox(height: 20),
 
-          // ---------- TRUST BADGES ----------
           FadeTransition(
             opacity: _staggerAnimations[3],
             child: Row(
@@ -1469,7 +1468,6 @@ class _ProfileScreenState extends State<ProfileScreen>
 
           _sectionLabel('Contact details', isDark, 10),
 
-          // ---------- DETAIL CARD ----------
           FadeTransition(
             opacity: _staggerAnimations[4],
             child: Container(
@@ -1543,7 +1541,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           const SizedBox(height: 24),
 
-          // ---------- BACK BUTTON ----------
           FadeTransition(
             opacity: _staggerAnimations[5],
             child: SizedBox(
@@ -1720,7 +1717,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== COMMON STATES ==========
   Widget _buildLoadingState(bool isDark) {
     return Center(
       child: Column(
@@ -1813,7 +1809,10 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             const SizedBox(height: 22),
             ElevatedButton.icon(
-              onPressed: _loadProfileData,
+              onPressed: () {
+                _hasLoadedProfile = false;
+                _loadProfileData();
+              },
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: Text(
                 'Retry',
@@ -1870,7 +1869,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ========== LOGOUT DIALOG ==========
   Future<void> _showLogoutDialog(BuildContext context) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

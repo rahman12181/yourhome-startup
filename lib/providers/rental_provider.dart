@@ -37,25 +37,39 @@ class RentalProvider extends ChangeNotifier {
 
   // ── Agreement detail + its invoices (one call site) ─────────────
   Future<bool> fetchAgreementWithInvoices(int agreementId) async {
-    isLoading = true;
-    error = null;
+  isLoading = true;
+  error = null;
+  notifyListeners();
+
+  final detailRes = await _service.getAgreementDetail(agreementId);
+  final invoicesRes = await _service.getAgreementInvoices(agreementId);
+  isLoading = false;
+
+  // 🔥 DEBUG
+  debugPrint('═══════════════════════════════════════');
+  debugPrint('📋 AGREEMENT DETAIL');
+  debugPrint('   success: ${detailRes.success}');
+  debugPrint('   message: ${detailRes.message}');
+  debugPrint('   data: ${detailRes.data}');
+  debugPrint('   propertyTitle: ${detailRes.data?.propertyTitle}');
+  debugPrint('   roomNumber: ${detailRes.data?.roomNumber}');
+  debugPrint('   monthlyRent: ${detailRes.data?.monthlyRent}');
+  debugPrint('📋 INVOICES');
+  debugPrint('   success: ${invoicesRes.success}');
+  debugPrint('   count: ${invoicesRes.data?.length}');
+  debugPrint('═══════════════════════════════════════');
+
+  if (detailRes.success) {
+    selectedAgreement = detailRes.data;
+    invoices = invoicesRes.data ?? [];
     notifyListeners();
-
-    final detailRes = await _service.getAgreementDetail(agreementId);
-    final invoicesRes = await _service.getAgreementInvoices(agreementId);
-    isLoading = false;
-
-    if (detailRes.success) {
-      selectedAgreement = detailRes.data;
-      invoices = invoicesRes.data ?? [];
-      notifyListeners();
-      return true;
-    } else {
-      error = detailRes.message;
-      notifyListeners();
-      return false;
-    }
+    return true;
+  } else {
+    error = detailRes.message;
+    notifyListeners();
+    return false;
   }
+}
 
   // ── Terminate agreement ──────────────────────────────────────
   Future<Map<String, dynamic>> terminateAgreement(
@@ -108,6 +122,7 @@ class RentalProvider extends ChangeNotifier {
     notifyListeners();
     return false;
   }
+  
 
   /// Call this after a successful monthly-rent confirm, or after
   /// terminating, to refresh the invoices list for the currently
@@ -119,4 +134,6 @@ class RentalProvider extends ChangeNotifier {
     invoices = invoicesRes.data ?? invoices;
     notifyListeners();
   }
+
+  
 }

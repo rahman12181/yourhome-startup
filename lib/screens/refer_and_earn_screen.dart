@@ -31,13 +31,19 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen>
   late AnimationController _staggerController;
   late List<Animation<double>> _staggerAnimations;
 
-  @override
-  void initState() {
-    super.initState();
-    _setupAnimations();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadData();
-  }
+@override
+void initState() {
+  super.initState();
+  _setupAnimations();
+  _tabController = TabController(length: 2, vsync: this);
+
+  // ✅ FIX: addPostFrameCallback — first frame render hone ke baad load
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) {
+      _loadData();
+    }
+  });
+}
 
   void _setupAnimations() {
     _mainController = AnimationController(

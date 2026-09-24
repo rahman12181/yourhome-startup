@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:yourhome/utils/constants.dart';
 import '../../providers/payment_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -73,16 +74,18 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
   }
 
   void _initRazorpay() {
+    debugPrint('🟣 Initializing Razorpay...');
     _razorpay = Razorpay();
     _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay!.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    debugPrint('✅ Razorpay initialized');
   }
 
   Future<void> _loadPaymentSummary() async {
     final provider = Provider.of<PaymentProvider>(context, listen: false);
     final success = await provider.fetchPaymentSummary(widget.bookingRequestId);
-    
+
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -96,8 +99,17 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    debugPrint('');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('✅ RAZORPAY PAYMENT SUCCESS');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('Payment ID : ${response.paymentId}');
+    debugPrint('Order ID   : ${response.orderId}');
+    debugPrint('Signature  : ${response.signature}');
+    debugPrint('════════════════════════════════════════');
+
     final provider = Provider.of<PaymentProvider>(context, listen: false);
-    
+
     final result = await provider.confirmPayment(
       bookingRequestId: widget.bookingRequestId,
       razorpayOrderId: response.orderId!,
@@ -105,31 +117,71 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
       razorpaySignature: response.signature!,
     );
 
+    if (!mounted) return;
+
     if (result['success'] == true) {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PaymentSuccessScreen(
-              response: result['data'],
-            ),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentSuccessScreen(
+            response: result['data'],
           ),
-        );
-      }
+        ),
+      );
     } else {
-      if (mounted) {
-        _showSnackBar(result['message'] ?? 'Payment confirmation failed', Colors.red);
-        setState(() => _isPaying = false);
-      }
+      setState(() => _isPaying = false);
+      _showSnackBar(
+        result['message'] ?? 'Payment confirmation failed',
+        Colors.red,
+      );
     }
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
+    debugPrint('');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('❌ RAZORPAY PAYMENT FAILED');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('Error Code    : ${response.code}');
+    debugPrint('Error Message : ${response.message}');
+    debugPrint('Error Details : ${response.error}');
+    debugPrint('════════════════════════════════════════');
+
     setState(() => _isPaying = false);
-    _showSnackBar('Payment failed: ${response.message}', Colors.red);
+
+    String errorMsg;
+    Color bgColor;
+
+    switch (response.code) {
+      case Razorpay.NETWORK_ERROR:
+        errorMsg = 'Network error. Check your internet and try again.';
+        bgColor = Colors.orange[700]!;
+        break;
+      case Razorpay.INVALID_OPTIONS:
+        errorMsg = 'Payment configuration error. Please contact support.';
+        bgColor = Colors.red[700]!;
+        break;
+      case Razorpay.PAYMENT_CANCELLED:
+        errorMsg = 'Payment cancelled. Tap "Pay" to try again.';
+        bgColor = Colors.orange[700]!;
+        break;
+      case Razorpay.TLS_ERROR:
+        errorMsg = 'Security error. Please check your device settings.';
+        bgColor = Colors.red[700]!;
+        break;
+      default:
+        errorMsg = response.message?.isNotEmpty == true
+            ? response.message!
+            : 'Payment failed. Please try again.';
+        bgColor = Colors.red[700]!;
+    }
+
+    _showSnackBar(errorMsg, bgColor);
   }
 
-  void _handleExternalWallet(ExternalWalletResponse response) {}
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    debugPrint('👛 External wallet: ${response.walletName}');
+  }
 
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -137,7 +189,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
         content: Row(
           children: [
             Icon(
-              color == Colors.green ? Icons.check_circle : Icons.error_outline,
+              color == Colors.green
+                  ? Icons.check_circle
+                  : Icons.error_outline,
               color: Colors.white,
               size: 20,
             ),
@@ -169,29 +223,61 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
 
     final result = await provider.initiatePayment(widget.bookingRequestId);
 
+    if (!mounted) return;
+
     if (result['success'] == true) {
       final data = result['data'] as InitiatePaymentResponse;
-      
-      var options = {
-        'key': 'rzp_live_YOUR_KEY_HERE',
+
+      final phone = authProvider.user?.phone ?? '9876543210';
+      final email = authProvider.user?.email ?? 'user@example.com';
+
+      final options = {
+        'key': AppConstants.razorpayKeyId,
         'amount': data.amount,
         'currency': data.currency,
         'order_id': data.razorpayOrderId,
-        'name': 'YourHome',
+        'name': AppConstants.appName,
         'description': 'Rent Payment - ${widget.propertyTitle}',
         'prefill': {
-          'contact': authProvider.user?.phone ?? '',
-          'email': authProvider.user?.email ?? '',
+          'contact': phone,
+          'email': email,
         },
         'theme': {
           'color': '#2563EB',
         },
+        'retry': {
+          'enabled': true,
+          'max_count': 2,
+        },
+        'timeout': 300,
       };
-      
-      _razorpay!.open(options);
+
+      debugPrint('');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('🟣 RAZORPAY CHECKOUT OPTIONS');
+      debugPrint('════════════════════════════════════════');
+      debugPrint('Key        : ${AppConstants.razorpayKeyId}');
+      debugPrint('Amount     : ${data.amount}');
+      debugPrint('Currency   : ${data.currency}');
+      debugPrint('Order ID   : ${data.razorpayOrderId}');
+      debugPrint('Phone      : $phone');
+      debugPrint('Email      : $email');
+      debugPrint('════════════════════════════════════════');
+
+      try {
+        _razorpay!.open(options);
+        debugPrint('✅ Razorpay.open() called');
+      } catch (e) {
+        debugPrint('❌ Razorpay.open() exception: $e');
+        setState(() => _isPaying = false);
+        _showSnackBar('Unable to open payment checkout.', Colors.red[700]!);
+      }
     } else {
       setState(() => _isPaying = false);
-      _showSnackBar(result['message'] ?? 'Failed to initiate payment', Colors.red);
+      _showSnackBar(
+        result['message'] ?? 'Failed to initiate payment',
+        Colors.red[700]!,
+      );
     }
   }
 
@@ -239,7 +325,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     );
   }
 
-  // ========== PREMIUM APP BAR ==========
   PreferredSizeWidget _buildPremiumAppBar(BuildContext context, bool isDark) {
     return AppBar(
       elevation: 0,
@@ -337,7 +422,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     );
   }
 
-  // ========== LOADING STATE ==========
   Widget _buildLoadingState(bool isDark) {
     return Center(
       child: Column(
@@ -386,7 +470,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     );
   }
 
-  // ========== ERROR STATE ==========
   Widget _buildErrorState(bool isDark) {
     return Center(
       child: Padding(
@@ -400,10 +483,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
                 color: const Color(0xFFEF4444).withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.error_outline_rounded,
                 size: 48,
-                color: const Color(0xFFEF4444),
+                color: Color(0xFFEF4444),
               ),
             ),
             const SizedBox(height: 16),
@@ -456,7 +539,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     );
   }
 
-  // ========== EMPTY STATE ==========
   Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Padding(
@@ -499,14 +581,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     );
   }
 
-  // ========== PREMIUM PAYMENT CONTENT ==========
   Widget _buildPremiumPaymentContent(BuildContext context, bool isDark) {
     final summary = _summary!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Property Card
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -588,7 +668,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
         ),
         const SizedBox(height: 16),
 
-        // Discount Banner
         if (summary.eligibleForFirstBookingDiscount)
           Container(
             padding: const EdgeInsets.all(16),
@@ -649,7 +728,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
           ),
         const SizedBox(height: 16),
 
-        // Payment Summary - Premium
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -722,7 +800,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
         ),
         const SizedBox(height: 24),
 
-        // Pay Button - Premium
         Container(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -835,10 +912,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: isDiscount 
-                ? Colors.green 
-                : (isBold 
-                    ? const Color(0xFF2563EB) 
+            color: isDiscount
+                ? Colors.green
+                : (isBold
+                    ? const Color(0xFF2563EB)
                     : (isDark ? Colors.white : const Color(0xFF1A1A2E))),
           ),
         ),

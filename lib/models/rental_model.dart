@@ -1,9 +1,4 @@
 // lib/models/rental_model.dart
-//
-// Models for Module 17 — Rental Agreements + Monthly Rent
-// Handles both the "list" shape (nested user/owner/property/room objects)
-// and the "detail" shape (flat propertyTitle/roomNumber/ownerName fields)
-// that the backend docs show for the same resource.
 
 double _asDouble(dynamic v) {
   if (v == null) return 0.0;
@@ -38,7 +33,7 @@ class RentalAgreement {
   final String startDate;
   final String? endDate;
   final int rentDueDay;
-  final String status; // ACTIVE | TERMINATED | EXPIRED
+  final String status;
   final String? terminationReason;
   final String? terminatedAt;
   final String? createdAt;
@@ -69,18 +64,41 @@ class RentalAgreement {
     final property = json['property'] as Map<String, dynamic>?;
     final room = json['room'] as Map<String, dynamic>?;
     final owner = json['owner'] as Map<String, dynamic>?;
+    final bookingRequest = json['bookingRequest'] as Map<String, dynamic>?;
+
+    final bookingProperty = bookingRequest?['property'] as Map<String, dynamic>?;
+    final bookingRoom = bookingRequest?['room'] as Map<String, dynamic>?;
+    final bookingOwner = bookingRequest?['owner'] as Map<String, dynamic>?;
 
     return RentalAgreement(
       id: _asInt(json['id']),
       agreementCode: json['agreementCode']?.toString() ?? '',
-      propertyTitle: (json['propertyTitle'] ?? property?['title'] ?? '')
+      propertyTitle: (json['propertyTitle'] ??
+              property?['title'] ??
+              bookingProperty?['title'] ??
+              bookingRequest?['propertyTitle'] ??
+              'Property')
           .toString(),
-      propertyCity: (json['propertyCity'] ?? property?['city'])?.toString(),
-      roomNumber: (json['roomNumber'] ?? room?['roomNumber'])?.toString(),
-      ownerName:
-          (json['ownerName'] ?? owner?['businessName'] ?? owner?['name'])
-              ?.toString(),
-      ownerPhone: json['ownerPhone']?.toString(),
+      propertyCity: (json['propertyCity'] ??
+              property?['city'] ??
+              bookingProperty?['city'] ??
+              bookingRequest?['propertyCity'])
+          ?.toString(),
+      roomNumber: (json['roomNumber'] ??
+              room?['roomNumber'] ??
+              bookingRoom?['roomNumber'] ??
+              bookingRequest?['roomNumber'])
+          ?.toString(),
+      ownerName: (json['ownerName'] ??
+              owner?['businessName'] ??
+              owner?['name'] ??
+              bookingOwner?['businessName'] ??
+              bookingOwner?['name'])
+          ?.toString(),
+      ownerPhone: (json['ownerPhone'] ??
+              owner?['phone'] ??
+              bookingOwner?['phone'])
+          ?.toString(),
       monthlyRent: _asDouble(json['monthlyRent']),
       securityDeposit: _asDouble(json['securityDeposit']),
       advancePaid: _asDoubleOrNull(json['advancePaid']),
@@ -99,11 +117,11 @@ class RentInvoice {
   final int id;
   final String invoiceCode;
   final int agreementId;
-  final String invoiceMonth; // "2026-10"
+  final String invoiceMonth;
   final String dueDate;
   final double amount;
   final double lateFee;
-  final String status; // PENDING | PAID | OVERDUE
+  final String status;
   final String? paidAt;
   final int daysOverdue;
   final String? createdAt;
@@ -127,10 +145,12 @@ class RentInvoice {
   double get totalPayable => amount + lateFee;
 
   factory RentInvoice.fromJson(Map<String, dynamic> json) {
+    final agreement = json['agreement'] as Map<String, dynamic>?;
+
     return RentInvoice(
       id: _asInt(json['id']),
       invoiceCode: json['invoiceCode']?.toString() ?? '',
-      agreementId: _asInt(json['agreementId']),
+      agreementId: _asInt(json['agreementId'] ?? agreement?['id']),
       invoiceMonth: json['invoiceMonth']?.toString() ?? '',
       dueDate: json['dueDate']?.toString() ?? '',
       amount: _asDouble(json['amount']),
@@ -143,7 +163,6 @@ class RentInvoice {
   }
 }
 
-/// Response of POST /user/monthly-rent/initiate/{invoiceId}
 class MonthlyRentInitiateResponse {
   final int id;
   final String paymentCode;
@@ -167,16 +186,14 @@ class MonthlyRentInitiateResponse {
   }
 }
 
-/// Response of both POST /user/monthly-rent/confirm and
-/// GET /user/monthly-rent/my-payments (list items).
 class MonthlyRentPayment {
   final int id;
   final String paymentCode;
   final double amount;
   final double? platformFeeAmount;
   final double? ownerPayoutAmount;
-  final String status; // CREATED | PAID | FAILED
-  final String? payoutStatus; // NOT_STARTED | PROCESSING | COMPLETED | FAILED
+  final String status;
+  final String? payoutStatus;
   final String? payoutTransactionRef;
   final String? paidAt;
   final String? payoutAt;
@@ -212,8 +229,6 @@ class MonthlyRentPayment {
   }
 }
 
-/// Generic wrapper matching the backend's standard
-/// { success, message, data } response envelope.
 class RentalApiResponse<T> {
   final bool success;
   final String message;

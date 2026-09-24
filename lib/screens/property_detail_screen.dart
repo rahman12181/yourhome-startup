@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:yourhome/models/booking_model.dart';
@@ -40,14 +41,18 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   List<Review> _reviews = [];
   int _selectedTabIndex = 0;
 
-  // ✅ Booking status tracking
   int? _activeBookingRequestId;
-  String? _bookingStatus; // 'PENDING' | 'ACCEPTED' | null
+  int? _activeRoomId;
+  String? _bookingStatus;
+  Set<int> _bookedRoomIds = {};
+  int _paidBookingsCount = 0;
   bool _isCheckingBooking = false;
+
+  bool _isUserLoggedIn = false;
+  bool _isCheckingLogin = true;
 
   final ChatService _chatService = ChatService();
 
-  // ✅ Premium color palette (derived from theme, consistent everywhere)
   Color get _primary => Theme.of(context).primaryColor;
   Color get _goldAccent => const Color(0xFFD4AF37);
 
@@ -60,6 +65,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
         _selectedTabIndex = _tabController.index;
       });
     });
+    _checkLoginStatus();
     _loadPropertyDetail();
   }
 
@@ -69,21 +75,67 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     super.dispose();
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // ✅ FIXED: Now correctly detects BOTH 'PENDING' and 'ACCEPTED' bookings.
-  //
-  // Previous bug: this method only ever looked for status == 'ACCEPTED',
-  // so after a user sent a booking request (status starts as 'PENDING'),
-  // _bookingStatus was NEVER set to 'PENDING' — meaning the "⏳ Booking
-  // Request Pending" UI (which already existed in _buildBookingActionButton)
-  // could never actually appear, and the button kept showing "Book Now"
-  // even though a request was already sent for this property.
-  //
-  // Priority logic: if the user has an ACCEPTED-but-unpaid booking for this
-  // property, prefer that (so the Pay button shows up), otherwise fall back
-  // to a PENDING booking if one exists.
-  // ══════════════════════════════════════════════════════════════════════
+  Future<void> _checkLoginStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      final isLoggedIn = token != null && token.isNotEmpty;
+
+      if (mounted) {
+        setState(() {
+          _isUserLoggedIn = isLoggedIn;
+          _isCheckingLogin = false;
+        });
+      }
+
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('🔐 LOGIN STATUS CHECK');
+      debugPrint('   Token exists: ${token != null}');
+      debugPrint('   Is logged in: $isLoggedIn');
+      debugPrint('═══════════════════════════════════════');
+    } catch (e) {
+      debugPrint('❌ Login check error: $e');
+      if (mounted) {
+        setState(() => _isCheckingLogin = false);
+      }
+    }
+  }
+
+  Future<void> _loadPropertyDetail() async {
+    setState(() => _isLoading = true);
+
+    final propertyProvider =
+        Provider.of<PropertyProvider>(context, listen: false);
+
+    await propertyProvider.loadPropertyDetailWithRooms(widget.propertyId);
+
+    final property = propertyProvider.selectedProperty;
+
+    if (property != null) {
+      _property = property;
+      _rooms = propertyProvider.rooms;
+      _isSaved = propertyProvider.savedProperties
+          .any((p) => p.propertyId == property.propertyId);
+
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('✅ PROPERTY: ${property.title}');
+      debugPrint('✅ ROOMS COUNT: ${_rooms.length}');
+      debugPrint('✅ ROOMS: ${_rooms.map((r) => "${r.roomNumber}|${r.status}").toList()}');
+      debugPrint('═══════════════════════════════════════');
+
+      if (_isUserLoggedIn) {
+        await _checkActiveBooking();
+      }
+    } else {
+      _error = propertyProvider.error ?? 'Failed to load property';
+    }
+
+    if (mounted) setState(() => _isLoading = false);
+  }
+
   Future<void> _checkActiveBooking() async {
+    if (!_isUserLoggedIn) return;
+
     setState(() => _isCheckingBooking = true);
 
     try {
@@ -93,76 +145,84 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       if (response.success && response.data != null) {
         final bookings = response.data!;
 
+        // Sirf is property ki bookings
+        final propertyBookings = bookings
+            .where((b) => b.propertyId == widget.propertyId)
+            .toList();
+
         BookingRequest? acceptedUnpaidBooking;
         BookingRequest? pendingBooking;
+        int paidCount = 0;
+        final Set<int> bookedRoomIds = {};
 
-        for (final booking in bookings) {
-          if (booking.propertyId != widget.propertyId) continue;
+        debugPrint('═══════════════════════════════════════');
+        debugPrint('📋 BOOKINGS FOR PROPERTY ${widget.propertyId}');
 
-          if (booking.status == 'ACCEPTED' && !booking.isPaid) {
+        for (final booking in propertyBookings) {
+          debugPrint(
+              '   #${booking.requestId} | roomId: ${booking.roomId} | status: ${booking.status} | isPaid: ${booking.isPaid}');
+
+          // Track booked rooms (PENDING, ACCEPTED, PAID — sab)
+          if (booking.roomId != null) {
+            if (booking.status == 'PENDING' ||
+                booking.status == 'ACCEPTED' ||
+                booking.isPaid) {
+              bookedRoomIds.add(booking.roomId!);
+            }
+          }
+
+          if (booking.status == 'ACCEPTED' && booking.isPaid) {
+            paidCount++;
+          } else if (booking.status == 'ACCEPTED' && !booking.isPaid) {
             acceptedUnpaidBooking = booking;
           } else if (booking.status == 'PENDING') {
             pendingBooking = booking;
           }
         }
+        debugPrint('   Booked room IDs: $bookedRoomIds');
+        debugPrint('   Paid bookings count: $paidCount');
+        debugPrint('═══════════════════════════════════════');
 
-        if (acceptedUnpaidBooking != null) {
+        if (mounted) {
           setState(() {
-            _activeBookingRequestId = acceptedUnpaidBooking!.requestId;
-            _bookingStatus = 'ACCEPTED';
-          });
-        } else if (pendingBooking != null) {
-          setState(() {
-            _activeBookingRequestId = pendingBooking!.requestId;
-            _bookingStatus = 'PENDING';
-          });
-        } else {
-          setState(() {
-            _activeBookingRequestId = null;
-            _bookingStatus = null;
+            _bookedRoomIds = bookedRoomIds;
+            _paidBookingsCount = paidCount;
+
+            if (acceptedUnpaidBooking != null) {
+              _activeBookingRequestId = acceptedUnpaidBooking!.requestId;
+              _activeRoomId = acceptedUnpaidBooking.roomId;
+              _bookingStatus = 'ACCEPTED';
+            } else if (pendingBooking != null) {
+              _activeBookingRequestId = pendingBooking!.requestId;
+              _activeRoomId = pendingBooking.roomId;
+              _bookingStatus = 'PENDING';
+            } else if (paidCount > 0) {
+              _activeBookingRequestId = null;
+              _activeRoomId = null;
+              _bookingStatus = 'PAID';
+            } else {
+              _activeBookingRequestId = null;
+              _activeRoomId = null;
+              _bookingStatus = null;
+            }
           });
         }
       }
     } catch (e) {
-      debugPrint('Error checking booking: $e');
+      debugPrint('❌ Error checking booking: $e');
     }
 
     if (mounted) setState(() => _isCheckingBooking = false);
   }
 
-  Future<void> _loadPropertyDetail() async {
-    setState(() => _isLoading = true);
-
-    final propertyProvider = Provider.of<PropertyProvider>(
-      context,
-      listen: false,
-    );
-
-    await propertyProvider.getPropertyDetail(widget.propertyId);
-    await propertyProvider.getRooms(widget.propertyId);
-    await propertyProvider.getSavedProperties();
-
-    final property = propertyProvider.selectedProperty;
-    if (property != null) {
-      _property = property;
-      _rooms = propertyProvider.rooms;
-      _isSaved = propertyProvider.savedProperties
-          .any((p) => p.propertyId == property.propertyId);
-
-      // ✅ Check for active booking (PENDING or ACCEPTED)
-      await _checkActiveBooking();
-    } else {
-      _error = propertyProvider.error ?? 'Failed to load property';
+  Future<void> _toggleSave() async {
+    if (!_isUserLoggedIn) {
+      _showLoginPrompt();
+      return;
     }
 
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  Future<void> _toggleSave() async {
-    final propertyProvider = Provider.of<PropertyProvider>(
-      context,
-      listen: false,
-    );
+    final propertyProvider =
+        Provider.of<PropertyProvider>(context, listen: false);
 
     if (_isSaved) {
       await propertyProvider.removeSavedProperty(widget.propertyId);
@@ -222,6 +282,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   }
 
   Future<void> _chatWithOwner() async {
+    if (!_isUserLoggedIn) {
+      _showLoginPrompt();
+      return;
+    }
+
     if (_property == null) return;
 
     try {
@@ -260,40 +325,76 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     }
   }
 
-  // ✅ PREMIUM BOOKING BOTTOM SHEET (replaces old dialog + dropdown)
-  Future<void> _bookNow() async {
+  Future<void> _bookNow({bool forceNew = false}) async {
+    if (!_isUserLoggedIn) {
+      _showLoginPrompt();
+      return;
+    }
+
     if (_property == null) return;
 
-    // If there's an ACCEPTED (unpaid) booking, go straight to payment.
-    if (_activeBookingRequestId != null && _bookingStatus == 'ACCEPTED') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BookingPaymentScreen(
-            bookingRequestId: _activeBookingRequestId!,
-            propertyTitle: _property!.title,
-            roomNumber:
-                _rooms.isNotEmpty ? _rooms.first.roomNumber ?? 'N/A' : 'N/A',
-            originalAmount: _property!.monthlyRentMin ?? 10000,
+    // Agar forceNew nahi hai — purane status check karo
+    if (!forceNew) {
+      // ACCEPTED unpaid → Pay Now
+      if (_activeBookingRequestId != null && _bookingStatus == 'ACCEPTED') {
+        final activeRoom = _rooms.firstWhere(
+          (r) => r.roomId == _activeRoomId,
+          orElse: () => _rooms.isNotEmpty
+              ? _rooms.first
+              : Room(
+                  roomId: 0,
+                  roomType: 'SINGLE',
+                  monthlyRent: 0,
+                  capacity: 1,
+                ),
+        );
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BookingPaymentScreen(
+              bookingRequestId: _activeBookingRequestId!,
+              propertyTitle: _property!.title,
+              roomNumber: activeRoom.roomNumber ?? 'N/A',
+              originalAmount: _property!.monthlyRentMin ?? 10000,
+            ),
           ),
-        ),
-      );
-      return;
+        );
+        return;
+      }
+
+      // PENDING → snackbar
+      if (_activeBookingRequestId != null && _bookingStatus == 'PENDING') {
+        _showSnack(
+          icon: Icons.hourglass_top_rounded,
+          iconColor: Colors.white,
+          text:
+              'You have a pending request. Please wait for owner response.',
+          bg: Colors.orange[700]!,
+        );
+        return;
+      }
     }
 
-    // If there's already a PENDING request, don't allow sending another —
-    // just inform the user (the status card is already shown on screen).
-    if (_activeBookingRequestId != null && _bookingStatus == 'PENDING') {
+    // ✅ Check karo koi available room hai kya (booked ke alawa)
+    final availableRooms = _rooms
+        .where((r) =>
+            r.status == 'AVAILABLE' && !_bookedRoomIds.contains(r.roomId))
+        .toList();
+
+    if (availableRooms.isEmpty) {
       _showSnack(
-        icon: Icons.hourglass_top_rounded,
+        icon: Icons.error_outline,
         iconColor: Colors.white,
-        text: 'You already have a pending request for this property.',
-        bg: Colors.orange[700]!,
+        text: _bookedRoomIds.isNotEmpty
+            ? 'You have already booked all available rooms in this property.'
+            : 'No rooms available for this property yet.',
+        bg: Colors.orange[800]!,
       );
       return;
     }
 
-    // ✅ Otherwise open booking bottom sheet
+    // Bottom sheet kholo — booked rooms exclude karke
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -302,21 +403,20 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       builder: (context) => BookingBottomSheet(
         property: _property!,
         rooms: _rooms,
+        bookedRoomIds: _bookedRoomIds,
         onSuccess: () {
           _showSnack(
             icon: Icons.check_circle,
             iconColor: Colors.greenAccent,
-            text: 'Booking request sent successfully!',
+            text: 'Booking request sent! Waiting for owner approval.',
             bg: Colors.grey[900]!,
           );
-          // ✅ Refresh booking status
           _checkActiveBooking();
         },
       ),
     );
   }
 
-  // ✅ Opens the tour video INSIDE the app (in-app player, no external app/browser)
   void _watchTour() {
     final videoMedia = _property?.media.firstWhere(
       (m) => m.mediaType == 'VIDEO',
@@ -348,6 +448,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   }
 
   Future<void> _reportProperty() async {
+    if (!_isUserLoggedIn) {
+      _showLoginPrompt();
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => ReportDialog(
@@ -397,7 +502,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final bodyColor =
         isDark ? const Color(0xFF12121E) : const Color(0xFFF7F8FA);
 
@@ -447,11 +551,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.red[300],
-              ),
+              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
               const SizedBox(height: 16),
               Text(
                 _error ?? 'Property not found',
@@ -494,7 +594,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== BOOK NOW SECTION (Premium with Payment) ==============
   Widget _buildBookNowSection(bool isDark) {
     final property = _property!;
 
@@ -574,10 +673,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
               ),
             ),
           const SizedBox(height: 18),
-
-          // ✅ Booking Status / Pay Button
           _buildBookingActionButton(isDark),
-
           const SizedBox(height: 12),
           Row(
             children: [
@@ -612,31 +708,16 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-// ✅ Booking Action Button with Status
   Widget _buildBookingActionButton(bool isDark) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final isLoggedIn = authProvider.isLoggedIn;
-
-    // While we're still checking booking status, show a lightweight loader
-    // so the button doesn't flash "Book Now" then jump to "Pending".
-    if (_isCheckingBooking) {
-      return Container(
-        width: double.infinity,
-        height: 52,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(strokeWidth: 2.2, color: _primary),
-        ),
-      );
+    if (_isCheckingLogin) {
+      return _loadingButton(isDark);
     }
 
-    // If booking is ACCEPTED (and unpaid) -> Show Pay Now
+    if (_isCheckingBooking) {
+      return _loadingButton(isDark);
+    }
+
+    // CASE 1: ACCEPTED unpaid → Pay Now
     if (_activeBookingRequestId != null && _bookingStatus == 'ACCEPTED') {
       return SizedBox(
         width: double.infinity,
@@ -668,7 +749,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                         color: Colors.white, size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'Book Now (Pay)',
+                      'Pay Now',
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -684,39 +765,131 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       );
     }
 
-    // If booking is PENDING -> Show status (non-tappable info card)
+    // CASE 2: PENDING → waiting card
     if (_activeBookingRequestId != null && _bookingStatus == 'PENDING') {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.orange.withOpacity(0.3),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.hourglass_top_rounded,
-                color: Colors.orange, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              '⏳ Booking Request Pending',
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.orange,
+      return Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.3),
+                width: 1.5,
               ),
             ),
-          ],
-        ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.hourglass_top_rounded,
+                    color: Colors.orange, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  '⏳ Booking Request Pending',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       );
     }
 
-    // Default: Book Now
+    // CASE 3: PAID → Already booked + Book Another Room
+    if (_bookingStatus == 'PAID' && _paidBookingsCount > 0) {
+      final hasAvailableRooms = _rooms.any((r) =>
+          r.status == 'AVAILABLE' && !_bookedRoomIds.contains(r.roomId));
+
+      return Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.green.withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: Colors.green, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  _paidBookingsCount > 1
+                      ? '✅ $_paidBookingsCount Rooms Booked'
+                      : '✅ Already Booked',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasAvailableRooms) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_primary, _primary.withOpacity(0.75)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primary.withOpacity(0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => _bookNow(forceNew: true),
+                    child: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.add_rounded,
+                              color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Book Another Room',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // CASE 4: No booking → Book Now
     return SizedBox(
       width: double.infinity,
       height: 52,
@@ -738,15 +911,19 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: (isLoggedIn == true) ? _bookNow : _showLoginPrompt,
+            onTap: _isUserLoggedIn ? _bookNow : _showLoginPrompt,
             child: Center(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.bolt, color: Colors.white, size: 20),
+                  Icon(
+                    _isUserLoggedIn ? Icons.bolt : Icons.login_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
-                    (isLoggedIn == true) ? 'Book Now' : 'Login to Book',
+                    _isUserLoggedIn ? 'Book Now' : 'Login to Book',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -763,16 +940,34 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
+  Widget _loadingButton(bool isDark) {
+    return Container(
+      width: double.infinity,
+      height: 52,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(strokeWidth: 2.2, color: _primary),
+      ),
+    );
+  }
+
   void _showLoginPrompt() {
     _showSnack(
       icon: Icons.login_rounded,
       iconColor: Colors.white,
-      text: 'Please login to book this property',
+      text: 'Please login to continue',
       bg: Colors.orange[700]!,
     );
   }
 
-  // ============== GLASS ICON BUTTON (premium blur effect) ==============
   Widget _glassIconButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -800,7 +995,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== APP BAR ==============
   Widget _buildAppBar(bool isDark, Color bodyColor) {
     final property = _property!;
 
@@ -853,7 +1047,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                       color: Colors.grey,
                     ),
                   ),
-            // ✅ Premium gradient overlay — richer, deeper
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -980,7 +1173,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== BODY ==============
   Widget _buildBody(bool isDark) {
     final property = _property!;
 
@@ -989,7 +1181,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Location
           Row(
             children: [
               Icon(
@@ -1012,7 +1203,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
             ],
           ),
           const SizedBox(height: 14),
-          // Tags
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1025,10 +1215,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
             ],
           ),
           const SizedBox(height: 20),
-          // Tab Bar
           _buildTabBar(isDark),
           const SizedBox(height: 18),
-          // Tab Content
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: KeyedSubtree(
@@ -1037,7 +1225,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
             ),
           ),
           const SizedBox(height: 24),
-          // Book Now Section
           _buildBookNowSection(isDark),
           const SizedBox(height: 32),
         ],
@@ -1066,7 +1253,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== TAB BAR ==============
   Widget _buildTabBar(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -1113,7 +1299,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== TAB CONTENT ==============
   Widget _buildTabContent(bool isDark) {
     switch (_selectedTabIndex) {
       case 0:
@@ -1148,14 +1333,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== OVERVIEW TAB ==============
   Widget _buildOverviewTab(bool isDark) {
     final property = _property!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // About
         if (property.description.isNotEmpty) ...[
           _premiumCard(
             isDark: isDark,
@@ -1184,7 +1367,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           ),
           const SizedBox(height: 16),
         ],
-        // Amenities
         if (property.amenities.isNotEmpty) ...[
           _premiumCard(
             isDark: isDark,
@@ -1245,7 +1427,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           ),
           const SizedBox(height: 16),
         ],
-        // Location with Map
         Text(
           'Location on Map',
           style: GoogleFonts.poppins(
@@ -1288,7 +1469,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                           const SizedBox(height: 8),
                           Text(
                             'Map not available',
-                            style: GoogleFonts.poppins(color: Colors.grey[600]),
+                            style:
+                                GoogleFonts.poppins(color: Colors.grey[600]),
                           ),
                         ],
                       ),
@@ -1348,7 +1530,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           ],
         ),
         const SizedBox(height: 16),
-        // Owner Info
         Text(
           'Property Owner',
           style: GoogleFonts.poppins(
@@ -1440,7 +1621,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== ROOMS TAB ==============
   Widget _buildRoomsTab(bool isDark) {
     if (_rooms.isEmpty) {
       return _emptyState(
@@ -1511,6 +1691,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
 
   Widget _buildRoomCard(Room room, bool isDark) {
     final isAvailable = room.status == 'AVAILABLE';
+    final isBooked = _bookedRoomIds.contains(room.roomId);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1526,9 +1707,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           ),
         ],
         border: Border.all(
-          color: isAvailable
-              ? const Color(0xFF11998E).withOpacity(0.25)
-              : Colors.transparent,
+          color: isBooked
+              ? Colors.green.withOpacity(0.4)
+              : (isAvailable
+                  ? const Color(0xFF11998E).withOpacity(0.25)
+                  : Colors.transparent),
+          width: isBooked ? 1.5 : 1,
         ),
       ),
       child: Row(
@@ -1540,9 +1724,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: isAvailable
-                    ? [const Color(0xFF11998E), const Color(0xFF38EF7D)]
-                    : [Colors.grey, Colors.grey.shade400],
+                colors: isBooked
+                    ? [Colors.green, Colors.green.shade400]
+                    : (isAvailable
+                        ? [const Color(0xFF11998E), const Color(0xFF38EF7D)]
+                        : [Colors.grey, Colors.grey.shade400]),
               ),
               borderRadius: BorderRadius.circular(3),
             ),
@@ -1552,13 +1738,37 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Room ${room.roomNumber ?? room.roomId}',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14.5,
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Room ${room.roomNumber ?? room.roomId}',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    if (isBooked) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'YOURS',
+                          style: GoogleFonts.poppins(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.green,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 3),
                 Row(
@@ -1589,6 +1799,25 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                         ),
                       ),
                     ],
+                    if (room.hasAttachedBathroom) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Bath',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.teal,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -1602,7 +1831,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                 style: GoogleFonts.poppins(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: isAvailable ? _primary : Colors.grey,
+                  color: isBooked
+                      ? Colors.green
+                      : (isAvailable ? _primary : Colors.grey),
                 ),
               ),
               Text(
@@ -1616,16 +1847,24 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isAvailable
-                      ? const Color(0xFF11998E).withOpacity(0.1)
-                      : Colors.grey.withOpacity(0.1),
+                  color: isBooked
+                      ? Colors.green.withOpacity(0.15)
+                      : (isAvailable
+                          ? const Color(0xFF11998E).withOpacity(0.1)
+                          : Colors.grey.withOpacity(0.1)),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isAvailable ? 'Available' : 'Occupied',
+                  isBooked
+                      ? 'Booked'
+                      : (isAvailable ? 'Available' : 'Occupied'),
                   style: GoogleFonts.poppins(
                     fontSize: 9,
-                    color: isAvailable ? const Color(0xFF11998E) : Colors.grey,
+                    color: isBooked
+                        ? Colors.green
+                        : (isAvailable
+                            ? const Color(0xFF11998E)
+                            : Colors.grey),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1637,7 +1876,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== REVIEWS TAB ==============
   Widget _buildReviewsTab(bool isDark) {
     if (_reviews.isEmpty) {
       return _emptyState(
@@ -1800,7 +2038,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== TOUR TAB ==============
   Widget _buildTourTab(bool isDark) {
     final videoMedia = _property?.media.firstWhere(
       (m) => m.mediaType == 'VIDEO',
@@ -1926,7 +2163,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ============== HELPERS ==============
   IconData _getAmenityIcon(String amenity) {
     switch (amenity.toLowerCase()) {
       case 'wifi':
@@ -1974,19 +2210,20 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// ✅ PREMIUM BOOKING BOTTOM SHEET
-// Selectable room cards, duration chips, date picker, price summary.
-// ══════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// BOOKING BOTTOM SHEET — Updated
+// ══════════════════════════════════════════════════════════════
 class BookingBottomSheet extends StatefulWidget {
   final Property property;
   final List<Room> rooms;
+  final Set<int> bookedRoomIds;
   final VoidCallback onSuccess;
 
   const BookingBottomSheet({
     super.key,
     required this.property,
     required this.rooms,
+    this.bookedRoomIds = const {},
     required this.onSuccess,
   });
 
@@ -1999,7 +2236,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
   final TextEditingController _messageController = TextEditingController();
 
   DateTime? _selectedDate;
-  int? _selectedRoomId; // null = "Any available room"
+  int? _selectedRoomId;
   int _durationMonths = 1;
   bool _isLoading = false;
   String? _dateError;
@@ -2008,8 +2245,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
 
   Color get _primary => Theme.of(context).primaryColor;
 
-  // Show ALL rooms of the PG as options (available + occupied).
-  // Occupied rooms are shown but disabled so the user can see the full room list.
   List<Room> get _allRooms => widget.rooms;
 
   Room? get _selectedRoom {
@@ -2132,7 +2367,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetColor = isDark ? const Color(0xFF15152A) : Colors.white;
-    final mediaQuery = MediaQuery.of(context);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.9,
@@ -2156,7 +2390,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
             key: _formKey,
             child: Column(
               children: [
-                // Drag handle
                 Padding(
                   padding: const EdgeInsets.only(top: 12, bottom: 4),
                   child: Container(
@@ -2168,7 +2401,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                     ),
                   ),
                 ),
-                // Header
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
                   child: Row(
@@ -2197,7 +2429,9 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Book Your Stay',
+                              widget.bookedRoomIds.isNotEmpty
+                                  ? 'Book Another Room'
+                                  : 'Book Your Stay',
                               style: GoogleFonts.poppins(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
@@ -2225,7 +2459,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                   ),
                 ),
                 const Divider(height: 1),
-                // Scrollable content
                 Expanded(
                   child: SingleChildScrollView(
                     controller: scrollController,
@@ -2234,13 +2467,10 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ─── Select Room ───
                         _sectionTitle('Select Room', isDark, optional: true),
                         const SizedBox(height: 10),
                         _buildRoomSelector(isDark),
                         const SizedBox(height: 22),
-
-                        // ─── Move-in Date ───
                         _sectionTitle('Move-in Date', isDark),
                         const SizedBox(height: 10),
                         _buildDateField(isDark),
@@ -2255,27 +2485,20 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                           ),
                         ],
                         const SizedBox(height: 22),
-
-                        // ─── Duration ───
                         _sectionTitle('Duration', isDark),
                         const SizedBox(height: 10),
                         _buildDurationChips(isDark),
                         const SizedBox(height: 22),
-
-                        // ─── Message ───
                         _sectionTitle('Message to Owner', isDark,
                             optional: true),
                         const SizedBox(height: 10),
                         _buildMessageField(isDark),
                         const SizedBox(height: 22),
-
-                        // ─── Price Summary ───
                         _buildPriceSummary(isDark),
                       ],
                     ),
                   ),
                 ),
-                // ─── Fixed bottom submit button ───
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
                   decoration: BoxDecoration(
@@ -2382,53 +2605,79 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     );
   }
 
-  // ─── Room selector: smooth selectable cards instead of a dropdown ───
   Widget _buildRoomSelector(bool isDark) {
+    // Available rooms — already booked by user excluded
+    final availableRooms = _allRooms
+        .where((r) =>
+            r.status == 'AVAILABLE' &&
+            !widget.bookedRoomIds.contains(r.roomId))
+        .toList();
+
     return Column(
       children: [
-        _roomOptionCard(
-          isDark: isDark,
-          selected: _selectedRoomId == null,
-          title: 'Any Available Room',
-          subtitle: 'Owner will assign the best available room',
-          trailing: null,
-          onTap: () => setState(() => _selectedRoomId = null),
-          icon: Icons.auto_awesome,
-        ),
+        // "Any Available Room" option (only if available rooms exist)
+        if (availableRooms.isNotEmpty)
+          _roomOptionCard(
+            isDark: isDark,
+            selected: _selectedRoomId == null,
+            title: 'Any Available Room',
+            subtitle: 'Owner will assign the best available room',
+            trailing: null,
+            onTap: () => setState(() => _selectedRoomId = null),
+            icon: Icons.auto_awesome,
+          ),
         const SizedBox(height: 10),
+
+        // Show ALL rooms — booked ones disabled
         ..._allRooms.map((room) {
           final isAvailable = room.status == 'AVAILABLE';
+          final isBooked = widget.bookedRoomIds.contains(room.roomId);
+          final canBook = isAvailable && !isBooked;
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: _roomOptionCard(
               isDark: isDark,
               selected: _selectedRoomId == room.roomId,
-              enabled: isAvailable,
+              enabled: canBook,
+              isBooked: isBooked,
               title: 'Room ${room.roomNumber ?? room.roomId}',
-              subtitle: isAvailable
-                  ? '${room.roomType}${room.hasAc ? ' • AC' : ''}'
-                  : '${room.roomType}${room.hasAc ? ' • AC' : ''} • Occupied',
-              trailing: isAvailable
-                  ? '₹${room.monthlyRent.toStringAsFixed(0)}/mo'
-                  : 'Unavailable',
-              onTap: isAvailable
-                  ? () => setState(() {
-                        _selectedRoomId = room.roomId;
-                      })
+              subtitle: isBooked
+                  ? 'Already booked by you'
+                  : (isAvailable
+                      ? '${room.roomType}${room.hasAc ? ' • AC' : ''}${room.hasAttachedBathroom ? ' • Bath' : ''}'
+                      : '${room.roomType}${room.hasAc ? ' • AC' : ''} • Occupied'),
+              trailing: isBooked
+                  ? 'Booked'
+                  : (isAvailable
+                      ? '₹${room.monthlyRent.toStringAsFixed(0)}/mo'
+                      : 'Unavailable'),
+              onTap: canBook
+                  ? () => setState(() => _selectedRoomId = room.roomId)
                   : null,
-              icon: Icons.bed_outlined,
+              icon: isBooked ? Icons.check_circle : Icons.bed_outlined,
             ),
           );
         }),
-        if (_allRooms.isEmpty)
+
+        if (availableRooms.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              'No rooms listed for this property yet — request will be sent for any available room.',
-              style: GoogleFonts.poppins(
-                fontSize: 11.5,
-                color: Colors.grey[500],
-              ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 14, color: Colors.orange[700]),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'No more rooms available for booking.',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.5,
+                      color: Colors.orange[700],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
       ],
@@ -2444,10 +2693,11 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     required VoidCallback? onTap,
     required IconData icon,
     bool enabled = true,
+    bool isBooked = false,
   }) {
     final color = _primary;
     return Opacity(
-      opacity: enabled ? 1 : 0.5,
+      opacity: enabled ? 1 : (isBooked ? 0.75 : 0.5),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
@@ -2462,10 +2712,18 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
               decoration: BoxDecoration(
                 color: selected
                     ? color.withOpacity(isDark ? 0.16 : 0.08)
-                    : (isDark ? const Color(0xFF1E1E38) : Colors.grey[50]),
+                    : (isBooked
+                        ? Colors.green.withOpacity(isDark ? 0.08 : 0.05)
+                        : (isDark
+                            ? const Color(0xFF1E1E38)
+                            : Colors.grey[50])),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: selected ? color : Colors.transparent,
+                  color: selected
+                      ? color
+                      : (isBooked
+                          ? Colors.green.withOpacity(0.3)
+                          : Colors.transparent),
                   width: 1.6,
                 ),
               ),
@@ -2474,13 +2732,20 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                   Container(
                     padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: selected
-                          ? color.withOpacity(0.15)
-                          : Colors.grey.withOpacity(0.12),
+                      color: isBooked
+                          ? Colors.green.withOpacity(0.15)
+                          : (selected
+                              ? color.withOpacity(0.15)
+                              : Colors.grey.withOpacity(0.12)),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon,
-                        size: 18, color: selected ? color : Colors.grey[600]),
+                    child: Icon(
+                      icon,
+                      size: 18,
+                      color: isBooked
+                          ? Colors.green
+                          : (selected ? color : Colors.grey[600]),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2500,7 +2765,13 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                           subtitle,
                           style: GoogleFonts.poppins(
                             fontSize: 11.5,
-                            color: !enabled ? Colors.red[300] : Colors.grey[500],
+                            color: isBooked
+                                ? Colors.green
+                                : (!enabled
+                                    ? Colors.red[300]
+                                    : Colors.grey[500]),
+                            fontWeight:
+                                isBooked ? FontWeight.w600 : null,
                           ),
                         ),
                       ],
@@ -2514,20 +2785,25 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: enabled ? color : Colors.grey,
+                          color: isBooked
+                              ? Colors.green
+                              : (enabled ? color : Colors.grey),
                         ),
                       ),
                     ),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: selected
-                        ? Icon(Icons.check_circle,
-                            color: color, size: 20, key: const ValueKey('sel'))
-                        : Icon(Icons.circle_outlined,
-                            color: Colors.grey[400],
-                            size: 20,
-                            key: const ValueKey('unsel')),
-                  ),
+                  if (!isBooked)
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: selected
+                          ? Icon(Icons.check_circle,
+                              color: color,
+                              size: 20,
+                              key: const ValueKey('sel'))
+                          : Icon(Icons.circle_outlined,
+                              color: Colors.grey[400],
+                              size: 20,
+                              key: const ValueKey('unsel')),
+                    ),
                 ],
               ),
             ),
@@ -2537,7 +2813,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     );
   }
 
-  // ─── Date field ───
   Widget _buildDateField(bool isDark) {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -2576,7 +2851,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     );
   }
 
-  // ─── Duration chips ───
   Widget _buildDurationChips(bool isDark) {
     return SizedBox(
       height: 44,
@@ -2634,7 +2908,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     );
   }
 
-  // ─── Message field ───
   Widget _buildMessageField(bool isDark) {
     return Container(
       decoration: BoxDecoration(
@@ -2661,7 +2934,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     );
   }
 
-  // ─── Price summary card ───
   Widget _buildPriceSummary(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -2746,7 +3018,9 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
   }
 }
 
-// ============== REPORT DIALOG ==============
+// ══════════════════════════════════════════════════════════════
+// REPORT DIALOG (unchanged)
+// ══════════════════════════════════════════════════════════════
 class ReportDialog extends StatefulWidget {
   final int propertyId;
   final VoidCallback onSuccess;
@@ -2785,7 +3059,6 @@ class _ReportDialogState extends State<ReportDialog> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).primaryColor;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -2973,14 +3246,9 @@ class _ReportDialogState extends State<ReportDialog> {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// ✅ IN-APP VIDEO PLAYER SCREEN
-// Plays the property tour video fully inside the app (no external browser
-// or external video-player app is opened).
-// Requires the `video_player` package — add to pubspec.yaml:
-//   dependencies:
-//     video_player: ^2.9.2
-// ══════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// IN-APP VIDEO PLAYER (unchanged)
+// ══════════════════════════════════════════════════════════════
 class InAppVideoPlayerScreen extends StatefulWidget {
   final String videoUrl;
   final String title;
@@ -3213,7 +3481,6 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
                         onPressed: _toggleFullscreen,
                       ),
                     ),
-                    // Center play/pause
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
@@ -3231,7 +3498,6 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
                         onPressed: _togglePlayPause,
                       ),
                     ),
-                    // Seek bar + time
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                       child: Column(

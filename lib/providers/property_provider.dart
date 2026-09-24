@@ -8,18 +8,27 @@ class PropertyProvider extends ChangeNotifier {
 
   List<Property> _properties = [];
   List<Property> _savedProperties = [];
-  List<Room> _rooms = []; // ✅ ADDED
+  List<Room> _rooms = [];
   Property? _selectedProperty;
+
   bool _isLoading = false;
+  bool _isLoadingRooms = false;
   String? _error;
   bool _isDisposed = false;
 
   List<Property> get properties => _properties;
   List<Property> get savedProperties => _savedProperties;
-  List<Room> get rooms => _rooms; // ✅ ADDED
+  List<Room> get rooms => _rooms;
   Property? get selectedProperty => _selectedProperty;
   bool get isLoading => _isLoading;
+  bool get isLoadingRooms => _isLoadingRooms;
   String? get error => _error;
+
+  int get availableRoomsCount =>
+      _rooms.where((r) => r.status == 'AVAILABLE').length;
+
+  int get occupiedRoomsCount =>
+      _rooms.where((r) => r.status == 'OCCUPIED').length;
 
   @override
   void dispose() {
@@ -58,7 +67,7 @@ class PropertyProvider extends ChangeNotifier {
       if (radius != null) queryParams['radius'] = radius;
       if (sort != null && sort.isNotEmpty) queryParams['sort'] = sort;
 
-      print('🔍 Searching properties with: $queryParams');
+      debugPrint('🔍 Searching properties: $queryParams');
 
       final response = await _api.get(
         '/properties/search',
@@ -68,236 +77,166 @@ class PropertyProvider extends ChangeNotifier {
       if (_isDisposed) return;
 
       if (response.data['success'] == true) {
-        final data = response.data['data'] as List;
+        final data = response.data['data'] as List? ?? [];
         _properties = data.map((item) => Property.fromJson(item)).toList();
-        print('✅ Found ${_properties.length} properties');
+        debugPrint('✅ Found ${_properties.length} properties');
       } else {
         _error = response.data['message'] ?? 'Failed to load properties';
-        print('❌ Search error: $_error');
       }
     } catch (e) {
       if (!_isDisposed) {
         _error = e.toString();
-        print('❌ Search exception: $e');
+        debugPrint('❌ Search exception: $e');
       }
     }
 
-    if (!_isDisposed) {
-      _setLoading(false);
-    }
+    if (!_isDisposed) _setLoading(false);
   }
 
   Future<void> getPropertyDetail(int propertyId) async {
     if (_isDisposed) return;
-    if (_isLoading) return;
 
-    _setLoading(true);
     _clearError();
 
     try {
-      print('🔍 Getting property detail: $propertyId');
-      
+      debugPrint('🔍 Getting property detail: $propertyId');
+
       final response = await _api.get('/properties/$propertyId');
 
       if (_isDisposed) return;
 
       if (response.data['success'] == true) {
         _selectedProperty = Property.fromJson(response.data['data']);
-        print('✅ Property detail loaded');
+        debugPrint('✅ Property loaded: ${_selectedProperty?.title}');
+        notifyListeners();
       } else {
         _error = response.data['message'] ?? 'Failed to load property details';
-        print('❌ Property detail error: $_error');
       }
     } catch (e) {
       if (!_isDisposed) {
         _error = e.toString();
-        print('❌ Property detail exception: $e');
+        debugPrint('❌ Property detail exception: $e');
       }
-    }
-
-    if (!_isDisposed) {
-      _setLoading(false);
     }
   }
 
-  // ✅ NEW: Get Rooms for a Property
   Future<void> getRooms(int propertyId) async {
     if (_isDisposed) return;
-    if (_isLoading) return;
 
-    _setLoading(true);
+    _isLoadingRooms = true;
     _clearError();
 
     try {
-      print('🔍 Getting rooms for property: $propertyId');
-      
+      debugPrint('🔍 Getting rooms for property: $propertyId');
+
       final response = await _api.get('/properties/$propertyId/rooms');
 
       if (_isDisposed) return;
 
       if (response.data['success'] == true) {
-        final data = response.data['data'] as List;
+        final data = response.data['data'] as List? ?? [];
         _rooms = data.map((item) => Room.fromJson(item)).toList();
-        print('✅ Found ${_rooms.length} rooms');
-        
-        // ✅ Update available rooms count in property
-        if (_selectedProperty != null) {
-          final available = _rooms.where((r) => r.status == 'AVAILABLE').length;
-          // You can update the property if needed
-        }
+        debugPrint('✅ Found ${_rooms.length} rooms');
       } else {
         _error = response.data['message'] ?? 'Failed to load rooms';
         _rooms = [];
-        print('❌ Rooms error: $_error');
       }
     } catch (e) {
       if (!_isDisposed) {
         _error = e.toString();
         _rooms = [];
-        print('❌ Rooms exception: $e');
+        debugPrint('❌ Rooms exception: $e');
       }
     }
 
     if (!_isDisposed) {
-      _setLoading(false);
+      _isLoadingRooms = false;
+      notifyListeners();
     }
   }
 
-  // ✅ NEW: Get Single Room Detail
-  Future<Room?> getRoomDetail(int propertyId, int roomId) async {
-    if (_isDisposed) return null;
-
-    try {
-      final response = await _api.get('/properties/$propertyId/rooms/$roomId');
-      
-      if (response.data['success'] == true) {
-        return Room.fromJson(response.data['data']);
-      }
-      return null;
-    } catch (e) {
-      print('❌ Room detail error: $e');
-      return null;
-    }
-  }
-
-  Future<void> getSavedProperties() async {
+  Future<void> loadPropertyDetailWithRooms(int propertyId) async {
     if (_isDisposed) return;
-    if (_isLoading) return;
 
     _setLoading(true);
     _clearError();
 
     try {
-      print('🔍 Getting saved properties');
-      
-      final response = await _api.get('/user/saved-properties');
+      debugPrint('🔍 Loading property + rooms: $propertyId');
 
-      if (_isDisposed) return;
+      await Future.wait([
+        getPropertyDetail(propertyId),
+        getRooms(propertyId),
+        getSavedProperties(),
+      ]);
 
-      if (response.data['success'] == true) {
-        final data = response.data['data'] as List;
-        _savedProperties = data.map((item) => Property.fromJson(item)).toList();
-        print('✅ Found ${_savedProperties.length} saved properties');
-      } else {
-        _error = response.data['message'] ?? 'Failed to load saved properties';
-        print('❌ Saved properties error: $_error');
-      }
+      debugPrint('✅ All loaded. Rooms: ${_rooms.length}');
     } catch (e) {
       if (!_isDisposed) {
         _error = e.toString();
-        print('❌ Saved properties exception: $e');
+        debugPrint('❌ Load all exception: $e');
       }
     }
 
-    if (!_isDisposed) {
-      _setLoading(false);
+    if (!_isDisposed) _setLoading(false);
+  }
+
+  Future<void> getSavedProperties() async {
+    if (_isDisposed) return;
+
+    _clearError();
+
+    try {
+      final response = await _api.get('/user/saved-properties');
+      if (_isDisposed) return;
+
+      if (response.data['success'] == true) {
+        final data = response.data['data'] as List? ?? [];
+        _savedProperties = data.map((item) => Property.fromJson(item)).toList();
+        debugPrint('✅ Saved properties: ${_savedProperties.length}');
+      }
+    } catch (e) {
+      if (!_isDisposed) {
+        debugPrint('❌ Saved properties exception: $e');
+      }
     }
   }
 
   Future<bool> saveProperty(int propertyId) async {
     if (_isDisposed) return false;
-
     try {
-      print('💾 Saving property: $propertyId');
-      
       final response = await _api.post('/user/saved-properties/$propertyId');
-      
       if (response.data['success'] == true && !_isDisposed) {
         await getSavedProperties();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Save property error: $e');
+      debugPrint('❌ Save property error: $e');
       return false;
     }
   }
 
   Future<bool> removeSavedProperty(int propertyId) async {
     if (_isDisposed) return false;
-
     try {
-      print('🗑️ Removing property: $propertyId');
-      
       final response = await _api.delete('/user/saved-properties/$propertyId');
-      
       if (response.data['success'] == true && !_isDisposed) {
         await getSavedProperties();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Remove property error: $e');
+      debugPrint('❌ Remove property error: $e');
       return false;
     }
   }
 
-  // ✅ NEW: Load All Property Data (Detail + Rooms)
-  Future<void> loadPropertyDetailWithRooms(int propertyId) async {
-    if (_isDisposed) return;
-    if (_isLoading) return;
-
-    _setLoading(true);
-    _clearError();
-
-    try {
-      print('🔍 Loading property detail with rooms: $propertyId');
-      
-      // Load both in parallel
-      await Future.wait([
-        getPropertyDetail(propertyId),
-        getRooms(propertyId),
-      ]);
-      
-      print('✅ Property and rooms loaded successfully');
-    } catch (e) {
-      if (!_isDisposed) {
-        _error = e.toString();
-        print('❌ Error loading property data: $e');
-      }
-    }
-
-    if (!_isDisposed) {
-      _setLoading(false);
-    }
-  }
-
-  // ✅ NEW: Clear Rooms
   void clearRooms() {
     if (!_isDisposed) {
       _rooms = [];
       notifyListeners();
     }
-  }
-
-  // ✅ NEW: Get Available Rooms Count
-  int get availableRoomsCount {
-    return _rooms.where((r) => r.status == 'AVAILABLE').length;
-  }
-
-  // ✅ NEW: Get Occupied Rooms Count
-  int get occupiedRoomsCount {
-    return _rooms.where((r) => r.status == 'OCCUPIED').length;
   }
 
   void _setLoading(bool loading) {
@@ -310,7 +249,6 @@ class PropertyProvider extends ChangeNotifier {
   void _clearError() {
     if (!_isDisposed && _error != null) {
       _error = null;
-      notifyListeners();
     }
   }
 
@@ -321,7 +259,6 @@ class PropertyProvider extends ChangeNotifier {
     }
   }
 
-  // Reset method to clear all data
   void reset() {
     if (!_isDisposed) {
       _properties = [];
@@ -329,6 +266,7 @@ class PropertyProvider extends ChangeNotifier {
       _rooms = [];
       _selectedProperty = null;
       _isLoading = false;
+      _isLoadingRooms = false;
       _error = null;
       notifyListeners();
     }

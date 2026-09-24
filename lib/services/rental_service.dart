@@ -1,57 +1,47 @@
 // lib/services/rental_service.dart
-//
-// ⚠️ INTEGRATION NOTE:
-// This file creates its own Dio instance + reads the token from
-// SharedPreferences directly, so it's self-contained and compiles on its
-// own. Your app already has a shared Dio client (the one BookingService /
-// ChatService use, with the base URL + auth interceptor already wired).
-// Replace `_dio` below with that shared client instance instead of
-// duplicating the setup — search your project for how BookingService
-// gets its Dio instance and mirror it here.
 
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
 import '../models/rental_model.dart';
+import 'api_service.dart';
 
 class RentalService {
-  // TODO: replace with your app's actual base URL constant.
-  static const String _baseUrl = 'https://api.nestora.in';
-
-  final Dio _dio = Dio(BaseOptions(baseUrl: _baseUrl));
-
-  Future<String?> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('accessToken'); // match your actual pref key
-  }
-
-  Future<Options> _authOptions() async {
-    final token = await _token();
-    return Options(headers: {
-      if (token != null) 'Authorization': 'Bearer $token',
-    });
-  }
+  final ApiService _api = ApiService();
 
   // ── 17.1 — Get my rental agreements ─────────────────────────────
   Future<RentalApiResponse<List<RentalAgreement>>> getMyAgreements() async {
     try {
-      final res = await _dio.get(
-        '/user/rental-agreements',
-        options: await _authOptions(),
-      );
-      final json = res.data;
+      debugPrint('🔍 [RentalService] Fetching agreements...');
+
+      final response = await _api.get('/user/rental-agreements');
+
+      debugPrint('📥 [RentalService] Response: ${response.data}');
+
+      final json = response.data;
       final list = (json['data'] as List? ?? [])
           .map((e) => RentalAgreement.fromJson(e as Map<String, dynamic>))
           .toList();
+
       return RentalApiResponse(
         success: json['success'] == true,
         message: json['message']?.toString() ?? '',
         data: list,
       );
     } on DioException catch (e) {
+      debugPrint('❌ [RentalService] DioException: ${e.message}');
+      debugPrint('❌ [RentalService] Response: ${e.response?.data}');
+
       return RentalApiResponse(
         success: false,
         message: e.response?.data?['message']?.toString() ??
+            e.message ??
             'Failed to load rental agreements',
+      );
+    } catch (e) {
+      debugPrint('❌ [RentalService] Exception: $e');
+      return RentalApiResponse(
+        success: false,
+        message: e.toString(),
       );
     }
   }
@@ -60,11 +50,9 @@ class RentalService {
   Future<RentalApiResponse<RentalAgreement>> getAgreementDetail(
       int agreementId) async {
     try {
-      final res = await _dio.get(
-        '/user/rental-agreements/$agreementId',
-        options: await _authOptions(),
-      );
-      final json = res.data;
+      final response = await _api.get('/user/rental-agreements/$agreementId');
+      final json = response.data;
+
       return RentalApiResponse(
         success: json['success'] == true,
         message: json['message']?.toString() ?? '',
@@ -78,6 +66,11 @@ class RentalService {
         message: e.response?.data?['message']?.toString() ??
             'Failed to load agreement',
       );
+    } catch (e) {
+      return RentalApiResponse(
+        success: false,
+        message: e.toString(),
+      );
     }
   }
 
@@ -85,14 +78,14 @@ class RentalService {
   Future<RentalApiResponse<List<RentInvoice>>> getAgreementInvoices(
       int agreementId) async {
     try {
-      final res = await _dio.get(
-        '/user/rental-agreements/$agreementId/invoices',
-        options: await _authOptions(),
-      );
-      final json = res.data;
+      final response =
+          await _api.get('/user/rental-agreements/$agreementId/invoices');
+      final json = response.data;
+
       final list = (json['data'] as List? ?? [])
           .map((e) => RentInvoice.fromJson(e as Map<String, dynamic>))
           .toList();
+
       return RentalApiResponse(
         success: json['success'] == true,
         message: json['message']?.toString() ?? '',
@@ -104,6 +97,11 @@ class RentalService {
         message: e.response?.data?['message']?.toString() ??
             'Failed to load invoices',
       );
+    } catch (e) {
+      return RentalApiResponse(
+        success: false,
+        message: e.toString(),
+      );
     }
   }
 
@@ -111,12 +109,12 @@ class RentalService {
   Future<RentalApiResponse<RentalAgreement>> terminateAgreement(
       int agreementId, String reason) async {
     try {
-      final res = await _dio.post(
+      final response = await _api.post(
         '/user/rental-agreements/$agreementId/terminate',
         data: {'reason': reason},
-        options: await _authOptions(),
       );
-      final json = res.data;
+      final json = response.data;
+
       return RentalApiResponse(
         success: json['success'] == true,
         message: json['message']?.toString() ?? '',
@@ -130,6 +128,11 @@ class RentalService {
         message: e.response?.data?['message']?.toString() ??
             'Failed to terminate agreement',
       );
+    } catch (e) {
+      return RentalApiResponse(
+        success: false,
+        message: e.toString(),
+      );
     }
   }
 
@@ -137,11 +140,10 @@ class RentalService {
   Future<RentalApiResponse<MonthlyRentInitiateResponse>> initiateMonthlyRent(
       int invoiceId) async {
     try {
-      final res = await _dio.post(
-        '/user/monthly-rent/initiate/$invoiceId',
-        options: await _authOptions(),
-      );
-      final json = res.data;
+      final response =
+          await _api.post('/user/monthly-rent/initiate/$invoiceId');
+      final json = response.data;
+
       return RentalApiResponse(
         success: json['success'] == true,
         message: json['message']?.toString() ?? '',
@@ -155,6 +157,11 @@ class RentalService {
         message: e.response?.data?['message']?.toString() ??
             'Failed to initiate payment',
       );
+    } catch (e) {
+      return RentalApiResponse(
+        success: false,
+        message: e.toString(),
+      );
     }
   }
 
@@ -165,16 +172,16 @@ class RentalService {
     required String razorpaySignature,
   }) async {
     try {
-      final res = await _dio.post(
+      final response = await _api.post(
         '/user/monthly-rent/confirm',
         data: {
           'razorpayOrderId': razorpayOrderId,
           'razorpayPaymentId': razorpayPaymentId,
           'razorpaySignature': razorpaySignature,
         },
-        options: await _authOptions(),
       );
-      final json = res.data;
+      final json = response.data;
+
       return RentalApiResponse(
         success: json['success'] == true,
         message: json['message']?.toString() ?? '',
@@ -188,6 +195,11 @@ class RentalService {
         message: e.response?.data?['message']?.toString() ??
             'Payment confirmation failed',
       );
+    } catch (e) {
+      return RentalApiResponse(
+        success: false,
+        message: e.toString(),
+      );
     }
   }
 
@@ -195,14 +207,13 @@ class RentalService {
   Future<RentalApiResponse<List<MonthlyRentPayment>>>
       getMyMonthlyPayments() async {
     try {
-      final res = await _dio.get(
-        '/user/monthly-rent/my-payments',
-        options: await _authOptions(),
-      );
-      final json = res.data;
+      final response = await _api.get('/user/monthly-rent/my-payments');
+      final json = response.data;
+
       final list = (json['data'] as List? ?? [])
           .map((e) => MonthlyRentPayment.fromJson(e as Map<String, dynamic>))
           .toList();
+
       return RentalApiResponse(
         success: json['success'] == true,
         message: json['message']?.toString() ?? '',
@@ -213,6 +224,11 @@ class RentalService {
         success: false,
         message: e.response?.data?['message']?.toString() ??
             'Failed to load payments',
+      );
+    } catch (e) {
+      return RentalApiResponse(
+        success: false,
+        message: e.toString(),
       );
     }
   }

@@ -28,10 +28,10 @@ class AppConstants {
     if (Platform.isIOS) {
       return 'ws://192.168.0.115:8080/ws';
     }
-    
+
     return 'ws://10.0.2.2:8080/ws';
   }
-  
+
   static const String appName = 'YourHome';
   static const String appVersion = '1.0.0';
 
@@ -101,5 +101,5 @@ class AppConstants {
   static const String keyUserName = 'user_name';
   static const String keyIsLoggedIn = 'is_logged_in';
   static const String keyThemeMode = 'theme_mode';
-  static const String keyProfileImage = 'profile_image';
+  static const String keyProfileImage = 'profile_image'; // ✅ fixed
 }
