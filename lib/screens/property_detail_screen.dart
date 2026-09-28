@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import 'package:yourhome/models/booking_model.dart';
 import 'package:yourhome/providers/auth_provider.dart';
 import 'package:yourhome/screens/booking/booking_payment_screen.dart';
+import 'package:yourhome/utils/constants.dart';
 import '../providers/property_provider.dart';
 import '../models/property_model.dart';
 import '../models/room_model.dart';
@@ -1458,7 +1459,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                     'center=${property.latitude},${property.longitude}&'
                     'zoom=15&size=600x300&'
                     'markers=color:red%7C${property.latitude},${property.longitude}&'
-                    'key=YOUR_GOOGLE_MAPS_API_KEY',
+                    'key=${AppConstants.googleMapsApiKey}',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       color: Colors.grey[300],

@@ -12,6 +12,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:yourhome/screens/help_support_screen.dart';
 import 'package:yourhome/screens/owner/owner_apply_page.dart';
 import 'package:yourhome/screens/privacy_policy_screen.dart';
+import 'package:yourhome/utils/constants.dart';
 import '../providers/profile_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
@@ -69,11 +70,23 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   bool _hasLoadedProfile = false;
 
+  /// 🔥 KEY: agar userId diya gaya hai to "doosre user ki profile" mode
+  bool get _isOtherUserMode => widget.userId != null;
+
   @override
   void initState() {
     super.initState();
+
+    // 🔍 DEBUG
+    print('═══════════════════════════════════════');
+    print('🔍 [ProfileScreen.initState]');
+    print('🔍 widget.userId: ${widget.userId}');
+    print('🔍 widget.isOwner: ${widget.isOwner}');
+    print('🔍 _isOtherUserMode: $_isOtherUserMode');
+    print('═══════════════════════════════════════');
+
     _setupAnimations();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _loadProfileData();
@@ -129,10 +142,25 @@ class _ProfileScreenState extends State<ProfileScreen>
     _staggerController.forward();
   }
 
+  // ============================================
+  // 🔥 LOAD PROFILE DATA (WITH DEBUG)
+  // ============================================
   Future<void> _loadProfileData() async {
+    // 🔍 DEBUG
+    print('═══════════════════════════════════════');
+    print('🔍 [ProfileScreen._loadProfileData]');
+    print('🔍 widget.userId: ${widget.userId}');
+    print('🔍 widget.isOwner: ${widget.isOwner}');
+    print('🔍 _isOtherUserMode: $_isOtherUserMode');
+    print('🔍 _hasLoadedProfile: $_hasLoadedProfile');
+    print('═══════════════════════════════════════');
+
     if (!mounted) return;
-    if (_hasLoadedProfile) return;
-    
+    if (_hasLoadedProfile) {
+      print('🔍 → Already loaded, skipping');
+      return;
+    }
+
     _hasLoadedProfile = true;
 
     final profileProvider = Provider.of<ProfileProvider>(
@@ -140,16 +168,22 @@ class _ProfileScreenState extends State<ProfileScreen>
       listen: false,
     );
 
-    if (widget.isOwner && widget.userId != null) {
+    // 🔥 KEY FIX: userId diya gaya to doosre user ki profile,
+    // warna apni profile
+    if (_isOtherUserMode) {
+      print('🔍 → Calling _loadOtherUserProfile(${widget.userId})');
       await _loadOtherUserProfile(widget.userId!);
     } else {
+      print('🔍 → Calling profileProvider.loadAllData() [MY OWN PROFILE]');
       await profileProvider.loadAllData();
     }
   }
 
   Future<void> _loadOtherUserProfile(int userId) async {
     if (!mounted) return;
-    
+
+    print('🔍 [ProfileScreen._loadOtherUserProfile] userId: $userId');
+
     setState(() {
       _isLoadingOtherUser = true;
       _otherUserError = null;
@@ -170,15 +204,21 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
 
       final dio = Dio();
+      final url = '${_getBaseUrl()}/user/profile/$userId';
+      print('🔍 → GET $url');
+
       final response = await dio.get(
-        '${_getBaseUrl()}/user/profile/$userId',
+        url,
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
 
+      print('🔍 → Response: ${response.statusCode}');
+
       if (response.data['success'] == true) {
         final data = response.data['data'];
+        print('🔍 → Loaded: ${data['name']} (${data['role']})');
         _otherUserProfile = UserProfile(
           userId: data['userId'] ?? userId,
           displayId:
@@ -194,9 +234,11 @@ class _ProfileScreenState extends State<ProfileScreen>
               : DateTime.now(),
         );
       } else {
+        print('🔍 → API returned success=false, using fallback');
         _fallbackUserProfile(userId);
       }
     } catch (e) {
+      print('🔍 → ERROR: $e');
       _fallbackUserProfile(userId);
     }
 
@@ -211,21 +253,19 @@ class _ProfileScreenState extends State<ProfileScreen>
     _otherUserProfile = UserProfile(
       userId: userId,
       displayId: 'NST-${userId.toString().padLeft(6, '0')}',
-      name: userId == 15 ? 'Riza Sheaikh' : 'Lutfur Rahman',
-      email: userId == 15 ? 'riza@email.com' : 'lutfur@email.com',
+      name: 'User',
+      email: 'user@email.com',
       phone: '9876543210',
-      profilePic: userId == 15
-          ? 'https://res.cloudinary.com/dhw16mrqc/image/upload/v1781066809/nestora/profile-pics/p3zmqrxp3q1zvr0vlbxy.jpg'
-          : 'https://res.cloudinary.com/dhw16mrqc/image/upload/v1778790707/nestora/profile-pics/hvayp0xihizoya1xamyc.jpg',
-      role: 'OWNER',
+      profilePic: null,
+      role: 'USER',
       isEmailVerified: true,
       createdAt: DateTime.now(),
     );
   }
 
-  String _getBaseUrl() {
-    return 'https://api.nestora.in';
-  }
+String _getBaseUrl() {
+  return AppConstants.baseUrl;   // ✅ Local IP use karega
+}
 
   @override
   void dispose() {
@@ -236,7 +276,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _pickAndUploadImage() async {
-    if (widget.isOwner) return;
+    if (_isOtherUserMode) return;
 
     HapticFeedback.lightImpact();
 
@@ -274,7 +314,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -318,15 +358,21 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    // 🔍 DEBUG
+    print('🔍 [ProfileScreen.build] userId: ${widget.userId}, _isOtherUserMode: $_isOtherUserMode');
+
     final authProvider = Provider.of<AuthProvider>(context);
     final profileProvider = Provider.of<ProfileProvider>(context);
     final user = authProvider.user;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    if (widget.isOwner) {
+    // 🔥 KEY FIX: userId diya gaya to doosre user ki profile view
+    if (_isOtherUserMode) {
+      print('🔍 → Rendering OTHER USER profile view');
       return _buildOwnerProfileView(context, isDark);
     }
 
+    print('🔍 → Rendering MY OWN profile view');
     return _buildUserProfileView(
         context, isDark, user, profileProvider, authProvider);
   }
@@ -535,11 +581,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     bool isDark, {
     bool isOwner = false,
   }) {
+    final showBack = _isOtherUserMode;
+
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      leading: isOwner
+      leading: showBack
           ? Container(
               margin: const EdgeInsets.only(left: 8),
               decoration: BoxDecoration(
@@ -563,7 +611,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             )
           : null,
       title: Text(
-        isOwner ? 'Owner Profile' : 'My Profile',
+        showBack ? 'User Profile' : 'My Profile',
         style: GoogleFonts.playfairDisplay(
           fontSize: 22,
           fontWeight: FontWeight.bold,
@@ -1221,6 +1269,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     final joinedLabel =
         '${_monthShort[profile.createdAt.month - 1]} $joinedYear';
 
+    final roleUpper = profile.role.toUpperCase();
+    final isOwnerRole = roleUpper == 'OWNER';
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -1260,14 +1311,24 @@ class _ProfileScreenState extends State<ProfileScreen>
                       Positioned(
                         top: -20,
                         right: -10,
-                        child: Icon(Icons.villa_rounded,
-                            size: 100, color: Colors.white.withOpacity(0.08)),
+                        child: Icon(
+                          isOwnerRole
+                              ? Icons.villa_rounded
+                              : Icons.school_rounded,
+                          size: 100,
+                          color: Colors.white.withOpacity(0.08),
+                        ),
                       ),
                       Positioned(
                         bottom: -30,
                         left: -20,
-                        child: Icon(Icons.apartment_rounded,
-                            size: 90, color: Colors.white.withOpacity(0.06)),
+                        child: Icon(
+                          isOwnerRole
+                              ? Icons.apartment_rounded
+                              : Icons.menu_book_rounded,
+                          size: 90,
+                          color: Colors.white.withOpacity(0.06),
+                        ),
                       ),
                       Positioned(
                         top: 12,
@@ -1320,7 +1381,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ? Text(
                               profile.name.isNotEmpty
                                   ? profile.name[0].toUpperCase()
-                                  : 'O',
+                                  : 'U',
                               style: GoogleFonts.poppins(
                                 fontSize: 30,
                                 color: _Palette.primary,
@@ -1446,9 +1507,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                 const SizedBox(width: 10),
                 Expanded(
                   child: _trustBadge(
-                    icon: Icons.house_rounded,
-                    label: 'Listing Owner',
-                    color: _Palette.gold,
+                    icon: isOwnerRole
+                        ? Icons.house_rounded
+                        : Icons.school_rounded,
+                    label: isOwnerRole ? 'Listing Owner' : 'Student',
+                    color: isOwnerRole ? _Palette.gold : _Palette.accent,
                     isDark: isDark,
                   ),
                 ),
@@ -1753,7 +1816,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Loading your profile...',
+            'Loading profile...',
             style: GoogleFonts.poppins(
               fontSize: 13,
               fontWeight: FontWeight.w500,

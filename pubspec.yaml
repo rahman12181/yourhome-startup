@@ -1,6 +1,9 @@
 name: yourhome
+
 description: A accommodation finder app
+
 publish_to: 'none'
+
 version: 1.0.0+1
 
 environment:
@@ -36,6 +39,14 @@ dependencies:
   share_plus: ^13.2.0
   flutter_local_notifications: 18.0.1
   fl_chart: ^0.68.0
+
+  # NEW
+  pull_to_refresh: ^2.0.0
+  flutter_staggered_animations: ^1.1.1
+  percent_indicator: ^4.2.3
+  syncfusion_flutter_gauges: ^27.1.48
+  lottie: ^3.1.2
+  flutter_slidable: ^3.1.0
 
 dev_dependencies:
   flutter_test:

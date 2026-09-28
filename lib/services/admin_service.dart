@@ -1,13 +1,198 @@
 import 'package:dio/dio.dart';
 import 'package:yourhome/models/property_model.dart';
 import '../models/admin_model.dart';
+import '../models/admin_analytics_models.dart';
 import '../models/api_response.dart';
 import 'api_service.dart';
 
 class AdminService {
   final ApiService _api = ApiService();
 
-  // ============== 10.1 GET PENDING OWNERS ==============
+  // ═══════════════════════════════════════════════════════════
+  // NEW — DASHBOARD SUMMARY (ALL-IN-ONE)
+  // GET /admin/dashboard/summary
+  // ═══════════════════════════════════════════════════════════
+  Future<ApiResponse<AdminDashboardSummary>> getDashboardSummary() async {
+    try {
+      final response = await _api.get('/admin/dashboard/summary');
+      return ApiResponse<AdminDashboardSummary>.fromJson(
+        response.data,
+        (data) => AdminDashboardSummary.fromJson(data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
+        return ApiResponse<AdminDashboardSummary>.fromJson(
+          e.response!.data,
+          (data) => AdminDashboardSummary.fromJson(data as Map<String, dynamic>),
+        );
+      }
+      return ApiResponse<AdminDashboardSummary>.error(e.message ?? 'Error');
+    } catch (e) {
+      return ApiResponse<AdminDashboardSummary>.error(e.toString());
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // NEW — USER ANALYTICS
+  // ═══════════════════════════════════════════════════════════
+  Future<ApiResponse<UserAnalytics>> getUserAnalytics({String period = '30d'}) async {
+    try {
+      final response = await _api.get(
+        '/admin/analytics/users',
+        queryParameters: {'period': period},
+      );
+      return ApiResponse<UserAnalytics>.fromJson(
+        response.data,
+        (data) => UserAnalytics.fromJson(data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
+        return ApiResponse<UserAnalytics>.fromJson(
+          e.response!.data,
+          (data) => UserAnalytics.fromJson(data as Map<String, dynamic>),
+        );
+      }
+      return ApiResponse<UserAnalytics>.error(e.message ?? 'Error');
+    } catch (e) {
+      return ApiResponse<UserAnalytics>.error(e.toString());
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // NEW — OWNER ANALYTICS
+  // ═══════════════════════════════════════════════════════════
+  Future<ApiResponse<OwnerAnalytics>> getOwnerAnalytics({String period = '30d'}) async {
+    try {
+      final response = await _api.get(
+        '/admin/analytics/owners',
+        queryParameters: {'period': period},
+      );
+      return ApiResponse<OwnerAnalytics>.fromJson(
+        response.data,
+        (data) => OwnerAnalytics.fromJson(data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
+        return ApiResponse<OwnerAnalytics>.fromJson(
+          e.response!.data,
+          (data) => OwnerAnalytics.fromJson(data as Map<String, dynamic>),
+        );
+      }
+      return ApiResponse<OwnerAnalytics>.error(e.message ?? 'Error');
+    } catch (e) {
+      return ApiResponse<OwnerAnalytics>.error(e.toString());
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // NEW — REVENUE ANALYTICS
+  // ═══════════════════════════════════════════════════════════
+  Future<ApiResponse<RevenueAnalytics>> getRevenueAnalytics({String period = '30d'}) async {
+    try {
+      final response = await _api.get(
+        '/admin/analytics/revenue',
+        queryParameters: {'period': period},
+      );
+      return ApiResponse<RevenueAnalytics>.fromJson(
+        response.data,
+        (data) => RevenueAnalytics.fromJson(data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
+        return ApiResponse<RevenueAnalytics>.fromJson(
+          e.response!.data,
+          (data) => RevenueAnalytics.fromJson(data as Map<String, dynamic>),
+        );
+      }
+      return ApiResponse<RevenueAnalytics>.error(e.message ?? 'Error');
+    } catch (e) {
+      return ApiResponse<RevenueAnalytics>.error(e.toString());
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // NEW — BOOKING ANALYTICS
+  // ═══════════════════════════════════════════════════════════
+  Future<ApiResponse<BookingAnalytics>> getBookingAnalytics({String period = '30d'}) async {
+    try {
+      final response = await _api.get(
+        '/admin/analytics/bookings',
+        queryParameters: {'period': period},
+      );
+      return ApiResponse<BookingAnalytics>.fromJson(
+        response.data,
+        (data) => BookingAnalytics.fromJson(data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
+        return ApiResponse<BookingAnalytics>.fromJson(
+          e.response!.data,
+          (data) => BookingAnalytics.fromJson(data as Map<String, dynamic>),
+        );
+      }
+      return ApiResponse<BookingAnalytics>.error(e.message ?? 'Error');
+    } catch (e) {
+      return ApiResponse<BookingAnalytics>.error(e.toString());
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // NEW — PROPERTY ANALYTICS
+  // ═══════════════════════════════════════════════════════════
+  Future<ApiResponse<PropertyAnalytics>> getPropertyAnalytics({String period = '30d'}) async {
+    try {
+      final response = await _api.get(
+        '/admin/analytics/properties',
+        queryParameters: {'period': period},
+      );
+      return ApiResponse<PropertyAnalytics>.fromJson(
+        response.data,
+        (data) => PropertyAnalytics.fromJson(data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
+        return ApiResponse<PropertyAnalytics>.fromJson(
+          e.response!.data,
+          (data) => PropertyAnalytics.fromJson(data as Map<String, dynamic>),
+        );
+      }
+      return ApiResponse<PropertyAnalytics>.error(e.message ?? 'Error');
+    } catch (e) {
+      return ApiResponse<PropertyAnalytics>.error(e.toString());
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // NEW — ENGAGEMENT ANALYTICS
+  // ═══════════════════════════════════════════════════════════
+  Future<ApiResponse<EngagementAnalytics>> getEngagementAnalytics({String period = '30d'}) async {
+    try {
+      final response = await _api.get(
+        '/admin/analytics/engagement',
+        queryParameters: {'period': period},
+      );
+      return ApiResponse<EngagementAnalytics>.fromJson(
+        response.data,
+        (data) => EngagementAnalytics.fromJson(data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
+        return ApiResponse<EngagementAnalytics>.fromJson(
+          e.response!.data,
+          (data) => EngagementAnalytics.fromJson(data as Map<String, dynamic>),
+        );
+      }
+      return ApiResponse<EngagementAnalytics>.error(e.message ?? 'Error');
+    } catch (e) {
+      return ApiResponse<EngagementAnalytics>.error(e.toString());
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // EXISTING METHODS (copied from your code — unchanged)
+  // ═══════════════════════════════════════════════════════════
+
+  // 10.1 GET PENDING OWNERS
   Future<ApiResponse<List<PendingOwner>>> getPendingOwners() async {
     try {
       final response = await _api.get('/admin/owners/pending');
@@ -41,7 +226,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.2 GET ALL OWNERS ==============
+  // 10.2 GET ALL OWNERS
   Future<ApiResponse<List<PendingOwner>>> getAllOwners() async {
     try {
       final response = await _api.get('/admin/owners/all');
@@ -75,20 +260,14 @@ class AdminService {
     }
   }
 
-  // ============== 10.3 VERIFY OWNER ==============
+  // 10.3 VERIFY OWNER
   Future<ApiResponse<void>> verifyOwner(int ownerId) async {
     try {
       final response = await _api.patch('/admin/owners/$ownerId/verify');
-      return ApiResponse<void>.fromJson(
-        response.data,
-        (data) => null,
-      );
+      return ApiResponse<void>.fromJson(response.data, (data) => null);
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        return ApiResponse<void>.fromJson(
-          e.response!.data,
-          (data) => null,
-        );
+        return ApiResponse<void>.fromJson(e.response!.data, (data) => null);
       }
       return ApiResponse<void>.error(e.message ?? 'Something went wrong');
     } catch (e) {
@@ -96,23 +275,17 @@ class AdminService {
     }
   }
 
-  // ============== 10.4 REJECT OWNER ==============
+  // 10.4 REJECT OWNER
   Future<ApiResponse<void>> rejectOwner(int ownerId, String reason) async {
     try {
       final response = await _api.patch(
         '/admin/owners/$ownerId/reject',
         data: {'reason': reason},
       );
-      return ApiResponse<void>.fromJson(
-        response.data,
-        (data) => null,
-      );
+      return ApiResponse<void>.fromJson(response.data, (data) => null);
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        return ApiResponse<void>.fromJson(
-          e.response!.data,
-          (data) => null,
-        );
+        return ApiResponse<void>.fromJson(e.response!.data, (data) => null);
       }
       return ApiResponse<void>.error(e.message ?? 'Something went wrong');
     } catch (e) {
@@ -120,7 +293,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.5 GET PENDING PROPERTIES ==============
+  // 10.5 GET PENDING PROPERTIES
   Future<ApiResponse<List<PendingProperty>>> getPendingProperties() async {
     try {
       final response = await _api.get('/admin/properties/pending');
@@ -156,21 +329,15 @@ class AdminService {
     }
   }
 
-  // ============== 10.6 PUBLISH PROPERTY ==============
+  // 10.6 PUBLISH PROPERTY
   Future<ApiResponse<void>> publishProperty(int propertyId) async {
     try {
       final response =
           await _api.patch('/admin/properties/$propertyId/publish');
-      return ApiResponse<void>.fromJson(
-        response.data,
-        (data) => null,
-      );
+      return ApiResponse<void>.fromJson(response.data, (data) => null);
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        return ApiResponse<void>.fromJson(
-          e.response!.data,
-          (data) => null,
-        );
+        return ApiResponse<void>.fromJson(e.response!.data, (data) => null);
       }
       return ApiResponse<void>.error(e.message ?? 'Something went wrong');
     } catch (e) {
@@ -178,21 +345,15 @@ class AdminService {
     }
   }
 
-  // ============== 10.7 UNPUBLISH PROPERTY ==============
+  // 10.7 UNPUBLISH PROPERTY
   Future<ApiResponse<void>> unpublishProperty(int propertyId) async {
     try {
       final response =
           await _api.patch('/admin/properties/$propertyId/unpublish');
-      return ApiResponse<void>.fromJson(
-        response.data,
-        (data) => null,
-      );
+      return ApiResponse<void>.fromJson(response.data, (data) => null);
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        return ApiResponse<void>.fromJson(
-          e.response!.data,
-          (data) => null,
-        );
+        return ApiResponse<void>.fromJson(e.response!.data, (data) => null);
       }
       return ApiResponse<void>.error(e.message ?? 'Something went wrong');
     } catch (e) {
@@ -200,7 +361,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.8 GET ALL USERS ==============
+  // 10.8 GET ALL USERS
   Future<ApiResponse<List<AdminUser>>> getAllUsers() async {
     try {
       final response = await _api.get('/admin/users');
@@ -233,20 +394,14 @@ class AdminService {
     }
   }
 
-  // ============== 10.9 DEACTIVATE USER ==============
+  // 10.9 DEACTIVATE USER
   Future<ApiResponse<void>> deactivateUser(int userId) async {
     try {
       final response = await _api.patch('/admin/users/$userId/deactivate');
-      return ApiResponse<void>.fromJson(
-        response.data,
-        (data) => null,
-      );
+      return ApiResponse<void>.fromJson(response.data, (data) => null);
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        return ApiResponse<void>.fromJson(
-          e.response!.data,
-          (data) => null,
-        );
+        return ApiResponse<void>.fromJson(e.response!.data, (data) => null);
       }
       return ApiResponse<void>.error(e.message ?? 'Something went wrong');
     } catch (e) {
@@ -254,20 +409,14 @@ class AdminService {
     }
   }
 
-  // ============== 10.10 ACTIVATE USER ==============
+  // 10.10 ACTIVATE USER
   Future<ApiResponse<void>> activateUser(int userId) async {
     try {
       final response = await _api.patch('/admin/users/$userId/activate');
-      return ApiResponse<void>.fromJson(
-        response.data,
-        (data) => null,
-      );
+      return ApiResponse<void>.fromJson(response.data, (data) => null);
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        return ApiResponse<void>.fromJson(
-          e.response!.data,
-          (data) => null,
-        );
+        return ApiResponse<void>.fromJson(e.response!.data, (data) => null);
       }
       return ApiResponse<void>.error(e.message ?? 'Something went wrong');
     } catch (e) {
@@ -275,7 +424,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.11 ADMIN DASHBOARD STATS ==============
+  // 10.11 ADMIN DASHBOARD STATS (LEGACY)
   Future<ApiResponse<AdminDashboardStats>> getDashboardStats() async {
     try {
       final response = await _api.get('/admin/dashboard/stats');
@@ -297,7 +446,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.12 GET PENDING REPORTS ==============
+  // 10.12 GET PENDING REPORTS
   Future<ApiResponse<List<AdminReport>>> getPendingReports() async {
     try {
       final response = await _api.get('/admin/reports');
@@ -330,20 +479,14 @@ class AdminService {
     }
   }
 
-  // ============== 10.13 RESOLVE REPORT ==============
+  // 10.13 RESOLVE REPORT
   Future<ApiResponse<void>> resolveReport(int reportId) async {
     try {
       final response = await _api.patch('/admin/reports/$reportId/resolve');
-      return ApiResponse<void>.fromJson(
-        response.data,
-        (data) => null,
-      );
+      return ApiResponse<void>.fromJson(response.data, (data) => null);
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        return ApiResponse<void>.fromJson(
-          e.response!.data,
-          (data) => null,
-        );
+        return ApiResponse<void>.fromJson(e.response!.data, (data) => null);
       }
       return ApiResponse<void>.error(e.message ?? 'Something went wrong');
     } catch (e) {
@@ -351,7 +494,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.14 GET PROPERTY DETAIL (ADMIN) ==============
+  // 10.14 GET PROPERTY DETAIL (ADMIN)
   Future<ApiResponse<Property>> getPropertyDetailAdmin(int propertyId) async {
     try {
       final response = await _api.get('/admin/properties/$propertyId/detail');
@@ -372,7 +515,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.15 GET ALL PROPERTIES (ADMIN) ==============
+  // 10.15 GET ALL PROPERTIES (ADMIN)
   Future<ApiResponse<List<Property>>> getAllPropertiesAdmin() async {
     try {
       final response = await _api.get('/admin/properties/all');
@@ -405,6 +548,7 @@ class AdminService {
     }
   }
 
+  // GET OWNER DETAIL
   Future<ApiResponse<OwnerDetail>> getOwnerDetail(int ownerId) async {
     try {
       final response = await _api.get('/admin/owners/$ownerId/detail');
@@ -435,7 +579,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.16 GET PROPERTY ACCESS SUBSCRIPTIONS ==============
+  // 10.16 GET PROPERTY ACCESS SUBSCRIPTIONS
   Future<ApiResponse<List<AdminPropertyAccessSubscription>>>
       getPropertyAccessSubscriptions({
     String? status,
@@ -482,7 +626,7 @@ class AdminService {
     }
   }
 
-  // ============== 10.17 FORCE EXPIRE SUBSCRIPTION ==============
+  // 10.17 FORCE EXPIRE SUBSCRIPTION
   Future<ApiResponse<void>> forceExpireSubscription(
       int subscriptionId, String reason) async {
     try {
@@ -490,16 +634,10 @@ class AdminService {
         '/admin/property-access-subscriptions/$subscriptionId/expire',
         data: {'reason': reason},
       );
-      return ApiResponse<void>.fromJson(
-        response.data,
-        (data) => null,
-      );
+      return ApiResponse<void>.fromJson(response.data, (data) => null);
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        return ApiResponse<void>.fromJson(
-          e.response!.data,
-          (data) => null,
-        );
+        return ApiResponse<void>.fromJson(e.response!.data, (data) => null);
       }
       return ApiResponse<void>.error(e.message ?? 'Something went wrong');
     } catch (e) {

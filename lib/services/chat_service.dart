@@ -112,12 +112,19 @@ class ChatService {
     }
   }
 
-  // ============== 9.4 SEND MESSAGE ==============
-  Future<ApiResponse<Message>> sendMessage(int conversationId, String content) async {
+  // ============== 9.4 SEND MESSAGE (⭐ UPDATED WITH REPLY) ==============
+  Future<ApiResponse<Message>> sendMessage(
+    int conversationId,
+    String content, {
+    int? replyToMessageId,   // 🆕 reply support
+  }) async {
     try {
       final response = await _api.post(
         '/chat/conversations/$conversationId/messages',
-        data: {'content': content},
+        data: {
+          'content': content,
+          if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
+        },
       );
 
       if (response.data['success'] == true) {

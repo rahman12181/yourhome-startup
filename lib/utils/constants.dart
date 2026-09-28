@@ -9,12 +9,12 @@ class AppConstants {
       return 'http://localhost:8080';
     }
     if (Platform.isAndroid) {
-      return 'http://192.168.0.115:8080';
+      return 'http://192.168.0.114:8080';
     }
     if (Platform.isIOS) {
-      return 'http://192.168.0.115:8080';
+      return 'http://192.168.0.114:8080';
     }
-    return 'http://10.0.2.2:8080';
+    return 'http://192.168.0.114:8080';
   }
 
   // WEBSOCKET URL - FIXED: http:// → ws://
@@ -23,10 +23,10 @@ class AppConstants {
       return 'ws://localhost:8080/ws';
     }
     if (Platform.isAndroid) {
-      return 'ws://192.168.0.115:8080/ws';
+      return 'ws://192.168.0.114:8080/ws';
     }
     if (Platform.isIOS) {
-      return 'ws://192.168.0.115:8080/ws';
+      return 'ws://192.168.0.114:8080/ws';
     }
 
     return 'ws://10.0.2.2:8080/ws';
@@ -36,6 +36,7 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   static const String razorpayKeyId = 'rzp_test_TedNqUpifo2RfH';
+  static const String googleMapsApiKey = 'AIzaSyD4LJZmPiQefY3g_mLDMcEVfpQC7qecDHA';
 
   static const List<String> propertyTypes = ['PG', 'HOSTEL', 'HOTEL', 'FLAT', 'ROOM'];
   static const List<String> genderOptions = ['BOYS', 'GIRLS', 'BOTH'];
@@ -101,5 +102,5 @@ class AppConstants {
   static const String keyUserName = 'user_name';
   static const String keyIsLoggedIn = 'is_logged_in';
   static const String keyThemeMode = 'theme_mode';
-  static const String keyProfileImage = 'profile_image'; // ✅ fixed
+  static const String keyProfileImage = 'profile_image'; 
 }

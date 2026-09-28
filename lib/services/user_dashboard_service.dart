@@ -152,7 +152,7 @@ class UserDashboardService {
 
   /// GET /user/support/tickets
   Future<ApiResponse<List<Map<String, dynamic>>>> getMyTickets() async {
-    try {
+    try {  
       final response = await _api.get('/user/support/tickets');
       if (response.data['success'] == true) {
         final list = response.data['data'] as List? ?? [];

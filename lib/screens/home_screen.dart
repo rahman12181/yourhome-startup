@@ -9,6 +9,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:yourhome/models/property_model.dart';
 import 'package:yourhome/providers/notification_provider.dart';
 import 'package:yourhome/screens/admin/admin_profile_screen.dart';
+import 'package:yourhome/screens/admin/admin_users_screen.dart';
 import 'package:yourhome/screens/booking/first_booking_discount_screen.dart';
 import 'package:yourhome/screens/owner/owner_profile_screen.dart';
 import 'package:yourhome/screens/reels/reels_feed_screen.dart';
@@ -36,7 +37,6 @@ import 'owner/owner_property_management_page.dart';
 import 'owner/owner_booking_management_page.dart';
 
 import 'admin/admin_dashboard_page.dart';
-import 'admin/admin_user_management_page.dart';
 import 'admin/admin_property_management_page.dart';
 
 class _HP {
@@ -150,7 +150,7 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case 'ADMIN':
         return const [
           AdminDashboardPage(),
-          AdminUserManagementPage(),
+          AdminUsersScreen(), // Assuming you have a users management page for admin
           AdminPropertyManagementPage(),
           AdminProfileScreen(),
         ];

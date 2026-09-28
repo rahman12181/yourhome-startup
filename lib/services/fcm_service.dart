@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:yourhome/main.dart' show navigatorKey;
 import 'package:yourhome/screens/bookings/booking_list_screen.dart';
+import 'package:yourhome/screens/chat/chat_screen.dart';
 import 'package:yourhome/screens/notifications/notification_screen.dart';
 import 'package:yourhome/screens/owner/owner_booking_management_page.dart';
 import 'package:yourhome/services/api_service.dart';
@@ -18,9 +19,6 @@ class FcmService {
 
   static bool _listenersAttached = false;
 
-  /// Call ONCE from main.dart, before login state is known.
-  /// Sets up permissions, local notifications, and listeners.
-  /// Does NOT save token to server (user may not be logged in yet).
   static Future<void> initialize() async {
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -39,8 +37,6 @@ class FcmService {
 
     await _notifications.initialize(
       settings,
-      // ✅ Fires when the LOCAL notification (shown while app is foreground)
-      // is tapped. We now route this through the same navigation logic.
       onDidReceiveNotificationResponse: (response) {
         _handleNotificationTap(response.payload);
       },
@@ -56,7 +52,6 @@ class FcmService {
     }
 
     if (!_listenersAttached) {
-      // Token refresh — only push to server if user is currently logged in.
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
         print('🔄 FCM Token refreshed: $newToken');
         final loggedIn = await _storage.getAccessToken();
@@ -65,33 +60,26 @@ class FcmService {
         }
       });
 
-      // App is OPEN (foreground) when the push arrives — show a local
-      // notification. Tapping it is handled by onDidReceiveNotificationResponse above.
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         _showNotification(message);
       });
 
       FirebaseMessaging.onBackgroundMessage(_backgroundHandler);
 
-      // App was in BACKGROUND (not killed) and user tapped the system notification.
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        _navigateForType(message.data['type'], message.data['refId']);
+        _navigateFromData(message.data);
       });
 
       _listenersAttached = true;
     }
 
-    // App was fully KILLED and opened via notification tap.
     RemoteMessage? initialMessage =
         await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
-      _navigateForType(initialMessage.data['type'], initialMessage.data['refId']);
+      _navigateFromData(initialMessage.data);
     }
   }
 
-  /// Call AFTER successful login/signup, AND after auto-login/splash
-  /// check confirms an existing valid session. Safe to call multiple
-  /// times — it always re-checks login state itself.
   static Future<void> syncToken() async {
     final accessToken = await _storage.getAccessToken();
     if (accessToken == null) {
@@ -110,7 +98,6 @@ class FcmService {
     }
   }
 
-  /// Call on logout so this device stops receiving push for the old user.
   static Future<void> clearToken() async {
     try {
       await _api.dio.delete('/user/fcm-token');
@@ -130,19 +117,31 @@ class FcmService {
   }
 
   // =============================================
-  // Show system notification while app is in foreground.
-  // Payload is now a JSON string carrying BOTH type + refId, so tapping
-  // it (handled in _handleNotificationTap) can navigate exactly like the
-  // background/killed cases do.
+  // Foreground notification — build payload with all data
   // =============================================
   static void _showNotification(RemoteMessage message) {
     String title = message.notification?.title ?? 'YourHome';
     String body = message.notification?.body ?? '';
 
-    final payload = jsonEncode({
+    // Build complete payload with all chat data
+    final payloadMap = <String, dynamic>{
       'type': message.data['type'],
       'refId': message.data['refId'],
-    });
+    };
+    if (message.data['conversationId'] != null) {
+      payloadMap['conversationId'] = message.data['conversationId'];
+    }
+    if (message.data['senderId'] != null) {
+      payloadMap['senderId'] = message.data['senderId'];
+    }
+    if (message.data['senderName'] != null) {
+      payloadMap['senderName'] = message.data['senderName'];
+    }
+    if (message.data['senderPic'] != null) {
+      payloadMap['senderPic'] = message.data['senderPic'];
+    }
+
+    final payload = jsonEncode(payloadMap);
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
@@ -151,7 +150,8 @@ class FcmService {
       channelDescription: 'Notifications from Nestora',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: 'ic_notification',              // ← CHANGED
+      color: Color(0xFF0E7490),             // ← ADDED
       enableVibration: true,
       playSound: true,
     );
@@ -196,7 +196,8 @@ class FcmService {
       channelDescription: 'Notifications from Nestora',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: 'ic_notification',              // ← CHANGED
+      color: Color(0xFF0E7490),             // ← ADDED
       enableVibration: true,
       playSound: true,
     );
@@ -212,21 +213,35 @@ class FcmService {
       iOS: iosDetails,
     );
 
+    // Build complete payload
+    final payloadMap = <String, dynamic>{
+      'type': message.data['type'],
+      'refId': message.data['refId'],
+    };
+    if (message.data['conversationId'] != null) {
+      payloadMap['conversationId'] = message.data['conversationId'];
+    }
+    if (message.data['senderId'] != null) {
+      payloadMap['senderId'] = message.data['senderId'];
+    }
+    if (message.data['senderName'] != null) {
+      payloadMap['senderName'] = message.data['senderName'];
+    }
+    if (message.data['senderPic'] != null) {
+      payloadMap['senderPic'] = message.data['senderPic'];
+    }
+
     await _notifications.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
       message.notification?.title ?? 'YourHome',
       message.notification?.body ?? '',
       details,
-      payload: jsonEncode({
-        'type': message.data['type'],
-        'refId': message.data['refId'],
-      }),
+      payload: jsonEncode(payloadMap),
     );
   }
 
   // =============================================
-  // Fired when the user taps the LOCAL notification we showed ourselves
-  // (i.e. the app was OPEN/foreground when the push arrived).
+  // Tap handler (foreground local notification)
   // =============================================
   static void _handleNotificationTap(String? payload) {
     if (payload == null) return;
@@ -234,18 +249,20 @@ class FcmService {
 
     try {
       final data = jsonDecode(payload) as Map<String, dynamic>;
-      _navigateForType(data['type'] as String?, data['refId'] as String?);
+      _navigateFromData(data);
     } catch (e) {
       print('❌ Failed to parse notification payload: $e');
     }
   }
 
   // =============================================
-  // ✅ SINGLE SOURCE OF TRUTH for navigation — used by all 3 states:
-  // foreground tap, background tap, killed-app tap.
+  // NAVIGATE — handles BOOKING + CHAT
   // =============================================
-  static Future<void> _navigateForType(String? type, String? refId) async {
-    print('🔔 Navigating for type=$type, refId=$refId');
+  static Future<void> _navigateFromData(Map<String, dynamic> data) async {
+    final type = data['type'] as String?;
+    final refId = data['refId'] as String?;
+
+    print('🔔 Navigating for type=$type, refId=$refId, data=$data');
 
     final navState = navigatorKey.currentState;
     if (navState == null) {
@@ -253,16 +270,43 @@ class FcmService {
       return;
     }
 
+    // CHAT — open the specific conversation
+    if (type == 'CHAT') {
+      final convIdStr = data['conversationId']?.toString() ?? refId;
+      final conversationId = int.tryParse(convIdStr ?? '');
+      final senderId = int.tryParse(data['senderId']?.toString() ?? '');
+      final senderName = data['senderName']?.toString() ?? 'User';
+      final senderPic = data['senderPic']?.toString();
+
+      if (conversationId != null && senderId != null) {
+        navState.push(MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            conversationId: conversationId,
+            otherUserId: senderId,
+            otherUserName: senderName,
+            otherUserPic: (senderPic != null && senderPic.isNotEmpty)
+                ? senderPic
+                : null,
+          ),
+        ));
+      } else {
+        print('⚠️ Invalid CHAT notification data: convId=$conversationId, senderId=$senderId');
+        navState.push(MaterialPageRoute(
+          builder: (_) => const NotificationScreen(),
+        ));
+      }
+      return;
+    }
+
+    // BOOKING
     if (type == 'BOOKING') {
       final role = await _storage.getUserRole();
 
       if (role == 'OWNER') {
-        // Owner ko naya booking request aaya — booking management page
         navState.push(MaterialPageRoute(
           builder: (_) => const OwnerBookingManagementPage(),
         ));
       } else {
-        // Student ko uske booking ka accept/reject status mila — booking list
         navState.push(MaterialPageRoute(
           builder: (_) => const BookingListScreen(),
         ));
@@ -270,6 +314,7 @@ class FcmService {
       return;
     }
 
+    // Default
     navState.push(MaterialPageRoute(
       builder: (_) => const NotificationScreen(),
     ));

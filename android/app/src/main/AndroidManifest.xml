@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- ✅ INTERNET PERMISSIONS - YAHAN ADD KARO (manifest ke andar, application se pehle) -->
+    <!-- ✅ INTERNET PERMISSIONS -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -9,7 +9,7 @@
         android:label="yourhome"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">  <!-- ✅ HTTP ke liye -->
+        android:usesCleartextTraffic="true">
         
         <activity
             android:name=".MainActivity"
@@ -34,6 +34,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        
+        <!-- ⬇️ YEH 2 LINES ADD KARO — Notification icon ke liye ⬇️ -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+        <!-- ⬆️ YAHAN TAK ⬆️ -->
+        
     </application>
     
     <queries>

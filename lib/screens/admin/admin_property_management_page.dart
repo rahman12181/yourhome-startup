@@ -76,7 +76,8 @@ class _AdminPropertyManagementPageState
     await adminProvider.getAllPropertiesAdmin();
 
     setState(() {
-      _totalProperties = adminProvider.allProperties.length + adminProvider.pendingProperties.length;
+      _totalProperties = adminProvider.allProperties.length +
+          adminProvider.pendingProperties.length;
       _pendingCount = adminProvider.pendingProperties.length;
       _publishedCount = adminProvider.allProperties.length;
     });
@@ -102,7 +103,8 @@ class _AdminPropertyManagementPageState
             pinned: true,
             floating: true,
             elevation: 0,
-            backgroundColor: isDark ? _AdminPalette.darkBg : _AdminPalette.lightBg,
+            backgroundColor:
+                isDark ? _AdminPalette.darkBg : _AdminPalette.lightBg,
             expandedHeight: 0,
             toolbarHeight: 64,
             title: Text(
@@ -159,9 +161,12 @@ class _AdminPropertyManagementPageState
                         child: TabBarView(
                           controller: _tabController,
                           children: [
-                            _buildAllPropertiesList(context, isDark, adminProvider),
-                            _buildPendingPropertiesList(context, isDark, adminProvider),
-                            _buildPublishedPropertiesList(context, isDark, adminProvider),
+                            _buildAllPropertiesList(
+                                context, isDark, adminProvider),
+                            _buildPendingPropertiesList(
+                                context, isDark, adminProvider),
+                            _buildPublishedPropertiesList(
+                                context, isDark, adminProvider),
                           ],
                         ),
                       ),
@@ -250,7 +255,8 @@ class _AdminPropertyManagementPageState
             child: TabBar(
               controller: _tabController,
               labelColor: Colors.white,
-              unselectedLabelColor: isDark ? Colors.grey[400] : Colors.grey[600],
+              unselectedLabelColor:
+                  isDark ? Colors.grey[400] : Colors.grey[600],
               labelStyle: GoogleFonts.poppins(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -433,7 +439,7 @@ class _AdminPropertyManagementPageState
         'isPublished': p.isPublished,
         'coverImage': '',
         'availableRooms': 0,
-        'monthlyRentMin': 0,
+        'monthlyRentMin': 0.0, // ✅ FIXED: int → double
         'isVerifiedOwner': false,
         'isPending': true,
       });
@@ -450,7 +456,8 @@ class _AdminPropertyManagementPageState
         'isPublished': true,
         'coverImage': p.coverImage,
         'availableRooms': p.availableRooms,
-        'monthlyRentMin': p.monthlyRentMin ?? 0,
+        // ✅ FIXED: safe conversion to double
+        'monthlyRentMin': (p.monthlyRentMin ?? 0).toDouble(),
         'isVerifiedOwner': p.isVerifiedOwner,
         'isPending': false,
       });
@@ -571,8 +578,10 @@ class _AdminPropertyManagementPageState
     final propertyType = property['propertyType'] ?? 'PG';
     final ownerName = property['ownerName'] ?? 'Unknown Owner';
     final coverImage = property['coverImage'] ?? '';
-    final availableRooms = property['availableRooms'] ?? 0;
-    final monthlyRentMin = property['monthlyRentMin'] ?? 0;
+    final availableRooms = (property['availableRooms'] as num?)?.toInt() ?? 0;
+    // ✅ FIXED: safe conversion to double
+    final monthlyRentMin =
+        (property['monthlyRentMin'] as num?)?.toDouble() ?? 0.0;
     final isVerifiedOwner = property['isVerifiedOwner'] ?? false;
     final propertyId = property['propertyId'] ?? 0;
 
@@ -610,7 +619,7 @@ class _AdminPropertyManagementPageState
       ownerName: property.ownerName,
       coverImage: '',
       availableRooms: 0,
-      monthlyRentMin: 0,
+      monthlyRentMin: 0.0, // ✅ FIXED: int → double
       isVerifiedOwner: false,
       propertyId: property.propertyId,
       isPending: true,
@@ -635,7 +644,8 @@ class _AdminPropertyManagementPageState
       ownerName: '',
       coverImage: property.coverImage,
       availableRooms: property.availableRooms,
-      monthlyRentMin: property.monthlyRentMin ?? 0,
+      // ✅ FIXED: safe conversion to double
+      monthlyRentMin: (property.monthlyRentMin ?? 0).toDouble(),
       isVerifiedOwner: property.isVerifiedOwner,
       propertyId: property.propertyId,
       isPending: false,
@@ -728,13 +738,17 @@ class _AdminPropertyManagementPageState
                               child: Container(
                                 width: 84,
                                 height: 84,
-                                color: isDark ? Colors.grey[850] : Colors.grey[200],
+                                color: isDark
+                                    ? Colors.grey[850]
+                                    : Colors.grey[200],
                                 child: coverImage.isNotEmpty
                                     ? CachedNetworkImage(
                                         imageUrl: coverImage,
                                         fit: BoxFit.cover,
                                         placeholder: (context, url) => Container(
-                                          color: isDark ? Colors.grey[850] : Colors.grey[200],
+                                          color: isDark
+                                              ? Colors.grey[850]
+                                              : Colors.grey[200],
                                           child: const Center(
                                             child: SizedBox(
                                               width: 18,
@@ -746,16 +760,21 @@ class _AdminPropertyManagementPageState
                                             ),
                                           ),
                                         ),
-                                        errorWidget: (context, url, error) => Icon(
+                                        errorWidget:
+                                            (context, url, error) => Icon(
                                           Icons.apartment_rounded,
                                           size: 32,
-                                          color: isDark ? Colors.grey[600] : Colors.grey[400],
+                                          color: isDark
+                                              ? Colors.grey[600]
+                                              : Colors.grey[400],
                                         ),
                                       )
                                     : Icon(
                                         Icons.apartment_rounded,
                                         size: 32,
-                                        color: isDark ? Colors.grey[600] : Colors.grey[400],
+                                        color: isDark
+                                            ? Colors.grey[600]
+                                            : Colors.grey[400],
                                       ),
                               ),
                             ),
@@ -769,7 +788,8 @@ class _AdminPropertyManagementPageState
                                       ? _AdminPalette.warning
                                       : _AdminPalette.success,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  border: Border.all(
+                                      color: Colors.white, width: 1.5),
                                 ),
                                 child: Icon(
                                   isPending
@@ -792,7 +812,9 @@ class _AdminPropertyManagementPageState
                                 style: GoogleFonts.poppins(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 15,
-                                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF1A1A2E),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -800,16 +822,22 @@ class _AdminPropertyManagementPageState
                               const SizedBox(height: 3),
                               Row(
                                 children: [
-                                  Icon(Icons.location_on_rounded,
-                                      size: 12,
-                                      color: isDark ? Colors.grey[500] : Colors.grey[500]),
+                                  Icon(
+                                    Icons.location_on_rounded,
+                                    size: 12,
+                                    color: isDark
+                                        ? Colors.grey[500]
+                                        : Colors.grey[500],
+                                  ),
                                   const SizedBox(width: 2),
                                   Expanded(
                                     child: Text(
                                       '$city, $state',
                                       style: GoogleFonts.poppins(
                                         fontSize: 12,
-                                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                        color: isDark
+                                            ? Colors.grey[400]
+                                            : Colors.grey[600],
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -822,13 +850,17 @@ class _AdminPropertyManagementPageState
                                 spacing: 6,
                                 runSpacing: 6,
                                 children: [
-                                  _buildBadge(propertyType, _AdminPalette.info),
+                                  _buildBadge(
+                                      propertyType, _AdminPalette.info),
                                   _buildBadge(
                                     isPending ? 'Pending' : 'Published',
-                                    isPending ? _AdminPalette.warning : _AdminPalette.success,
+                                    isPending
+                                        ? _AdminPalette.warning
+                                        : _AdminPalette.success,
                                   ),
                                   if (isVerifiedOwner)
-                                    _buildBadge('Verified', _AdminPalette.gold,
+                                    _buildBadge(
+                                        'Verified', _AdminPalette.gold,
                                         icon: Icons.verified_rounded),
                                 ],
                               ),
@@ -840,13 +872,16 @@ class _AdminPropertyManagementPageState
                   ),
 
                   Divider(
-                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[200],
+                    color: isDark
+                        ? Colors.white.withOpacity(0.05)
+                        : Colors.grey[200],
                     height: 1,
                   ),
 
                   // Stats Row
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     child: Row(
                       children: [
                         _buildStatItem(
@@ -869,7 +904,9 @@ class _AdminPropertyManagementPageState
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,
-                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                color: isDark
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -896,17 +933,21 @@ class _AdminPropertyManagementPageState
                                 ),
                               );
                             },
-                            icon: const Icon(Icons.visibility_rounded, size: 16),
+                            icon: const Icon(Icons.visibility_rounded,
+                                size: 16),
                             label: Text('View Detail',
                                 style: GoogleFonts.poppins(
-                                    fontSize: 12, fontWeight: FontWeight.w600)),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _AdminPalette.primary,
-                              side: const BorderSide(color: _AdminPalette.primary, width: 1.3),
+                              side: const BorderSide(
+                                  color: _AdminPalette.primary, width: 1.3),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 11),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 11),
                             ),
                           ),
                         ),
@@ -916,12 +957,16 @@ class _AdminPropertyManagementPageState
                             child: Container(
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [_AdminPalette.success, Color(0xFF22C55E)],
+                                  colors: [
+                                    _AdminPalette.success,
+                                    Color(0xFF22C55E)
+                                  ],
                                 ),
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: _AdminPalette.success.withOpacity(0.3),
+                                    color: _AdminPalette.success
+                                        .withOpacity(0.3),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -930,31 +975,40 @@ class _AdminPropertyManagementPageState
                               child: ElevatedButton.icon(
                                 onPressed: () async {
                                   HapticFeedback.mediumImpact();
-                                  final success = await provider.publishProperty(propertyId);
+                                  final success = await provider
+                                      .publishProperty(propertyId);
                                   if (success && context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
                                       SnackBar(
                                         content: Row(
                                           children: [
-                                            const Icon(Icons.check_circle, color: Colors.white),
+                                            const Icon(Icons.check_circle,
+                                                color: Colors.white),
                                             const SizedBox(width: 8),
-                                            Text('Property published successfully ✅',
-                                                style: GoogleFonts.poppins()),
+                                            Text(
+                                                'Property published successfully ✅',
+                                                style:
+                                                    GoogleFonts.poppins()),
                                           ],
                                         ),
-                                        backgroundColor: _AdminPalette.success,
+                                        backgroundColor:
+                                            _AdminPalette.success,
                                         behavior: SnackBarBehavior.floating,
                                         shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12)),
+                                            borderRadius:
+                                                BorderRadius.circular(12)),
                                       ),
                                     );
                                     _loadData();
                                   }
                                 },
-                                icon: const Icon(Icons.publish_rounded, size: 16),
+                                icon: const Icon(Icons.publish_rounded,
+                                    size: 16),
                                 label: Text('Publish',
                                     style: GoogleFonts.poppins(
-                                        fontSize: 12, fontWeight: FontWeight.w600)),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
                                   shadowColor: Colors.transparent,
@@ -962,7 +1016,8 @@ class _AdminPropertyManagementPageState
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 11),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 11),
                                 ),
                               ),
                             ),
@@ -973,38 +1028,51 @@ class _AdminPropertyManagementPageState
                             child: OutlinedButton.icon(
                               onPressed: () async {
                                 HapticFeedback.mediumImpact();
-                                final success = await provider.unpublishProperty(propertyId);
+                                final success = await provider
+                                    .unpublishProperty(propertyId);
                                 if (success && context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(
                                     SnackBar(
                                       content: Row(
                                         children: [
-                                          const Icon(Icons.remove_circle, color: Colors.white),
+                                          const Icon(
+                                              Icons.remove_circle,
+                                              color: Colors.white),
                                           const SizedBox(width: 8),
                                           Text('Property unpublished',
-                                              style: GoogleFonts.poppins()),
+                                              style:
+                                                  GoogleFonts.poppins()),
                                         ],
                                       ),
-                                      backgroundColor: _AdminPalette.warning,
+                                      backgroundColor:
+                                          _AdminPalette.warning,
                                       behavior: SnackBarBehavior.floating,
                                       shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12)),
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
                                     ),
                                   );
                                   _loadData();
                                 }
                               },
-                              icon: const Icon(Icons.remove_circle_rounded, size: 16),
+                              icon: const Icon(
+                                  Icons.remove_circle_rounded,
+                                  size: 16),
                               label: Text('Unpublish',
                                   style: GoogleFonts.poppins(
-                                      fontSize: 12, fontWeight: FontWeight.w600)),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: _AdminPalette.warning,
-                                side: const BorderSide(color: _AdminPalette.warning, width: 1.3),
+                                side: const BorderSide(
+                                    color: _AdminPalette.warning,
+                                    width: 1.3),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 11),
                               ),
                             ),
                           ),
@@ -1049,11 +1117,14 @@ class _AdminPropertyManagementPageState
     );
   }
 
-  Widget _buildStatItem(IconData icon, String label, bool isDark, {Color? color}) {
+  Widget _buildStatItem(IconData icon, String label, bool isDark,
+      {Color? color}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color ?? (isDark ? Colors.grey[400] : Colors.grey[600])),
+        Icon(icon,
+            size: 14,
+            color: color ?? (isDark ? Colors.grey[400] : Colors.grey[600])),
         const SizedBox(width: 4),
         Text(
           label,

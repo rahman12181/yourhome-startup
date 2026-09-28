@@ -6,6 +6,7 @@ class PendingOwner {
   final String name;
   final String email;
   final String phone;
+  final String? profilePic; // ✅ NEW
   final String businessName;
   final String aadharNumber;
   final String panNumber;
@@ -15,7 +16,7 @@ class PendingOwner {
   final String verificationStatus;
   final String? rejectionReason;
   final String subscriptionPlan;
-  final DateTime? verifiedAt; // ✅ ADD THIS
+  final DateTime? verifiedAt;
   final DateTime createdAt;
 
   PendingOwner({
@@ -25,6 +26,7 @@ class PendingOwner {
     required this.name,
     required this.email,
     required this.phone,
+    this.profilePic, // ✅ NEW
     required this.businessName,
     required this.aadharNumber,
     required this.panNumber,
@@ -34,7 +36,7 @@ class PendingOwner {
     required this.verificationStatus,
     this.rejectionReason,
     required this.subscriptionPlan,
-    this.verifiedAt, // ✅ ADD THIS
+    this.verifiedAt,
     required this.createdAt,
   });
 
@@ -46,6 +48,7 @@ class PendingOwner {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
+      profilePic: json['profilePic'], // ✅ NEW
       businessName: json['businessName'] ?? '',
       aadharNumber: json['aadharNumber'] ?? '',
       panNumber: json['panNumber'] ?? '',
@@ -55,10 +58,11 @@ class PendingOwner {
       verificationStatus: json['verificationStatus'] ?? 'PENDING',
       rejectionReason: json['rejectionReason'],
       subscriptionPlan: json['subscriptionPlan'] ?? 'BASIC',
-      verifiedAt: json['verifiedAt'] != null 
-          ? DateTime.parse(json['verifiedAt']) 
-          : null, 
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      verifiedAt: json['verifiedAt'] != null
+          ? DateTime.parse(json['verifiedAt'])
+          : null,
+      createdAt: DateTime.parse(
+          json['createdAt'] ?? DateTime.now().toIso8601String()),
     );
   }
 
@@ -66,6 +70,8 @@ class PendingOwner {
   bool get isVerified => verificationStatus == 'VERIFIED';
   bool get isRejected => verificationStatus == 'REJECTED';
 }
+
+// ============== OWNER DETAIL ==============
 class OwnerDetail {
   final int ownerId;
   final int userId;
@@ -73,6 +79,7 @@ class OwnerDetail {
   final String name;
   final String email;
   final String phone;
+  final String? profilePic; // ✅ NEW
   final String businessName;
   final String aadharNumber;
   final String panNumber;
@@ -95,6 +102,7 @@ class OwnerDetail {
     required this.name,
     required this.email,
     required this.phone,
+    this.profilePic, // ✅ NEW
     required this.businessName,
     required this.aadharNumber,
     required this.panNumber,
@@ -119,6 +127,7 @@ class OwnerDetail {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
+      profilePic: json['profilePic'], // ✅ NEW
       businessName: json['businessName'] ?? '',
       aadharNumber: json['aadharNumber'] ?? '',
       panNumber: json['panNumber'] ?? '',
@@ -128,10 +137,11 @@ class OwnerDetail {
       verificationStatus: json['verificationStatus'] ?? 'PENDING',
       rejectionReason: json['rejectionReason'],
       subscriptionPlan: json['subscriptionPlan'] ?? 'BASIC',
-      verifiedAt: json['verifiedAt'] != null 
-          ? DateTime.parse(json['verifiedAt']) 
+      verifiedAt: json['verifiedAt'] != null
+          ? DateTime.parse(json['verifiedAt'])
           : null,
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      createdAt: DateTime.parse(
+          json['createdAt'] ?? DateTime.now().toIso8601String()),
       totalProperties: json['totalProperties'] ?? 0,
       totalRooms: json['totalRooms'] ?? 0,
       totalRevenue: json['totalRevenue']?.toDouble() ?? 0.0,
@@ -177,7 +187,8 @@ class PendingProperty {
       state: json['state'] ?? '',
       propertyType: json['propertyType'] ?? '',
       isPublished: json['isPublished'] ?? false,
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      createdAt: DateTime.parse(
+          json['createdAt'] ?? DateTime.now().toIso8601String()),
     );
   }
 
@@ -191,6 +202,7 @@ class AdminUser {
   final String name;
   final String email;
   final String? phone;
+  final String? profilePic;
   final String role;
   final bool isActive;
   final bool isEmailVerified;
@@ -202,6 +214,7 @@ class AdminUser {
     required this.name,
     required this.email,
     this.phone,
+    this.profilePic,
     required this.role,
     required this.isActive,
     required this.isEmailVerified,
@@ -215,10 +228,12 @@ class AdminUser {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'],
+      profilePic: json['profilePic'],
       role: json['role'] ?? 'STUDENT',
       isActive: json['isActive'] ?? true,
       isEmailVerified: json['isEmailVerified'] ?? false,
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      createdAt: DateTime.parse(
+          json['createdAt'] ?? DateTime.now().toIso8601String()),
     );
   }
 }
@@ -259,13 +274,15 @@ class AdminDashboardStats {
       publishedProperties: json['publishedProperties'] ?? 0,
       pendingProperties: json['pendingProperties'] ?? 0,
       totalRevenue: json['totalRevenue']?.toDouble() ?? 0.0,
-      listingSubscriptionRevenue: json['listingSubscriptionRevenue']?.toDouble() ?? 0.0,
-      propertyAccessRevenue: json['propertyAccessRevenue']?.toDouble() ?? 0.0,
+      listingSubscriptionRevenue:
+          json['listingSubscriptionRevenue']?.toDouble() ?? 0.0,
+      propertyAccessRevenue:
+          json['propertyAccessRevenue']?.toDouble() ?? 0.0,
     );
   }
 }
 
-// ============== REPORT ==============
+// ============== ADMIN REPORT ==============
 class AdminReport {
   final int id;
   final String type;
@@ -296,7 +313,8 @@ class AdminReport {
       description: json['description'],
       status: json['status'] ?? 'PENDING',
       reporterName: json['reporter']?['name'] ?? 'Unknown',
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      createdAt: DateTime.parse(
+          json['createdAt'] ?? DateTime.now().toIso8601String()),
     );
   }
 
@@ -328,17 +346,21 @@ class AdminPropertyAccessSubscription {
     required this.purchasedAt,
   });
 
-  factory AdminPropertyAccessSubscription.fromJson(Map<String, dynamic> json) {
+  factory AdminPropertyAccessSubscription.fromJson(
+      Map<String, dynamic> json) {
     return AdminPropertyAccessSubscription(
       subscriptionId: json['subscriptionId'] ?? 0,
       plan: json['plan'] ?? '',
       durationMonths: json['durationMonths'] ?? 0,
       status: json['status'] ?? 'ACTIVE',
-      startDate: DateTime.parse(json['startDate'] ?? DateTime.now().toIso8601String()),
-      endDate: DateTime.parse(json['endDate'] ?? DateTime.now().toIso8601String()),
+      startDate: DateTime.parse(
+          json['startDate'] ?? DateTime.now().toIso8601String()),
+      endDate: DateTime.parse(
+          json['endDate'] ?? DateTime.now().toIso8601String()),
       amountPaid: json['amountPaid']?.toDouble() ?? 0.0,
       paymentId: json['paymentId'] ?? '',
-      purchasedAt: DateTime.parse(json['purchasedAt'] ?? DateTime.now().toIso8601String()),
+      purchasedAt: DateTime.parse(
+          json['purchasedAt'] ?? DateTime.now().toIso8601String()),
     );
   }
 

@@ -50,7 +50,6 @@ class Conversation {
     }
   }
 
-  // ✅ NEW — copyWith method
   Conversation copyWith({
     int? conversationId,
     int? otherUserId,
@@ -74,7 +73,7 @@ class Conversation {
   }
 }
 
-// ✅ FIXED MESSAGE CLASS
+// ✅ MESSAGE CLASS (with receiverId, otherUserId, and reply fields)
 class Message {
   final int messageId;
   final int conversationId;
@@ -88,6 +87,14 @@ class Message {
   final bool isDeletedForEveryone;
   final bool isEdited;
   final DateTime? editedAt;
+  final int? receiverId;
+  final int? otherUserId;
+
+  // 🆕 REPLY FIELDS
+  final int? replyToMessageId;      // jis message ko reply kiya
+  final String? replyToContent;     // us message ka content preview
+  final String? replyToSenderName;  // us message ka sender ka naam
+  final bool? replyToIsMine;        // kya wo replied message mera tha?
 
   Message({
     required this.messageId,
@@ -102,6 +109,13 @@ class Message {
     this.isDeletedForEveryone = false,
     this.isEdited = false,
     this.editedAt,
+    this.receiverId,
+    this.otherUserId,
+    // 🆕 reply
+    this.replyToMessageId,
+    this.replyToContent,
+    this.replyToSenderName,
+    this.replyToIsMine,
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
@@ -120,32 +134,31 @@ class Message {
       isEdited: json['isEdited'] ?? false,
       editedAt:
           json['editedAt'] != null ? DateTime.parse(json['editedAt']) : null,
+      receiverId: json['receiverId'],
+      otherUserId: json['otherUserId'],
+      // 🆕 reply
+      replyToMessageId: json['replyToMessageId'],
+      replyToContent: json['replyToContent'],
+      replyToSenderName: json['replyToSenderName'],
+      replyToIsMine: json['replyToIsMine'],
     );
   }
 
-  // ✅ Getter for sent time
   String get sentTime {
     final hour = sentAt.hour.toString().padLeft(2, '0');
     final minute = sentAt.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
 
-  // ✅ Getter for isEditedNow (for backward compatibility)
   bool get isEditedNow => isEdited;
-
-  // ✅ Getter for isDeleted
   bool get isDeleted => isDeletedForEveryone;
-
-  // ✅ Getter for hasContent
   bool get hasContent => content != null && content!.isNotEmpty;
-
-  // ✅ Getter for isFromMe
   bool get isFromMe => isMine;
-
-  // ✅ Getter for isMessageRead
   bool get isMessageRead => isRead;
 
-  // ✅ Getter for displayContent
+  // 🆕 Kya ye message kisi aur message ka reply hai?
+  bool get isReply => replyToMessageId != null;
+
   String get displayContent {
     if (isDeletedForEveryone) {
       return 'This message was deleted';
@@ -153,7 +166,6 @@ class Message {
     return content ?? '';
   }
 
-  // ✅ Convert to JSON for API
   Map<String, dynamic> toJson() => {
         'messageId': messageId,
         'conversationId': conversationId,
@@ -167,9 +179,15 @@ class Message {
         'isDeletedForEveryone': isDeletedForEveryone,
         'isEdited': isEdited,
         'editedAt': editedAt?.toIso8601String(),
+        'receiverId': receiverId,
+        'otherUserId': otherUserId,
+        // 🆕 reply
+        'replyToMessageId': replyToMessageId,
+        'replyToContent': replyToContent,
+        'replyToSenderName': replyToSenderName,
+        'replyToIsMine': replyToIsMine,
       };
 
-  // ✅ CopyWith method for updates
   Message copyWith({
     int? messageId,
     int? conversationId,
@@ -183,6 +201,13 @@ class Message {
     bool? isDeletedForEveryone,
     bool? isEdited,
     DateTime? editedAt,
+    int? receiverId,
+    int? otherUserId,
+    // 🆕 reply
+    int? replyToMessageId,
+    String? replyToContent,
+    String? replyToSenderName,
+    bool? replyToIsMine,
   }) {
     return Message(
       messageId: messageId ?? this.messageId,
@@ -197,18 +222,30 @@ class Message {
       isDeletedForEveryone: isDeletedForEveryone ?? this.isDeletedForEveryone,
       isEdited: isEdited ?? this.isEdited,
       editedAt: editedAt ?? this.editedAt,
+      receiverId: receiverId ?? this.receiverId,
+      otherUserId: otherUserId ?? this.otherUserId,
+      // 🆕 reply
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      replyToContent: replyToContent ?? this.replyToContent,
+      replyToSenderName: replyToSenderName ?? this.replyToSenderName,
+      replyToIsMine: replyToIsMine ?? this.replyToIsMine,
     );
   }
 }
 
-// ✅ Send Message Request
+// ✅ Send Message Request (with optional replyToMessageId)
 class SendMessageRequest {
   final String content;
+  final int? replyToMessageId;    // 🆕
 
-  SendMessageRequest({required this.content});
+  SendMessageRequest({
+    required this.content,
+    this.replyToMessageId,
+  });
 
   Map<String, dynamic> toJson() => {
         'content': content,
+        if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
       };
 }
 

@@ -18,7 +18,7 @@ class ChatProvider extends ChangeNotifier {
   final Map<int, bool> _typingByConversation = {};
   final Map<int, Timer> _typingTimers = {};
 
-  // ✅ NEW — Unread count
+  // ✅ Unread count
   int _unreadCount = 0;
 
   List<Conversation> get conversations => _conversations;
@@ -28,7 +28,6 @@ class ChatProvider extends ChangeNotifier {
   WebSocketManager get wsManager => _wsManager;
   int? get activeConversationId => _activeConversationId;
 
-  // ✅ NEW — Getter
   int get unreadCount => _unreadCount;
 
   bool isOtherUserTyping(int conversationId) =>
@@ -56,8 +55,14 @@ class ChatProvider extends ChangeNotifier {
 
   void initWebSocket({required String token, required int userId}) {
     _wsManager.onMessageReceived = (message) {
+      // 🔥 DUPLICATE FIX: Apne hi messages ignore karo
+      // (REST response se already handle ho rahe hain)
+      if (message.isMine) {
+        print('📩 [WS] ChatProvider: Ignoring own message (isMine=true)');
+        return;
+      }
+
       _addMessage(message);
-      // ✅ NEW — Increment unread count on new message
       _unreadCount += 1;
       notifyListeners();
     };
@@ -76,6 +81,13 @@ class ChatProvider extends ChangeNotifier {
 
     _wsManager.onTypingReceived = (event) {
       _handleTypingEvent(event);
+    };
+
+    // 🆕 READ RECEIPT — global handler (blue tick ke liye)
+    _wsManager.onMessagesRead = (conversationId) {
+      if (_activeConversationId == conversationId) {
+        markAllMyMessagesAsRead();
+      }
     };
 
     _wsManager.onConnected = () {
@@ -100,7 +112,7 @@ class ChatProvider extends ChangeNotifier {
       final response = await _chatService.getConversations();
       if (response.success && response.data != null) {
         _conversations = response.data!;
-        _recalculateUnread();  // ✅ NEW
+        _recalculateUnread();
       }
     } catch (e) {
       _error = e.toString();
@@ -121,9 +133,6 @@ class ChatProvider extends ChangeNotifier {
     _setLoading(false);
   }
 
-  // ============================================
-  // ✅ NEW — Load unread count
-  // ============================================
   Future<void> loadUnreadCount() async {
     try {
       final response = await _chatService.getConversations();
@@ -135,7 +144,6 @@ class ChatProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  // ✅ NEW — Helper to calculate total unread
   void _recalculateUnread() {
     int total = 0;
     for (final c in _conversations) {
@@ -154,7 +162,13 @@ class ChatProvider extends ChangeNotifier {
     if (index != -1) {
       _messages[index] = realMessage;
     } else {
-      _messages.add(realMessage);
+      // Duplicate safety: agar already exist karta hai to add mat karo
+      final exists = _messages.any(
+        (m) => m.messageId == realMessage.messageId,
+      );
+      if (!exists) {
+        _messages.add(realMessage);
+      }
     }
     notifyListeners();
   }
@@ -230,7 +244,6 @@ class ChatProvider extends ChangeNotifier {
     try {
       await _chatService.markAsRead(conversationId);
 
-      // ✅ NEW — Reset unread count for this conversation
       final index = _conversations.indexWhere(
         (c) => c.conversationId == conversationId,
       );
@@ -240,6 +253,20 @@ class ChatProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {}
+  }
+
+  // ============================================
+  // BLUE TICK — Sender ke saare outgoing messages read mark karo
+  // ============================================
+  void markAllMyMessagesAsRead() {
+    bool changed = false;
+    for (int i = 0; i < _messages.length; i++) {
+      if (_messages[i].isMine && !_messages[i].isRead) {
+        _messages[i] = _messages[i].copyWith(isRead: true);
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
   }
 
   void sendTypingIndicator({
@@ -271,10 +298,10 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _addMessage(Message message) {
+    // Duplicate check — messageId match
     final exists = _messages.any((m) => m.messageId == message.messageId);
     if (!exists) {
       _messages.add(message);
-      // ✅ Removed print statement
     }
     _typingByConversation[message.conversationId] = false;
     notifyListeners();
@@ -314,7 +341,7 @@ class ChatProvider extends ChangeNotifier {
       if (bTime == null) return -1;
       return bTime.compareTo(aTime);
     });
-    _recalculateUnread();  // ✅ NEW
+    _recalculateUnread();
     notifyListeners();
   }
 
