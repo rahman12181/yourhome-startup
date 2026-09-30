@@ -25,16 +25,16 @@ class PaymentSummary {
 
   factory PaymentSummary.fromJson(Map<String, dynamic> json) {
     return PaymentSummary(
-      bookingRequestId: json['bookingRequestId'] ?? 0,
-      propertyTitle: json['propertyTitle'] ?? '',
-      roomNumber: json['roomNumber'] ?? '',
-      originalAmount: (json['originalAmount'] ?? 0).toDouble(),
-      eligibleForFirstBookingDiscount: json['eligibleForFirstBookingDiscount'] ?? false,
-      availableCouponCode: json['availableCouponCode'],
-      discountPercent: (json['discountPercent'] ?? 0).toDouble(),
-      estimatedDiscountAmount: (json['estimatedDiscountAmount'] ?? 0).toDouble(),
-      estimatedPayableAmount: (json['estimatedPayableAmount'] ?? 0).toDouble(),
-      alreadyPaid: json['alreadyPaid'] ?? false,
+      bookingRequestId: (json['bookingRequestId'] as num?)?.toInt() ?? 0,
+      propertyTitle: json['propertyTitle']?.toString() ?? '',
+      roomNumber: json['roomNumber']?.toString() ?? '',
+      originalAmount: (json['originalAmount'] as num?)?.toDouble() ?? 0.0,
+      eligibleForFirstBookingDiscount: json['eligibleForFirstBookingDiscount'] == true,
+      availableCouponCode: json['availableCouponCode']?.toString(),
+      discountPercent: (json['discountPercent'] as num?)?.toDouble() ?? 0.0,
+      estimatedDiscountAmount: (json['estimatedDiscountAmount'] as num?)?.toDouble() ?? 0.0,
+      estimatedPayableAmount: (json['estimatedPayableAmount'] as num?)?.toDouble() ?? 0.0,
+      alreadyPaid: json['alreadyPaid'] == true,
     );
   }
 }
@@ -60,13 +60,13 @@ class InitiatePaymentResponse {
 
   factory InitiatePaymentResponse.fromJson(Map<String, dynamic> json) {
     return InitiatePaymentResponse(
-      rentPaymentId: json['rentPaymentId'] ?? 0,
-      razorpayOrderId: json['razorpayOrderId'] ?? '',
-      amount: json['amount'] ?? 0,
-      currency: json['currency'] ?? 'INR',
-      couponApplied: json['couponApplied'],
-      discountAmount: (json['discountAmount'] ?? 0).toDouble(),
-      payableAmount: (json['payableAmount'] ?? 0).toDouble(),
+      rentPaymentId: (json['rentPaymentId'] as num?)?.toInt() ?? 0,
+      razorpayOrderId: json['razorpayOrderId']?.toString() ?? '',
+      amount: (json['amount'] as num).toInt(),
+      currency: json['currency']?.toString() ?? 'INR',
+      couponApplied: json['couponApplied']?.toString(),
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      payableAmount: (json['payableAmount'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
@@ -110,23 +110,44 @@ class ConfirmPaymentResponse {
 
   factory ConfirmPaymentResponse.fromJson(Map<String, dynamic> json) {
     return ConfirmPaymentResponse(
-      rentPaymentId: json['rentPaymentId'] ?? 0,
-      bookingRequestId: json['bookingRequestId'] ?? 0,
-      propertyTitle: json['propertyTitle'] ?? '',
-      roomNumber: json['roomNumber'] ?? '',
-      originalAmount: (json['originalAmount'] ?? 0).toDouble(),
-      couponCode: json['couponCode'],
-      discountAmount: (json['discountAmount'] ?? 0).toDouble(),
-      studentPayableAmount: (json['studentPayableAmount'] ?? 0).toDouble(),
-      ownerPayoutAmount: (json['ownerPayoutAmount'] ?? 0).toDouble(),
-      status: json['status'] ?? 'PAID',
-      razorpayPaymentId: json['razorpayPaymentId'] ?? '',
-      payoutStatus: json['payoutStatus'] ?? 'NOT_STARTED',
-      payoutTransactionRef: json['payoutTransactionRef'],
-      createdAt: json['createdAt'] ?? '',
-      paidAt: json['paidAt'] ?? '',
-      payoutAt: json['payoutAt'],
+      rentPaymentId: (json['rentPaymentId'] as num?)?.toInt() ?? 0,
+      bookingRequestId: (json['bookingRequestId'] as num?)?.toInt() ?? 0,
+      propertyTitle: json['propertyTitle']?.toString() ?? '',
+      roomNumber: json['roomNumber']?.toString() ?? '',
+      originalAmount: (json['originalAmount'] as num?)?.toDouble() ?? 0.0,
+      couponCode: json['couponCode']?.toString(),
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      studentPayableAmount: (json['studentPayableAmount'] as num?)?.toDouble() ?? 0.0,
+      ownerPayoutAmount: (json['ownerPayoutAmount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status']?.toString() ?? 'PAID',
+      razorpayPaymentId: json['razorpayPaymentId']?.toString() ?? '',
+      payoutStatus: json['payoutStatus']?.toString() ?? 'NOT_STARTED',
+      payoutTransactionRef: json['payoutTransactionRef']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
+      paidAt: json['paidAt']?.toString() ?? '',
+      payoutAt: json['payoutAt']?.toString(),
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'rentPaymentId': rentPaymentId,
+      'bookingRequestId': bookingRequestId,
+      'propertyTitle': propertyTitle,
+      'roomNumber': roomNumber,
+      'originalAmount': originalAmount,
+      'couponCode': couponCode,
+      'discountAmount': discountAmount,
+      'studentPayableAmount': studentPayableAmount,
+      'ownerPayoutAmount': ownerPayoutAmount,
+      'status': status,
+      'razorpayPaymentId': razorpayPaymentId,
+      'payoutStatus': payoutStatus,
+      'payoutTransactionRef': payoutTransactionRef,
+      'createdAt': createdAt,
+      'paidAt': paidAt,
+      'payoutAt': payoutAt,
+    };
   }
 }
 
@@ -167,21 +188,21 @@ class RentPayment {
 
   factory RentPayment.fromJson(Map<String, dynamic> json) {
     return RentPayment(
-      rentPaymentId: json['rentPaymentId'] ?? 0,
-      bookingRequestId: json['bookingRequestId'] ?? 0,
-      propertyTitle: json['propertyTitle'] ?? '',
-      roomNumber: json['roomNumber'] ?? '',
-      originalAmount: (json['originalAmount'] ?? 0).toDouble(),
-      couponCode: json['couponCode'],
-      discountAmount: (json['discountAmount'] ?? 0).toDouble(),
-      studentPayableAmount: (json['studentPayableAmount'] ?? 0).toDouble(),
-      status: json['status'] ?? 'CREATED',
-      razorpayPaymentId: json['razorpayPaymentId'] ?? '',
-      payoutStatus: json['payoutStatus'] ?? 'NOT_STARTED',
-      payoutTransactionRef: json['payoutTransactionRef'],
-      createdAt: json['createdAt'] ?? '',
-      paidAt: json['paidAt'],
-      payoutAt: json['payoutAt'],
+      rentPaymentId: (json['rentPaymentId'] as num?)?.toInt() ?? 0,
+      bookingRequestId: (json['bookingRequestId'] as num?)?.toInt() ?? 0,
+      propertyTitle: json['propertyTitle']?.toString() ?? '',
+      roomNumber: json['roomNumber']?.toString() ?? '',
+      originalAmount: (json['originalAmount'] as num?)?.toDouble() ?? 0.0,
+      couponCode: json['couponCode']?.toString(),
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      studentPayableAmount: (json['studentPayableAmount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status']?.toString() ?? 'CREATED',
+      razorpayPaymentId: json['razorpayPaymentId']?.toString() ?? '',
+      payoutStatus: json['payoutStatus']?.toString() ?? 'NOT_STARTED',
+      payoutTransactionRef: json['payoutTransactionRef']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
+      paidAt: json['paidAt']?.toString(),
+      payoutAt: json['payoutAt']?.toString(),
     );
   }
 }
@@ -227,23 +248,23 @@ class OwnerPayment {
 
   factory OwnerPayment.fromJson(Map<String, dynamic> json) {
     return OwnerPayment(
-      rentPaymentId: json['rentPaymentId'] ?? 0,
-      bookingRequestId: json['bookingRequestId'] ?? 0,
-      propertyTitle: json['propertyTitle'] ?? '',
-      roomNumber: json['roomNumber'] ?? '',
-      originalAmount: (json['originalAmount'] ?? 0).toDouble(),
-      couponCode: json['couponCode'],
-      discountAmount: (json['discountAmount'] ?? 0).toDouble(),
-      ownerPayoutAmount: (json['ownerPayoutAmount'] ?? 0).toDouble(),
-      status: json['status'] ?? 'PAID',
-      payoutStatus: json['payoutStatus'] ?? 'NOT_STARTED',
-      payoutTransactionRef: json['payoutTransactionRef'],
-      studentId: json['studentId'] ?? 0,
-      studentName: json['studentName'] ?? '',
-      studentDisplayId: json['studentDisplayId'] ?? '',
-      createdAt: json['createdAt'] ?? '',
-      paidAt: json['paidAt'],
-      payoutAt: json['payoutAt'],
+      rentPaymentId: (json['rentPaymentId'] as num?)?.toInt() ?? 0,
+      bookingRequestId: (json['bookingRequestId'] as num?)?.toInt() ?? 0,
+      propertyTitle: json['propertyTitle']?.toString() ?? '',
+      roomNumber: json['roomNumber']?.toString() ?? '',
+      originalAmount: (json['originalAmount'] as num?)?.toDouble() ?? 0.0,
+      couponCode: json['couponCode']?.toString(),
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      ownerPayoutAmount: (json['ownerPayoutAmount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status']?.toString() ?? 'PAID',
+      payoutStatus: json['payoutStatus']?.toString() ?? 'NOT_STARTED',
+      payoutTransactionRef: json['payoutTransactionRef']?.toString(),
+      studentId: (json['studentId'] as num?)?.toInt() ?? 0,
+      studentName: json['studentName']?.toString() ?? '',
+      studentDisplayId: json['studentDisplayId']?.toString() ?? '',
+      createdAt: json['createdAt']?.toString() ?? '',
+      paidAt: json['paidAt']?.toString(),
+      payoutAt: json['payoutAt']?.toString(),
     );
   }
 }
@@ -287,22 +308,22 @@ class AdminRentPayment {
 
   factory AdminRentPayment.fromJson(Map<String, dynamic> json) {
     return AdminRentPayment(
-      rentPaymentId: json['rentPaymentId'] ?? 0,
-      bookingRequestId: json['bookingRequestId'] ?? 0,
-      propertyTitle: json['propertyTitle'] ?? '',
-      originalAmount: (json['originalAmount'] ?? 0).toDouble(),
-      couponCode: json['couponCode'],
-      discountAmount: (json['discountAmount'] ?? 0).toDouble(),
-      studentPayableAmount: (json['studentPayableAmount'] ?? 0).toDouble(),
-      ownerPayoutAmount: (json['ownerPayoutAmount'] ?? 0).toDouble(),
-      status: json['status'] ?? 'PAID',
-      payoutStatus: json['payoutStatus'] ?? 'NOT_STARTED',
-      payoutTransactionRef: json['payoutTransactionRef'],
-      studentId: json['studentId'] ?? 0,
-      studentName: json['studentName'] ?? '',
-      studentDisplayId: json['studentDisplayId'] ?? '',
-      createdAt: json['createdAt'] ?? '',
-      paidAt: json['paidAt'],
+      rentPaymentId: (json['rentPaymentId'] as num?)?.toInt() ?? 0,
+      bookingRequestId: (json['bookingRequestId'] as num?)?.toInt() ?? 0,
+      propertyTitle: json['propertyTitle']?.toString() ?? '',
+      originalAmount: (json['originalAmount'] as num?)?.toDouble() ?? 0.0,
+      couponCode: json['couponCode']?.toString(),
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      studentPayableAmount: (json['studentPayableAmount'] as num?)?.toDouble() ?? 0.0,
+      ownerPayoutAmount: (json['ownerPayoutAmount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status']?.toString() ?? 'PAID',
+      payoutStatus: json['payoutStatus']?.toString() ?? 'NOT_STARTED',
+      payoutTransactionRef: json['payoutTransactionRef']?.toString(),
+      studentId: (json['studentId'] as num?)?.toInt() ?? 0,
+      studentName: json['studentName']?.toString() ?? '',
+      studentDisplayId: json['studentDisplayId']?.toString() ?? '',
+      createdAt: json['createdAt']?.toString() ?? '',
+      paidAt: json['paidAt']?.toString(),
     );
   }
 }

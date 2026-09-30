@@ -34,6 +34,9 @@ class PropertyDetailScreen extends StatefulWidget {
 class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late PageController _pageController;
+  final ValueNotifier<int> _imageIndex = ValueNotifier<int>(0);
+
   bool _isLoading = true;
   bool _isSaved = false;
   String? _error;
@@ -42,11 +45,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   List<Review> _reviews = [];
   int _selectedTabIndex = 0;
 
-  int? _activeBookingRequestId;
-  int? _activeRoomId;
-  String? _bookingStatus;
+  List<BookingRequest> _myBookings = [];
   Set<int> _bookedRoomIds = {};
-  int _paidBookingsCount = 0;
   bool _isCheckingBooking = false;
 
   bool _isUserLoggedIn = false;
@@ -66,14 +66,22 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
         _selectedTabIndex = _tabController.index;
       });
     });
-    _checkLoginStatus();
-    _loadPropertyDetail();
+    _pageController = PageController();
+    _init();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _pageController.dispose();
+    _imageIndex.dispose();
     super.dispose();
+  }
+
+  Future<void> _init() async {
+    await _checkLoginStatus();
+    if (!mounted) return;
+    await _loadPropertyDetail();
   }
 
   Future<void> _checkLoginStatus() async {
@@ -89,11 +97,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
         });
       }
 
-      debugPrint('═══════════════════════════════════════');
-      debugPrint('🔐 LOGIN STATUS CHECK');
-      debugPrint('   Token exists: ${token != null}');
-      debugPrint('   Is logged in: $isLoggedIn');
-      debugPrint('═══════════════════════════════════════');
+      debugPrint('🔐 LOGIN STATUS: token exists = ${token != null}, '
+          'logged in = $isLoggedIn');
     } catch (e) {
       debugPrint('❌ Login check error: $e');
       if (mounted) {
@@ -103,7 +108,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   }
 
   Future<void> _loadPropertyDetail() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     final propertyProvider =
         Provider.of<PropertyProvider>(context, listen: false);
@@ -117,12 +125,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       _rooms = propertyProvider.rooms;
       _isSaved = propertyProvider.savedProperties
           .any((p) => p.propertyId == property.propertyId);
+      _imageIndex.value = 0;
 
-      debugPrint('═══════════════════════════════════════');
       debugPrint('✅ PROPERTY: ${property.title}');
       debugPrint('✅ ROOMS COUNT: ${_rooms.length}');
-      debugPrint('✅ ROOMS: ${_rooms.map((r) => "${r.roomNumber}|${r.status}").toList()}');
-      debugPrint('═══════════════════════════════════════');
+      debugPrint('✅ IMAGES COUNT: ${_galleryImages.length}');
 
       if (_isUserLoggedIn) {
         await _checkActiveBooking();
@@ -132,6 +139,54 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     }
 
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  List<String> get _galleryImages {
+    final p = _property;
+    if (p == null) return [];
+
+    final urls = <String>[];
+    for (final m in p.media) {
+      if (m.mediaType == 'IMAGE' && m.url.isNotEmpty && !urls.contains(m.url)) {
+        urls.add(m.url);
+      }
+    }
+
+    if (p.coverImage.isNotEmpty) {
+      urls.remove(p.coverImage);
+      urls.insert(0, p.coverImage);
+    }
+    return urls;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // BOOKING LOGIC — FIXED
+  // ══════════════════════════════════════════════════════════
+
+  /// Booking is "paid" if:
+  /// - isPaid flag is true, OR
+  /// - status equals 'PAID', OR
+  /// - status equals 'COMPLETED'
+  bool _isBookingPaid(BookingRequest b) {
+    final s = (b.status ?? '').toUpperCase();
+    return b.isPaid == true || s == 'PAID' || s == 'COMPLETED';
+  }
+
+  /// Booking is "awaiting payment" if:
+  /// - status is ACCEPTED AND not paid yet
+  bool _isBookingAwaitingPayment(BookingRequest b) {
+    final s = (b.status ?? '').toUpperCase();
+    return s == 'ACCEPTED' && !_isBookingPaid(b);
+  }
+
+  /// Booking is active (should be shown in MyBookings section) if:
+  /// - PENDING, ACCEPTED, or PAID
+  bool _isBookingActive(BookingRequest b) {
+    final s = (b.status ?? '').toUpperCase();
+    if (s == 'PENDING' || s == 'ACCEPTED' || s == 'PAID' || s == 'COMPLETED') {
+      return true;
+    }
+    return _isBookingPaid(b);
   }
 
   Future<void> _checkActiveBooking() async {
@@ -144,68 +199,49 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       final response = await bookingService.getMyBookings();
 
       if (response.success && response.data != null) {
-        final bookings = response.data!;
-
-        // Sirf is property ki bookings
-        final propertyBookings = bookings
+        final propertyBookings = response.data!
             .where((b) => b.propertyId == widget.propertyId)
             .toList();
 
-        BookingRequest? acceptedUnpaidBooking;
-        BookingRequest? pendingBooking;
-        int paidCount = 0;
         final Set<int> bookedRoomIds = {};
-
-        debugPrint('═══════════════════════════════════════');
-        debugPrint('📋 BOOKINGS FOR PROPERTY ${widget.propertyId}');
+        final List<BookingRequest> active = [];
 
         for (final booking in propertyBookings) {
-          debugPrint(
-              '   #${booking.requestId} | roomId: ${booking.roomId} | status: ${booking.status} | isPaid: ${booking.isPaid}');
+          if (!_isBookingActive(booking)) continue;
 
-          // Track booked rooms (PENDING, ACCEPTED, PAID — sab)
+          active.add(booking);
+
           if (booking.roomId != null) {
-            if (booking.status == 'PENDING' ||
-                booking.status == 'ACCEPTED' ||
-                booking.isPaid) {
-              bookedRoomIds.add(booking.roomId!);
-            }
-          }
-
-          if (booking.status == 'ACCEPTED' && booking.isPaid) {
-            paidCount++;
-          } else if (booking.status == 'ACCEPTED' && !booking.isPaid) {
-            acceptedUnpaidBooking = booking;
-          } else if (booking.status == 'PENDING') {
-            pendingBooking = booking;
+            bookedRoomIds.add(booking.roomId!);
           }
         }
-        debugPrint('   Booked room IDs: $bookedRoomIds');
-        debugPrint('   Paid bookings count: $paidCount');
-        debugPrint('═══════════════════════════════════════');
+
+        // Sort:
+        // 0. ACCEPTED but not paid → Pay Now (top)
+        // 1. PENDING → Waiting for owner
+        // 2. PAID → Paid & Booked
+        int rank(BookingRequest b) {
+          if (_isBookingAwaitingPayment(b)) return 0;
+          final s = (b.status ?? '').toUpperCase();
+          if (s == 'PENDING') return 1;
+          return 2;
+        }
+
+        active.sort((a, b) => rank(a).compareTo(rank(b)));
+
+        debugPrint('════════════════════════════════════════');
+        debugPrint('📋 Active bookings: ${active.length}');
+        debugPrint('   booked rooms: $bookedRoomIds');
+        for (final b in active) {
+          debugPrint('   → #${b.requestId} room=${b.roomId} '
+              'status=${b.status} isPaid=${b.isPaid}');
+        }
+        debugPrint('════════════════════════════════════════');
 
         if (mounted) {
           setState(() {
             _bookedRoomIds = bookedRoomIds;
-            _paidBookingsCount = paidCount;
-
-            if (acceptedUnpaidBooking != null) {
-              _activeBookingRequestId = acceptedUnpaidBooking!.requestId;
-              _activeRoomId = acceptedUnpaidBooking.roomId;
-              _bookingStatus = 'ACCEPTED';
-            } else if (pendingBooking != null) {
-              _activeBookingRequestId = pendingBooking!.requestId;
-              _activeRoomId = pendingBooking.roomId;
-              _bookingStatus = 'PENDING';
-            } else if (paidCount > 0) {
-              _activeBookingRequestId = null;
-              _activeRoomId = null;
-              _bookingStatus = 'PAID';
-            } else {
-              _activeBookingRequestId = null;
-              _activeRoomId = null;
-              _bookingStatus = null;
-            }
+            _myBookings = active;
           });
         }
       }
@@ -214,6 +250,81 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     }
 
     if (mounted) setState(() => _isCheckingBooking = false);
+  }
+
+  List<Room> get _availableRoomsForUser => _rooms
+      .where(
+          (r) => r.status == 'AVAILABLE' && !_bookedRoomIds.contains(r.roomId))
+      .toList();
+
+  BookingRequest? _bookingForRoom(int roomId) {
+    for (final b in _myBookings) {
+      if (b.roomId == roomId) return b;
+    }
+    return null;
+  }
+
+  bool _needsPayment(BookingRequest? b) =>
+      b != null && _isBookingAwaitingPayment(b);
+
+  bool _isPaid(BookingRequest? b) => b != null && _isBookingPaid(b);
+
+  String _bookingLabel(BookingRequest b) {
+    if (_isBookingPaid(b)) return 'Paid & Booked';
+    final s = (b.status ?? '').toUpperCase();
+    if (s == 'ACCEPTED') return 'Approved • Payment pending';
+    if (s == 'PENDING') return 'Waiting for owner';
+    return b.status ?? '';
+  }
+
+  Color _bookingColor(BookingRequest b) {
+    if (_isBookingPaid(b)) return Colors.green;
+    final s = (b.status ?? '').toUpperCase();
+    if (s == 'ACCEPTED') return Colors.orange;
+    return Colors.blue;
+  }
+
+  String _roomStateLabel(BookingRequest? b) {
+    if (b == null) return 'Booked';
+    if (_isBookingPaid(b)) return 'Booked';
+    final s = (b.status ?? '').toUpperCase();
+    if (s == 'ACCEPTED') return 'Approved';
+    return 'Requested';
+  }
+
+  String _roomLabel(int? roomId) {
+    if (roomId == null) return 'Any available room';
+    for (final r in _rooms) {
+      if (r.roomId == roomId) return 'Room ${r.roomNumber ?? r.roomId}';
+    }
+    return 'Room #$roomId';
+  }
+
+  Future<void> _payForBooking(BookingRequest booking) async {
+    if (_property == null) return;
+
+    Room? room;
+    for (final r in _rooms) {
+      if (r.roomId == booking.roomId) {
+        room = r;
+        break;
+      }
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingPaymentScreen(
+          bookingRequestId: booking.requestId,
+          propertyTitle: _property!.title,
+          roomNumber: room?.roomNumber ?? 'N/A',
+          originalAmount:
+              room?.monthlyRent ?? _property!.monthlyRentMin ?? 10000,
+        ),
+      ),
+    );
+
+    if (mounted) _checkActiveBooking();
   }
 
   Future<void> _toggleSave() async {
@@ -326,7 +437,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     }
   }
 
-  Future<void> _bookNow({bool forceNew = false}) async {
+  Future<void> _bookNow() async {
     if (!_isUserLoggedIn) {
       _showLoginPrompt();
       return;
@@ -334,54 +445,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
 
     if (_property == null) return;
 
-    // Agar forceNew nahi hai — purane status check karo
-    if (!forceNew) {
-      // ACCEPTED unpaid → Pay Now
-      if (_activeBookingRequestId != null && _bookingStatus == 'ACCEPTED') {
-        final activeRoom = _rooms.firstWhere(
-          (r) => r.roomId == _activeRoomId,
-          orElse: () => _rooms.isNotEmpty
-              ? _rooms.first
-              : Room(
-                  roomId: 0,
-                  roomType: 'SINGLE',
-                  monthlyRent: 0,
-                  capacity: 1,
-                ),
-        );
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BookingPaymentScreen(
-              bookingRequestId: _activeBookingRequestId!,
-              propertyTitle: _property!.title,
-              roomNumber: activeRoom.roomNumber ?? 'N/A',
-              originalAmount: _property!.monthlyRentMin ?? 10000,
-            ),
-          ),
-        );
-        return;
-      }
-
-      // PENDING → snackbar
-      if (_activeBookingRequestId != null && _bookingStatus == 'PENDING') {
-        _showSnack(
-          icon: Icons.hourglass_top_rounded,
-          iconColor: Colors.white,
-          text:
-              'You have a pending request. Please wait for owner response.',
-          bg: Colors.orange[700]!,
-        );
-        return;
-      }
-    }
-
-    // ✅ Check karo koi available room hai kya (booked ke alawa)
-    final availableRooms = _rooms
-        .where((r) =>
-            r.status == 'AVAILABLE' && !_bookedRoomIds.contains(r.roomId))
-        .toList();
+    final availableRooms = _availableRoomsForUser;
 
     if (availableRooms.isEmpty) {
       _showSnack(
@@ -395,7 +459,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
       return;
     }
 
-    // Bottom sheet kholo — booked rooms exclude karke
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -675,6 +738,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
             ),
           const SizedBox(height: 18),
           _buildBookingActionButton(isDark),
+          _buildMyBookingsSection(isDark),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -709,188 +773,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  Widget _buildBookingActionButton(bool isDark) {
-    if (_isCheckingLogin) {
-      return _loadingButton(isDark);
-    }
-
-    if (_isCheckingBooking) {
-      return _loadingButton(isDark);
-    }
-
-    // CASE 1: ACCEPTED unpaid → Pay Now
-    if (_activeBookingRequestId != null && _bookingStatus == 'ACCEPTED') {
-      return SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [_primary, _primary.withOpacity(0.8)],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: _primary.withOpacity(0.35),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: _bookNow,
-              child: Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.payment_rounded,
-                        color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Pay Now',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // CASE 2: PENDING → waiting card
-    if (_activeBookingRequestId != null && _bookingStatus == 'PENDING') {
-      return Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.orange.withOpacity(0.3),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.hourglass_top_rounded,
-                    color: Colors.orange, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  '⏳ Booking Request Pending',
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.orange,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    // CASE 3: PAID → Already booked + Book Another Room
-    if (_bookingStatus == 'PAID' && _paidBookingsCount > 0) {
-      final hasAvailableRooms = _rooms.any((r) =>
-          r.status == 'AVAILABLE' && !_bookedRoomIds.contains(r.roomId));
-
-      return Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.green.withOpacity(0.3),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.check_circle_rounded,
-                    color: Colors.green, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  _paidBookingsCount > 1
-                      ? '✅ $_paidBookingsCount Rooms Booked'
-                      : '✅ Already Booked',
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (hasAvailableRooms) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [_primary, _primary.withOpacity(0.75)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _primary.withOpacity(0.35),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => _bookNow(forceNew: true),
-                    child: Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.add_rounded,
-                              color: Colors.white, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Book Another Room',
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      );
-    }
-
-    // CASE 4: No booking → Book Now
+  Widget _gradientButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return SizedBox(
       width: double.infinity,
       height: 52,
@@ -912,19 +799,15 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: _isUserLoggedIn ? _bookNow : _showLoginPrompt,
+            onTap: onTap,
             child: Center(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    _isUserLoggedIn ? Icons.bolt : Icons.login_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  Icon(icon, color: Colors.white, size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    _isUserLoggedIn ? 'Book Now' : 'Login to Book',
+                    label,
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -937,6 +820,231 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBookingActionButton(bool isDark) {
+    if (_isCheckingLogin || _isCheckingBooking) {
+      return _loadingButton(isDark);
+    }
+
+    if (!_isUserLoggedIn) {
+      return _gradientButton(
+        icon: Icons.login_rounded,
+        label: 'Login to Book',
+        onTap: _showLoginPrompt,
+      );
+    }
+
+    if (_availableRoomsForUser.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.grey.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.info_outline, color: Colors.grey[600], size: 18),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                _myBookings.isNotEmpty
+                    ? 'You have booked all available rooms'
+                    : 'No rooms available right now',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _gradientButton(
+      icon: _myBookings.isEmpty ? Icons.bolt : Icons.add_rounded,
+      label: _myBookings.isEmpty ? 'Book Now' : 'Book Another Room',
+      onTap: _bookNow,
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // FIXED: "Your Bookings Here" section
+  // ══════════════════════════════════════════════════════════
+  Widget _buildMyBookingsSection(bool isDark) {
+    if (!_isUserLoggedIn || _myBookings.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Icon(Icons.bookmark_rounded, size: 16, color: _primary),
+            const SizedBox(width: 6),
+            Text(
+              'Your bookings here',
+              style: GoogleFonts.poppins(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ..._myBookings.map((b) => _buildMyBookingTile(b, isDark)),
+      ],
+    );
+  }
+
+  Widget _buildMyBookingTile(BookingRequest booking, bool isDark) {
+    final color = _bookingColor(booking);
+    final needsPay = _needsPayment(booking);
+    final paid = _isPaid(booking);
+
+    IconData leadingIcon;
+    if (paid) {
+      leadingIcon = Icons.check_circle_rounded;
+    } else if (needsPay) {
+      leadingIcon = Icons.verified_rounded;
+    } else {
+      leadingIcon = Icons.hourglass_top_rounded;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(isDark ? 0.12 : 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            leadingIcon,
+            color: color,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _roomLabel(booking.roomId),
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (paid) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check_circle,
+                                size: 10, color: Colors.green),
+                            const SizedBox(width: 3),
+                            Text(
+                              'PAID',
+                              style: GoogleFonts.poppins(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.green,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _bookingLabel(booking),
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Pay Now button ONLY when payment actually needed
+          if (needsPay)
+            ElevatedButton.icon(
+              onPressed: () => _payForBooking(booking),
+              icon: const Icon(Icons.payment_rounded, size: 16),
+              label: Text(
+                'Pay Now',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            )
+          else if (paid)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.verified_rounded,
+                      size: 14, color: Colors.green),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Booked',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -996,8 +1104,109 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
+  Widget _galleryNetworkImage(String url) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          color: Colors.grey[300],
+          child: const Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+          ),
+        );
+      },
+      errorBuilder: (_, __, ___) => Container(
+        color: Colors.grey[300],
+        child: const Icon(
+          Icons.image_not_supported,
+          size: 64,
+          color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageSlider() {
+    final images = _galleryImages;
+
+    if (images.isEmpty) {
+      return Container(
+        color: Colors.grey[300],
+        child: const Icon(
+          Icons.house,
+          size: 64,
+          color: Colors.grey,
+        ),
+      );
+    }
+
+    if (images.length == 1) {
+      return _galleryNetworkImage(images.first);
+    }
+
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: images.length,
+      onPageChanged: (i) => _imageIndex.value = i,
+      itemBuilder: (_, i) => _galleryNetworkImage(images[i]),
+    );
+  }
+
+  Widget _buildImageIndicator(int count) {
+    return ValueListenableBuilder<int>(
+      valueListenable: _imageIndex,
+      builder: (_, index, __) {
+        if (count > 8) {
+          return Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${index + 1} / $count',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(count, (i) {
+            final active = i == index;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: active ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: active ? Colors.white : Colors.white54,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
   Widget _buildAppBar(bool isDark, Color bodyColor) {
     final property = _property!;
+    final imageCount = _galleryImages.length;
 
     return SliverAppBar(
       expandedHeight: 320,
@@ -1027,67 +1236,85 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
         background: Stack(
           fit: StackFit.expand,
           children: [
-            property.coverImage.isNotEmpty
-                ? Image.network(
-                    property.coverImage,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.image_not_supported,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  )
-                : Container(
-                    color: Colors.grey[300],
-                    child: const Icon(
-                      Icons.house,
-                      size: 64,
-                      color: Colors.grey,
-                    ),
-                  ),
+            _buildImageSlider(),
             Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.0, 0.55, 1.0],
-                    colors: [
-                      Colors.black.withOpacity(0.35),
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.85),
-                    ],
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: const [0.0, 0.55, 1.0],
+                      colors: [
+                        Colors.black.withOpacity(0.35),
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.85),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
             Positioned(
-              bottom: 18,
+              bottom: 28,
               left: 18,
               right: 18,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      if (property.isVerifiedOwner)
+              child: IgnorePointer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (property.isVerifiedOwner)
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified,
+                                    color: Colors.white, size: 13),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Verified Owner',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         Container(
-                          margin: const EdgeInsets.only(right: 8),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                              colors: [Color(0xFFF7971E), Color(0xFFFFD200)],
                             ),
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.green.withOpacity(0.4),
+                                color: Colors.orange.withOpacity(0.35),
                                 blurRadius: 8,
                                 offset: const Offset(0, 3),
                               ),
@@ -1096,11 +1323,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.verified,
+                              const Icon(Icons.play_circle_fill,
                                   color: Colors.white, size: 13),
                               const SizedBox(width: 4),
                               Text(
-                                'Verified Owner',
+                                'Tour Available',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontSize: 10,
@@ -1110,64 +1337,39 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                             ],
                           ),
                         ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFF7971E), Color(0xFFFFD200)],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.orange.withOpacity(0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.play_circle_fill,
-                                color: Colors.white, size: 13),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Tour Available',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    property.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.1,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withOpacity(0.4),
-                          blurRadius: 8,
-                        ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    Text(
+                      property.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.1,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withOpacity(0.4),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+            if (imageCount > 1)
+              Positioned(
+                bottom: 8,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: _buildImageIndicator(imageCount),
+                ),
+              ),
           ],
         ),
       ),
@@ -1693,6 +1895,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   Widget _buildRoomCard(Room room, bool isDark) {
     final isAvailable = room.status == 'AVAILABLE';
     final isBooked = _bookedRoomIds.contains(room.roomId);
+    final booking = _bookingForRoom(room.roomId);
+    final bookedColor = booking != null ? _bookingColor(booking) : Colors.green;
+    final needsPay = _needsPayment(booking);
+    final paid = _isPaid(booking);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1709,7 +1915,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
         ],
         border: Border.all(
           color: isBooked
-              ? Colors.green.withOpacity(0.4)
+              ? bookedColor.withOpacity(0.4)
               : (isAvailable
                   ? const Color(0xFF11998E).withOpacity(0.25)
                   : Colors.transparent),
@@ -1726,7 +1932,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: isBooked
-                    ? [Colors.green, Colors.green.shade400]
+                    ? [bookedColor, bookedColor.withOpacity(0.6)]
                     : (isAvailable
                         ? [const Color(0xFF11998E), const Color(0xFF38EF7D)]
                         : [Colors.grey, Colors.grey.shade400]),
@@ -1755,15 +1961,15 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.15),
+                          color: bookedColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          'YOURS',
+                          paid ? 'PAID' : 'YOURS',
                           style: GoogleFonts.poppins(
                             fontSize: 8,
                             fontWeight: FontWeight.w800,
-                            color: Colors.green,
+                            color: bookedColor,
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -1833,7 +2039,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: isBooked
-                      ? Colors.green
+                      ? bookedColor
                       : (isAvailable ? _primary : Colors.grey),
                 ),
               ),
@@ -1849,7 +2055,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
                   color: isBooked
-                      ? Colors.green.withOpacity(0.15)
+                      ? bookedColor.withOpacity(0.15)
                       : (isAvailable
                           ? const Color(0xFF11998E).withOpacity(0.1)
                           : Colors.grey.withOpacity(0.1)),
@@ -1857,12 +2063,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                 ),
                 child: Text(
                   isBooked
-                      ? 'Booked'
+                      ? _roomStateLabel(booking)
                       : (isAvailable ? 'Available' : 'Occupied'),
                   style: GoogleFonts.poppins(
                     fontSize: 9,
                     color: isBooked
-                        ? Colors.green
+                        ? bookedColor
                         : (isAvailable
                             ? const Color(0xFF11998E)
                             : Colors.grey),
@@ -1870,6 +2076,29 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                   ),
                 ),
               ),
+              if (needsPay) ...[
+                const SizedBox(height: 6),
+                ElevatedButton(
+                  onPressed: () => _payForBooking(booking!),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    minimumSize: const Size(0, 28),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Pay Now',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
@@ -2212,7 +2441,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
 }
 
 // ══════════════════════════════════════════════════════════════
-// BOOKING BOTTOM SHEET — Updated
+// BOOKING BOTTOM SHEET
 // ══════════════════════════════════════════════════════════════
 class BookingBottomSheet extends StatefulWidget {
   final Property property;
@@ -2607,7 +2836,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
   }
 
   Widget _buildRoomSelector(bool isDark) {
-    // Available rooms — already booked by user excluded
     final availableRooms = _allRooms
         .where((r) =>
             r.status == 'AVAILABLE' &&
@@ -2616,7 +2844,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
 
     return Column(
       children: [
-        // "Any Available Room" option (only if available rooms exist)
         if (availableRooms.isNotEmpty)
           _roomOptionCard(
             isDark: isDark,
@@ -2628,8 +2855,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
             icon: Icons.auto_awesome,
           ),
         const SizedBox(height: 10),
-
-        // Show ALL rooms — booked ones disabled
         ..._allRooms.map((room) {
           final isAvailable = room.status == 'AVAILABLE';
           final isBooked = widget.bookedRoomIds.contains(room.roomId);
@@ -2660,7 +2885,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
             ),
           );
         }),
-
         if (availableRooms.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -2771,8 +2995,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                                 : (!enabled
                                     ? Colors.red[300]
                                     : Colors.grey[500]),
-                            fontWeight:
-                                isBooked ? FontWeight.w600 : null,
+                            fontWeight: isBooked ? FontWeight.w600 : null,
                           ),
                         ),
                       ],
@@ -3020,7 +3243,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
 }
 
 // ══════════════════════════════════════════════════════════════
-// REPORT DIALOG (unchanged)
+// REPORT DIALOG
 // ══════════════════════════════════════════════════════════════
 class ReportDialog extends StatefulWidget {
   final int propertyId;
@@ -3248,7 +3471,7 @@ class _ReportDialogState extends State<ReportDialog> {
 }
 
 // ══════════════════════════════════════════════════════════════
-// IN-APP VIDEO PLAYER (unchanged)
+// IN-APP VIDEO PLAYER
 // ══════════════════════════════════════════════════════════════
 class InAppVideoPlayerScreen extends StatefulWidget {
   final String videoUrl;

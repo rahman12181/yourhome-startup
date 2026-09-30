@@ -20,14 +20,19 @@ class PaymentProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // ========== 14.1 - Get Payment Summary ==========
   Future<bool> fetchPaymentSummary(int bookingRequestId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
+      debugPrint('🟡 [PaymentProvider] GET /user/bookings/$bookingRequestId/payment-summary');
+
       final response = await _api.get('/user/bookings/$bookingRequestId/payment-summary');
+
+      debugPrint('🟡 statusCode: ${response.statusCode}');
+      debugPrint('🟡 data: ${response.data}');
+
       if (response.statusCode == 200 && response.data['success'] == true) {
         _paymentSummary = PaymentSummary.fromJson(response.data['data']);
         _isLoading = false;
@@ -39,7 +44,9 @@ class PaymentProvider extends ChangeNotifier {
         notifyListeners();
         return false;
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ fetchPaymentSummary EXCEPTION: $e');
+      debugPrint('STACK: $stack');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
@@ -47,7 +54,6 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 14.2 - Initiate Payment ==========
   Future<Map<String, dynamic>> initiatePayment(
     int bookingRequestId, {
     String? couponCode,
@@ -57,18 +63,31 @@ class PaymentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final data = <String, dynamic>{};
+      final body = <String, dynamic>{};
       if (couponCode != null && couponCode.isNotEmpty) {
-        data['couponCode'] = couponCode;
+        body['couponCode'] = couponCode;
       }
+
+      debugPrint('🟡 [PaymentProvider] POST /user/bookings/$bookingRequestId/pay/initiate');
+      debugPrint('🟡 body: $body');
 
       final response = await _api.post(
         '/user/bookings/$bookingRequestId/pay/initiate',
-        data: data,
+        data: body,
       );
+
+      debugPrint('🟡 statusCode: ${response.statusCode}');
+      debugPrint('🟡 data: ${response.data}');
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         final result = InitiatePaymentResponse.fromJson(response.data['data']);
+
+        debugPrint('✅ InitiatePaymentResponse parsed');
+        debugPrint('   amount       : ${result.amount} (${result.amount.runtimeType})');
+        debugPrint('   orderId      : ${result.razorpayOrderId}');
+        debugPrint('   currency     : ${result.currency}');
+        debugPrint('   payableAmount: ${result.payableAmount}');
+
         _isLoading = false;
         notifyListeners();
         return {
@@ -85,7 +104,9 @@ class PaymentProvider extends ChangeNotifier {
           'message': _error,
         };
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ initiatePayment EXCEPTION: $e');
+      debugPrint('STACK: $stack');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
@@ -96,7 +117,6 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 14.3 - Confirm Payment ==========
   Future<Map<String, dynamic>> confirmPayment({
     required int bookingRequestId,
     required String razorpayOrderId,
@@ -108,6 +128,10 @@ class PaymentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('🟡 [PaymentProvider] POST /user/bookings/$bookingRequestId/pay/confirm');
+      debugPrint('🟡 orderId  : $razorpayOrderId');
+      debugPrint('🟡 paymentId: $razorpayPaymentId');
+
       final response = await _api.post(
         '/user/bookings/$bookingRequestId/pay/confirm',
         data: {
@@ -117,13 +141,22 @@ class PaymentProvider extends ChangeNotifier {
         },
       );
 
+      debugPrint('🟡 statusCode: ${response.statusCode}');
+      debugPrint('🟡 data: ${response.data}');
+
       if (response.statusCode == 200 && response.data['success'] == true) {
-        final result = ConfirmPaymentResponse.fromJson(response.data['data']);
+        final parsed = ConfirmPaymentResponse.fromJson(response.data['data']);
+
+        debugPrint('✅ ConfirmPaymentResponse parsed');
+        debugPrint('   status       : ${parsed.status}');
+        debugPrint('   payoutStatus : ${parsed.payoutStatus}');
+        debugPrint('   payoutRef    : ${parsed.payoutTransactionRef}');
+
         _isLoading = false;
         notifyListeners();
         return {
           'success': true,
-          'data': result,
+          'data': parsed.toMap(),
           'message': response.data['message'],
         };
       } else {
@@ -135,7 +168,9 @@ class PaymentProvider extends ChangeNotifier {
           'message': _error,
         };
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ confirmPayment EXCEPTION: $e');
+      debugPrint('STACK: $stack');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
@@ -146,7 +181,6 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 14.4 - Get My Payments (Student) ==========
   Future<bool> fetchStudentPayments() async {
     _isLoading = true;
     _error = null;
@@ -174,7 +208,6 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 14.6 - Get My Payments (Owner) ==========
   Future<bool> fetchOwnerPayments() async {
     _isLoading = true;
     _error = null;
@@ -202,7 +235,6 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 14.7 - Get All Rent Payments (Admin) ==========
   Future<bool> fetchAdminRentPayments({String? status}) async {
     _isLoading = true;
     _error = null;
@@ -239,7 +271,6 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
-  // ========== 14.5 - Set Payout UPI ID (Owner) ==========
   Future<Map<String, dynamic>> setPayoutUpi(String upiId) async {
     _isLoading = true;
     _error = null;

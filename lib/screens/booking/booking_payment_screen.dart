@@ -30,7 +30,8 @@ class BookingPaymentScreen extends StatefulWidget {
 
 class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     with TickerProviderStateMixin {
-  Razorpay? _razorpay;
+  late Razorpay _razorpay;
+
   bool _isLoading = true;
   bool _isPaying = false;
   PaymentSummary? _summary;
@@ -44,9 +45,32 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
   @override
   void initState() {
     super.initState();
-    _setupAnimations();
     _initRazorpay();
+    _setupAnimations();
     _loadPaymentSummary();
+  }
+
+  void _initRazorpay() {
+    debugPrint('════════════════════════════════════════');
+    debugPrint('🟣 Initializing Razorpay');
+    debugPrint('════════════════════════════════════════');
+
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+
+    debugPrint('✅ Razorpay initialized');
+    debugPrint('Key ID : ${AppConstants.razorpayKeyId}');
+    debugPrint('Key OK : ${AppConstants.razorpayKeyId.startsWith("rzp_")}');
+    debugPrint('════════════════════════════════════════');
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    _mainController.dispose();
+    super.dispose();
   }
 
   void _setupAnimations() {
@@ -73,80 +97,180 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     _mainController.forward();
   }
 
-  void _initRazorpay() {
-    debugPrint('🟣 Initializing Razorpay...');
-    _razorpay = Razorpay();
-    _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay!.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
-    debugPrint('✅ Razorpay initialized');
-  }
-
   Future<void> _loadPaymentSummary() async {
+    debugPrint('════════════════════════════════════════');
+    debugPrint('🟡 Loading payment summary');
+    debugPrint('bookingRequestId: ${widget.bookingRequestId}');
+    debugPrint('════════════════════════════════════════');
+
     final provider = Provider.of<PaymentProvider>(context, listen: false);
     final success = await provider.fetchPaymentSummary(widget.bookingRequestId);
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        if (success) {
-          _summary = provider.paymentSummary;
-        } else {
-          _error = provider.error ?? 'Failed to load payment details';
-        }
-      });
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+      if (success) {
+        _summary = provider.paymentSummary;
+        debugPrint('✅ Summary loaded');
+        debugPrint('   originalAmount   : ${_summary?.originalAmount}');
+        debugPrint('   payableAmount    : ${_summary?.estimatedPayableAmount}');
+        debugPrint('   eligibleDiscount : ${_summary?.eligibleForFirstBookingDiscount}');
+      } else {
+        _error = provider.error ?? 'Failed to load payment details';
+        debugPrint('❌ Summary load failed: $_error');
+      }
+    });
+  }
+
+  Future<void> _payNow() async {
+    if (_isPaying) return;
+
+    setState(() => _isPaying = true);
+
+    final provider = Provider.of<PaymentProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    debugPrint('════════════════════════════════════════');
+    debugPrint('🟡 STEP 1: INITIATE PAYMENT');
+    debugPrint('════════════════════════════════════════');
+
+    final result = await provider.initiatePayment(widget.bookingRequestId);
+
+    if (!mounted) return;
+
+    if (result['success'] != true) {
+      setState(() => _isPaying = false);
+      _showSnackBar(
+        result['message'] ?? 'Failed to initiate payment',
+        Colors.red[700]!,
+      );
+      return;
+    }
+
+    final data = result['data'] as InitiatePaymentResponse;
+
+    debugPrint('════════════════════════════════════════');
+    debugPrint('🔍 TYPE CHECK');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('amount runtimeType : ${data.amount.runtimeType}');
+    debugPrint('amount value       : ${data.amount}');
+    debugPrint('razorpayOrderId    : ${data.razorpayOrderId}');
+    debugPrint('currency           : ${data.currency}');
+    debugPrint('════════════════════════════════════════');
+
+    final int amountInPaise = data.amount;
+
+    if (amountInPaise <= 0) {
+      setState(() => _isPaying = false);
+      _showSnackBar('Invalid payment amount. Please retry.', Colors.red[700]!);
+      return;
+    }
+
+    if (data.razorpayOrderId.isEmpty) {
+      setState(() => _isPaying = false);
+      _showSnackBar('Invalid order ID. Please retry.', Colors.red[700]!);
+      return;
+    }
+
+    final phone = authProvider.user?.phone ?? '';
+    final email = authProvider.user?.email ?? '';
+
+    final options = {
+      'key': AppConstants.razorpayKeyId,
+      'amount': amountInPaise,
+      'currency': data.currency.isNotEmpty ? data.currency : 'INR',
+      'order_id': data.razorpayOrderId,
+      'name': AppConstants.appName,
+      'description': 'Rent Payment - ${widget.propertyTitle}',
+      'prefill': {
+        if (phone.isNotEmpty) 'contact': phone,
+        if (email.isNotEmpty) 'email': email,
+      },
+      'theme': {'color': '#2563EB'},
+      'retry': {'enabled': true, 'max_count': 2},
+      'timeout': 300,
+    };
+
+    debugPrint('════════════════════════════════════════');
+    debugPrint('🟣 STEP 2: RAZORPAY CHECKOUT OPTIONS');
+    debugPrint('════════════════════════════════════════');
+    debugPrint('$options');
+    debugPrint('════════════════════════════════════════');
+
+    try {
+      _razorpay.open(options);
+      debugPrint('✅ Razorpay.open() called');
+    } catch (e, stack) {
+      debugPrint('❌ Razorpay.open() EXCEPTION: $e');
+      debugPrint('STACK: $stack');
+      setState(() => _isPaying = false);
+      _showSnackBar('Unable to open payment checkout.', Colors.red[700]!);
     }
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    debugPrint('');
     debugPrint('════════════════════════════════════════');
-    debugPrint('✅ RAZORPAY PAYMENT SUCCESS');
+    debugPrint('✅ STEP 3: RAZORPAY PAYMENT SUCCESS');
     debugPrint('════════════════════════════════════════');
     debugPrint('Payment ID : ${response.paymentId}');
     debugPrint('Order ID   : ${response.orderId}');
     debugPrint('Signature  : ${response.signature}');
     debugPrint('════════════════════════════════════════');
 
-    final provider = Provider.of<PaymentProvider>(context, listen: false);
+    try {
+      final provider = Provider.of<PaymentProvider>(context, listen: false);
 
-    final result = await provider.confirmPayment(
-      bookingRequestId: widget.bookingRequestId,
-      razorpayOrderId: response.orderId!,
-      razorpayPaymentId: response.paymentId!,
-      razorpaySignature: response.signature!,
-    );
+      final result = await provider.confirmPayment(
+        bookingRequestId: widget.bookingRequestId,
+        razorpayOrderId: response.orderId ?? '',
+        razorpayPaymentId: response.paymentId ?? '',
+        razorpaySignature: response.signature ?? '',
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (result['success'] == true) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PaymentSuccessScreen(
-            response: result['data'],
+      if (result['success'] == true) {
+        debugPrint('════════════════════════════════════════');
+        debugPrint('✅ STEP 4: PAYMENT CONFIRMED BY BACKEND');
+        debugPrint('════════════════════════════════════════');
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PaymentSuccessScreen(response: result['data']),
           ),
-        ),
-      );
-    } else {
-      setState(() => _isPaying = false);
-      _showSnackBar(
-        result['message'] ?? 'Payment confirmation failed',
-        Colors.red,
-      );
+        );
+      } else {
+        setState(() => _isPaying = false);
+        _showSnackBar(
+          result['message'] ?? 'Payment confirmation failed',
+          Colors.red[700]!,
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('❌ _handlePaymentSuccess EXCEPTION: $e');
+      debugPrint('STACK: $stack');
+      if (mounted) {
+        setState(() => _isPaying = false);
+        _showSnackBar(
+          'Payment confirmation failed. Contact support.',
+          Colors.red[700]!,
+        );
+      }
     }
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
-    debugPrint('');
     debugPrint('════════════════════════════════════════');
     debugPrint('❌ RAZORPAY PAYMENT FAILED');
     debugPrint('════════════════════════════════════════');
-    debugPrint('Error Code    : ${response.code}');
-    debugPrint('Error Message : ${response.message}');
-    debugPrint('Error Details : ${response.error}');
+    debugPrint('Code    : ${response.code}');
+    debugPrint('Message : ${response.message}');
+    debugPrint('Error   : ${response.error}');
     debugPrint('════════════════════════════════════════');
 
+    if (!mounted) return;
     setState(() => _isPaying = false);
 
     String errorMsg;
@@ -170,7 +294,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
         bgColor = Colors.red[700]!;
         break;
       default:
-        errorMsg = response.message?.isNotEmpty == true
+        errorMsg = (response.message?.isNotEmpty == true)
             ? response.message!
             : 'Payment failed. Please try again.';
         bgColor = Colors.red[700]!;
@@ -180,10 +304,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
+    debugPrint('════════════════════════════════════════');
     debugPrint('👛 External wallet: ${response.walletName}');
+    debugPrint('════════════════════════════════════════');
+    setState(() => _isPaying = false);
   }
 
   void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -215,79 +345,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     );
   }
 
-  Future<void> _payNow() async {
-    setState(() => _isPaying = true);
-
-    final provider = Provider.of<PaymentProvider>(context, listen: false);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    final result = await provider.initiatePayment(widget.bookingRequestId);
-
-    if (!mounted) return;
-
-    if (result['success'] == true) {
-      final data = result['data'] as InitiatePaymentResponse;
-
-      final phone = authProvider.user?.phone ?? '9876543210';
-      final email = authProvider.user?.email ?? 'user@example.com';
-
-      final options = {
-        'key': AppConstants.razorpayKeyId,
-        'amount': data.amount,
-        'currency': data.currency,
-        'order_id': data.razorpayOrderId,
-        'name': AppConstants.appName,
-        'description': 'Rent Payment - ${widget.propertyTitle}',
-        'prefill': {
-          'contact': phone,
-          'email': email,
-        },
-        'theme': {
-          'color': '#2563EB',
-        },
-        'retry': {
-          'enabled': true,
-          'max_count': 2,
-        },
-        'timeout': 300,
-      };
-
-      debugPrint('');
-      debugPrint('════════════════════════════════════════');
-      debugPrint('🟣 RAZORPAY CHECKOUT OPTIONS');
-      debugPrint('════════════════════════════════════════');
-      debugPrint('Key        : ${AppConstants.razorpayKeyId}');
-      debugPrint('Amount     : ${data.amount}');
-      debugPrint('Currency   : ${data.currency}');
-      debugPrint('Order ID   : ${data.razorpayOrderId}');
-      debugPrint('Phone      : $phone');
-      debugPrint('Email      : $email');
-      debugPrint('════════════════════════════════════════');
-
-      try {
-        _razorpay!.open(options);
-        debugPrint('✅ Razorpay.open() called');
-      } catch (e) {
-        debugPrint('❌ Razorpay.open() exception: $e');
-        setState(() => _isPaying = false);
-        _showSnackBar('Unable to open payment checkout.', Colors.red[700]!);
-      }
-    } else {
-      setState(() => _isPaying = false);
-      _showSnackBar(
-        result['message'] ?? 'Failed to initiate payment',
-        Colors.red[700]!,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _razorpay?.clear();
-    _mainController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -299,7 +356,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
+        backgroundColor:
+            isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF5F7FA),
         appBar: _buildPremiumAppBar(context, isDark),
         body: _isLoading
             ? _buildLoadingState(isDark)
@@ -316,7 +374,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
                             child: SingleChildScrollView(
                               physics: const BouncingScrollPhysics(),
                               padding: const EdgeInsets.all(16),
-                              child: _buildPremiumPaymentContent(context, isDark),
+                              child: _buildPremiumPaymentContent(
+                                  context, isDark),
                             ),
                           ),
                         ),
@@ -325,7 +384,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
     );
   }
 
-  PreferredSizeWidget _buildPremiumAppBar(BuildContext context, bool isDark) {
+  PreferredSizeWidget _buildPremiumAppBar(
+      BuildContext context, bool isDark) {
     return AppBar(
       elevation: 0,
       backgroundColor: Colors.transparent,
@@ -347,7 +407,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
             Icons.arrow_back_rounded,
             color: isDark ? Colors.white : const Color(0xFF4B5563),
           ),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (!_isPaying) Navigator.pop(context);
+          },
         ),
       ),
       title: Row(
@@ -404,7 +466,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
           child: IconButton(
             icon: Icon(
               isDark ? Icons.wb_sunny_rounded : Icons.nightlight_round,
-              color: isDark ? const Color(0xFF2563EB) : const Color(0xFF4B5563),
+              color: isDark
+                  ? const Color(0xFF2563EB)
+                  : const Color(0xFF4B5563),
               size: 22,
             ),
             onPressed: () {
@@ -527,7 +591,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -549,7 +614,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey[100],
+                color: isDark
+                    ? Colors.white.withOpacity(0.04)
+                    : Colors.grey[100],
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -593,7 +660,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
             color: isDark ? const Color(0xFF1A1F33) : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04),
+              color: isDark
+                  ? Colors.white.withOpacity(0.05)
+                  : Colors.black.withOpacity(0.04),
               width: 1,
             ),
             boxShadow: [
@@ -632,7 +701,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                        color:
+                            isDark ? Colors.white : const Color(0xFF1A1A2E),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -642,14 +712,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
                       'Room ${summary.roomNumber}',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: isDark ? Colors.grey[400] : Colors.grey[500],
+                        color:
+                            isDark ? Colors.grey[400] : Colors.grey[500],
                       ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2563EB).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -667,8 +739,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
           ),
         ),
         const SizedBox(height: 16),
-
-        if (summary.eligibleForFirstBookingDiscount)
+        if (summary.eligibleForFirstBookingDiscount) ...[
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -726,15 +797,17 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
               ],
             ),
           ),
-        const SizedBox(height: 16),
-
+          const SizedBox(height: 16),
+        ],
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1A1F33) : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04),
+              color: isDark
+                  ? Colors.white.withOpacity(0.05)
+                  : Colors.black.withOpacity(0.04),
               width: 1,
             ),
             boxShadow: [
@@ -768,7 +841,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      color:
+                          isDark ? Colors.white : const Color(0xFF1A1A2E),
                     ),
                   ),
                 ],
@@ -799,7 +873,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
           ),
         ),
         const SizedBox(height: 24),
-
         Container(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -904,7 +977,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen>
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
-            color: isDiscount ? Colors.green : (isDark ? Colors.grey[400] : Colors.grey[600]),
+            color: isDiscount
+                ? Colors.green
+                : (isDark ? Colors.grey[400] : Colors.grey[600]),
           ),
         ),
         Text(
