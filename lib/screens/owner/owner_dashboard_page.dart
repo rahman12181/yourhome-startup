@@ -32,33 +32,46 @@ import 'listing_subscription_page.dart';
 import 'owner_apply_page.dart';
 
 // ============================================================
-// DESIGN TOKENS
+// DESIGN TOKENS — Blue brand palette
+//   • Blue family  = brand / charts / neutral actions
+//   • Green/Amber/Red = status only (success / warning / error)
 // ============================================================
 class _P {
-  static const primary = Color(0xFF7C3AED);
-  static const primaryLight = Color(0xFF9F7AEA);
-  static const primaryDeep = Color(0xFF5B21B6);
+  // Brand blues
+  static const primary = Color(0xFF1E5EFF);
+  static const primaryLight = Color(0xFF4B7BFF);
+  static const primaryDeep = Color(0xFF1247D6);
+  static const primarySoft = Color(0xFFEBF1FF);
+
+  // Supporting cool tones (for chart / category variety)
+  static const sky = Color(0xFF0EA5E9);
+  static const indigo = Color(0xFF6366F1);
+  static const teal = Color(0xFF06B6D4);
+
+  // Status colours
+  static const success = Color(0xFF16A34A);
   static const gold = Color(0xFFF59E0B);
-  static const success = Color(0xFF22C55E);
-  static const danger = Color(0xFFEF4444);
-  static const teal = Color(0xFF14B8A6);
-  static const blue = Color(0xFF3B82F6);
-  static const pink = Color(0xFFEC4899);
+  static const danger = Color(0xFFDC2626);
+
+  // Surfaces
   static const darkBg = Color(0xFF0A0E1A);
-  static const darkSurface = Color(0xFF121729);
-  static const darkCard = Color(0xFF1A1F33);
-  static const lightBg = Color(0xFFF6F7FB);
+  static const darkSurface = Color(0xFF141A2C);
+  static const darkCard = Color(0xFF1B2338);
+  static const lightBg = Color(0xFFF7F8FC);
 
   static Color bg(bool d) => d ? darkBg : lightBg;
   static Color card(bool d) => d ? darkSurface : Colors.white;
-  static Color ink(bool d) => d ? Colors.white : const Color(0xFF111827);
+  static Color ink(bool d) => d ? Colors.white : const Color(0xFF0B1220);
   static Color sub(bool d) =>
-      d ? const Color(0xFF9AA3B8) : const Color(0xFF6B7280);
+      d ? const Color(0xFF9AA3B8) : const Color(0xFF64748B);
   static Color hair(bool d) =>
-      d ? Colors.white.withOpacity(0.07) : const Color(0xFFEDEFF5);
+      d ? Colors.white.withOpacity(0.07) : const Color(0xFFE8ECF4);
   static Color soft(bool d) =>
-      d ? Colors.white.withOpacity(0.05) : const Color(0xFFF4F5F9);
+      d ? Colors.white.withOpacity(0.05) : const Color(0xFFF1F4FB);
 }
+
+/// Horizontal page margin shared by every card (change once to adjust all).
+const double _kPad = 16.0;
 
 // ============================================================
 // SAFE ACCESSORS (model fields can be missing — never crash the UI)
@@ -123,10 +136,10 @@ List _dl(dynamic Function() f) {
 // ============================================================
 // FORMATTERS
 // ============================================================
-final NumberFormat _inr0 = NumberFormat.currency(
-    locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-final NumberFormat _inr2 = NumberFormat.currency(
-    locale: 'en_IN', symbol: '₹', decimalDigits: 2);
+final NumberFormat _inr0 =
+    NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+final NumberFormat _inr2 =
+    NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
 /// Exact rupee amount with Indian digit grouping (₹3,85,000).
 String _inr(double v) => (v - v.roundToDouble()).abs() < 0.005
@@ -156,16 +169,6 @@ double _niceMax(double v) {
   final f = v / exp;
   final nice = f <= 1 ? 1 : (f <= 2 ? 2 : (f <= 2.5 ? 2.5 : (f <= 5 ? 5 : 10)));
   return nice * exp;
-}
-
-Color _hex(String? hex, [Color fallback = _P.primary]) {
-  if (hex == null || hex.isEmpty) return fallback;
-  try {
-    final h = hex.replaceAll('#', '');
-    return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
-  } catch (_) {
-    return fallback;
-  }
 }
 
 IconData _iconFor(String name) {
@@ -223,15 +226,15 @@ String _planName(String plan) {
 // ============================================================
 // SHARED STYLE HELPERS
 // ============================================================
-BoxDecoration _cardDeco(bool d, {double r = 22}) => BoxDecoration(
+BoxDecoration _cardDeco(bool d, {double r = 20}) => BoxDecoration(
       color: _P.card(d),
       borderRadius: BorderRadius.circular(r),
       border: Border.all(color: _P.hair(d)),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(d ? 0.28 : 0.045),
-          blurRadius: 20,
-          offset: const Offset(0, 8),
+          color: Colors.black.withOpacity(d ? 0.28 : 0.04),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
         ),
       ],
     );
@@ -240,7 +243,7 @@ Widget _cardBox(
   bool d, {
   required Widget child,
   EdgeInsets padding = const EdgeInsets.all(18),
-  EdgeInsets margin = const EdgeInsets.fromLTRB(16, 0, 16, 14),
+  EdgeInsets margin = const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
 }) {
   return Container(
     margin: margin,
@@ -261,8 +264,8 @@ Widget _secHead(
   return Row(
     children: [
       Container(
-        width: 34,
-        height: 34,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: color.withOpacity(d ? 0.18 : 0.10),
           borderRadius: BorderRadius.circular(11),
@@ -279,6 +282,7 @@ Widget _secHead(
               style: GoogleFonts.poppins(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w700,
+                letterSpacing: -0.1,
                 color: _P.ink(d),
                 height: 1.25,
               ),
@@ -306,7 +310,7 @@ Widget _pill(String text, Color c, {IconData? icon}) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: c.withOpacity(0.13),
+      color: c.withOpacity(0.12),
       borderRadius: BorderRadius.circular(20),
     ),
     child: Row(
@@ -316,13 +320,17 @@ Widget _pill(String text, Color c, {IconData? icon}) {
           Icon(icon, size: 11, color: c),
           const SizedBox(width: 3),
         ],
-        Text(
-          text,
-          style: GoogleFonts.poppins(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w700,
-            color: c,
-            height: 1.3,
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: c,
+              height: 1.3,
+            ),
           ),
         ),
       ],
@@ -373,7 +381,7 @@ Widget _segmented(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: sel
-                  ? (d ? const Color(0xFF2A3050) : Colors.white)
+                  ? (d ? const Color(0xFF2A3350) : Colors.white)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(9),
               boxShadow: sel
@@ -391,7 +399,7 @@ Widget _segmented(
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: sel ? _P.ink(d) : _P.sub(d),
+                color: sel ? (d ? Colors.white : _P.primary) : _P.sub(d),
               ),
             ),
           ),
@@ -644,8 +652,8 @@ class _Skel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = isDark ? const Color(0xFF1E2440) : const Color(0xFFE9ECF3);
-    final hi = isDark ? const Color(0xFF2A3154) : const Color(0xFFF5F6FA);
+    final base = isDark ? const Color(0xFF1E2640) : const Color(0xFFE8ECF4);
+    final hi = isDark ? const Color(0xFF2A3354) : const Color(0xFFF5F7FB);
     final dx = -2.0 + 4.0 * t;
     return Container(
       width: width,
@@ -806,7 +814,7 @@ class _DayPt {
 }
 
 // ============================================================
-// REVENUE CARD — stock-style interactive chart
+// REVENUE CARD — interactive area chart (brand blue)
 // ============================================================
 class _RevenueCard extends StatefulWidget {
   final _RevenueData data;
@@ -830,8 +838,7 @@ class _RevenueCardState extends State<_RevenueCard> {
     final useDaily = _range == 0 && hasDaily || (!hasMonthly && hasDaily);
     final pts = useDaily ? d.daily : d.monthly;
     final t = (_touched != null && _touched! < pts.length) ? _touched : null;
-    final up = d.growth >= 0;
-    final color = up ? _P.success : _P.danger;
+    const color = _P.primary;
 
     final total = pts.fold<double>(0, (s, p) => s + p.value);
     final span = pts.isEmpty
@@ -947,22 +954,13 @@ class _RevenueCardState extends State<_RevenueCard> {
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.only(right: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      useDaily
-                          ? 'Last $span days · ${_inr(total)} · avg ${_inr(avg)}/day'
-                          : 'Last $span months · ${_inr(total)} · avg ${_inr(avg)}/mo',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        color: _P.sub(dark),
-                      ),
-                    ),
-                  ),
-                ],
+              child: Text(
+                useDaily
+                    ? 'Last $span days · ${_inr(total)} · avg ${_inr(avg)}/day'
+                    : 'Last $span months · ${_inr(total)} · avg ${_inr(avg)}/mo',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(fontSize: 11, color: _P.sub(dark)),
               ),
             ),
           ],
@@ -974,14 +972,14 @@ class _RevenueCardState extends State<_RevenueCard> {
                 Row(
                   children: [
                     Expanded(
-                        child: _miniStat(
-                            dark, 'Paid', _inr(d.paid), _P.success)),
+                        child:
+                            _miniStat(dark, 'Paid', _inr(d.paid), _P.success)),
                     Expanded(
                         child: _miniStat(
                             dark, 'Pending', _inr(d.pending), _P.gold)),
                     Expanded(
                         child: _miniStat(dark, 'Collected',
-                            '${_trim(d.collection)}%', _P.blue)),
+                            '${_trim(d.collection)}%', _P.primary)),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -1221,7 +1219,7 @@ class _RevenueCardState extends State<_RevenueCard> {
           },
           touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) =>
-                dark ? const Color(0xFF2A3050) : const Color(0xFF111827),
+                dark ? const Color(0xFF2A3350) : const Color(0xFF0B1220),
             tooltipRoundedRadius: 8,
             getTooltipItems: (spots) => spots.map((s) {
               final i = s.spotIndex;
@@ -1259,7 +1257,7 @@ class _RevenueCardState extends State<_RevenueCard> {
             belowBarData: BarAreaData(
               show: true,
               gradient: LinearGradient(
-                colors: [c.withOpacity(0.30), c.withOpacity(0.0)],
+                colors: [c.withOpacity(0.28), c.withOpacity(0.0)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -1325,7 +1323,9 @@ class _TrendCardState extends State<_TrendCard> {
 
     final heroValue = t != null
         ? data[t].value
-        : (mode == 0 ? widget.totalThisWeek.toDouble() : widget.viewsTotal.toDouble());
+        : (mode == 0
+            ? widget.totalThisWeek.toDouble()
+            : widget.viewsTotal.toDouble());
     final heroLabel = t != null
         ? data[t].full
         : (mode == 0 ? 'bookings this week' : 'views this week');
@@ -1338,7 +1338,7 @@ class _TrendCardState extends State<_TrendCard> {
           _secHead(
             dark,
             Icons.bar_chart_rounded,
-            _P.blue,
+            _P.primary,
             'Weekly Performance',
             sub: 'Last 7 days',
             trailing: hasViews
@@ -1430,7 +1430,7 @@ class _TrendCardState extends State<_TrendCard> {
                   data.isEmpty
                       ? 0
                       : data.map((e) => e.value).reduce(math.max).round(),
-                  _P.teal,
+                  _P.sky,
                 ),
               ],
             ),
@@ -1473,8 +1473,11 @@ class _TrendCardState extends State<_TrendCard> {
       final total = math.max(e.value, (e.accepted ?? 0) + (e.rejected ?? 0));
       return math.max(m, total);
     });
-    final niceTop = mode == 1 ? _niceMax(maxVal * 1.1) : math.max(4.0, (maxVal * 1.25).ceilToDouble());
-    final interval = mode == 1 ? niceTop / 4 : math.max(1.0, (niceTop / 4).ceilToDouble());
+    final niceTop = mode == 1
+        ? _niceMax(maxVal * 1.1)
+        : math.max(4.0, (maxVal * 1.25).ceilToDouble());
+    final interval =
+        mode == 1 ? niceTop / 4 : math.max(1.0, (niceTop / 4).ceilToDouble());
     final maxY = mode == 1 ? niceTop : interval * 4;
 
     return BarChart(
@@ -1518,8 +1521,8 @@ class _TrendCardState extends State<_TrendCard> {
                   child: Text(
                     _compact(v),
                     textAlign: TextAlign.right,
-                    style: GoogleFonts.poppins(
-                        fontSize: 9.5, color: _P.sub(dark)),
+                    style:
+                        GoogleFonts.poppins(fontSize: 9.5, color: _P.sub(dark)),
                   ),
                 );
               },
@@ -1563,7 +1566,7 @@ class _TrendCardState extends State<_TrendCard> {
           },
           touchTooltipData: BarTouchTooltipData(
             getTooltipColor: (_) =>
-                dark ? const Color(0xFF2A3050) : const Color(0xFF111827),
+                dark ? const Color(0xFF2A3350) : const Color(0xFF0B1220),
             tooltipRoundedRadius: 8,
             getTooltipItem: (group, gi, rod, ri) {
               final e = data[group.x];
@@ -1588,7 +1591,7 @@ class _TrendCardState extends State<_TrendCard> {
           final a = e.accepted ?? 0;
           final r = e.rejected ?? 0;
           final total = math.max(e.value, a + r);
-          final radius = const BorderRadius.vertical(top: Radius.circular(7));
+          const radius = BorderRadius.vertical(top: Radius.circular(7));
           final back = BackgroundBarChartRodData(
             show: true,
             toY: maxY,
@@ -1600,7 +1603,8 @@ class _TrendCardState extends State<_TrendCard> {
             double cur = 0;
             void push(double amount, Color c) {
               if (amount <= 0) return;
-              items.add(BarChartRodStackItem(cur, cur + amount, c.withOpacity(op)));
+              items.add(
+                  BarChartRodStackItem(cur, cur + amount, c.withOpacity(op)));
               cur += amount;
             }
 
@@ -1629,7 +1633,7 @@ class _TrendCardState extends State<_TrendCard> {
                 borderRadius: radius,
                 gradient: LinearGradient(
                   colors: [
-                    _P.primary.withOpacity(dim ? 0.35 : 1),
+                    _P.primaryDeep.withOpacity(dim ? 0.35 : 1),
                     _P.primaryLight.withOpacity(dim ? 0.35 : 1),
                   ],
                   begin: Alignment.bottomCenter,
@@ -1696,7 +1700,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       vsync: this,
     )..repeat();
 
-    // ✅ Internet listener (works with connectivity_plus v5 and v6)
+    // Internet listener (works with connectivity_plus v5 and v6)
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((dynamic result) {
       if (!mounted || _isDisposed) return;
@@ -1711,7 +1715,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       }
     });
 
-    // ✅ Auto-reconnect loop — keeps trying while offline
+    // Auto-reconnect loop — keeps trying while offline
     _retryTimer = Timer.periodic(const Duration(seconds: 7), (_) {
       if (!mounted || _isDisposed) return;
       final p = Provider.of<OwnerProvider>(context, listen: false);
@@ -1934,8 +1938,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
 
     final sections = <Widget>[];
     int order = 0;
-    void add(String key, Widget w) =>
-        sections.add(_animated(order++, key, w));
+    void add(String key, Widget w) => sections.add(_animated(order++, key, w));
 
     if (!showSkeleton) {
       // ---------- ACTION REQUIRED ----------
@@ -2155,7 +2158,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final business = _ds(() => ownerProfile.businessName);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(_kPad, 14, _kPad, 14),
       child: Row(
         children: [
           _Tap(
@@ -2167,7 +2170,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [_P.primary, _P.pink],
+                  colors: [_P.primary, _P.primaryLight],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -2192,8 +2195,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                           fit: BoxFit.cover,
                           fadeInDuration: const Duration(milliseconds: 250),
                           placeholder: (_, __) => _avatarFallback(initial),
-                          errorWidget: (_, __, ___) =>
-                              _avatarFallback(initial),
+                          errorWidget: (_, __, ___) => _avatarFallback(initial),
                         )
                       : _avatarFallback(initial),
                 ),
@@ -2234,7 +2236,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     if (verified) ...[
                       const SizedBox(width: 5),
                       const Icon(Icons.verified_rounded,
-                          color: _P.blue, size: 17),
+                          color: _P.primary, size: 17),
                     ],
                   ],
                 ),
@@ -2340,8 +2342,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutBack,
               child: Container(
-                constraints:
-                    const BoxConstraints(minWidth: 19, minHeight: 19),
+                constraints: const BoxConstraints(minWidth: 19, minHeight: 19),
                 padding: const EdgeInsets.symmetric(horizontal: 5),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
@@ -2432,7 +2433,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     } else if (loading && hasData) {
       child = Padding(
         key: const ValueKey('slim'),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        padding: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 10),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
@@ -2480,7 +2481,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }) {
     return Container(
       key: ValueKey(key),
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      margin: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: color.withOpacity(isDark ? 0.14 : 0.09),
@@ -2667,8 +2668,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               color: _P.danger.withOpacity(0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.cloud_off_rounded,
-                color: _P.danger, size: 26),
+            child:
+                const Icon(Icons.cloud_off_rounded, color: _P.danger, size: 26),
           ),
           const SizedBox(height: 14),
           Text(
@@ -2707,28 +2708,39 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   // ============================================================
-  // ACTION REQUIRED
+  // ACTION REQUIRED  (colour by priority: urgent=red, medium=amber, else blue)
   // ============================================================
+  Color _priorityColor(String priority) {
+    switch (priority.toUpperCase()) {
+      case 'HIGH':
+        return _P.danger;
+      case 'MEDIUM':
+        return _P.gold;
+      default:
+        return _P.primary;
+    }
+  }
+
   Widget _actionRequiredSection(bool isDark, dynamic actions, int total) {
     final items = _dl(() => actions.items);
     final shown = _showAllActions ? items : items.take(3).toList();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      padding: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: _P.danger.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.bolt_rounded,
-                    color: _P.danger, size: 17),
+                child:
+                    const Icon(Icons.bolt_rounded, color: _P.danger, size: 18),
               ),
               const SizedBox(width: 10),
               Text(
@@ -2736,6 +2748,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 style: GoogleFonts.poppins(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w700,
+                  letterSpacing: -0.1,
                   color: _P.ink(isDark),
                 ),
               ),
@@ -2784,9 +2797,9 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   Widget _actionCard(bool isDark, dynamic item) {
-    final c = _hex(_ds(() => item.color));
     final type = _ds(() => item.type);
     final priority = _ds(() => item.priority);
+    final c = _priorityColor(priority);
     final title = _ds(() => item.title);
     final desc = _ds(() => item.description);
     final label = _ds(() => item.actionLabel, 'Open');
@@ -2802,9 +2815,16 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: c.withOpacity(isDark ? 0.10 : 0.06),
+            color: _P.card(isDark),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: c.withOpacity(0.25)),
+            border: Border.all(color: c.withOpacity(0.30)),
+            boxShadow: [
+              BoxShadow(
+                color: c.withOpacity(isDark ? 0.10 : 0.07),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
           child: Row(
             children: [
@@ -2812,7 +2832,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: c.withOpacity(0.16),
+                  color: c.withOpacity(0.13),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(icon, color: c, size: 21),
@@ -2824,7 +2844,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                   children: [
                     Row(
                       children: [
-                        if (priority == 'HIGH')
+                        if (priority.toUpperCase() == 'HIGH')
                           Container(
                             margin: const EdgeInsets.only(right: 6),
                             padding: const EdgeInsets.symmetric(
@@ -2878,13 +2898,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 decoration: BoxDecoration(
                   color: c,
                   borderRadius: BorderRadius.circular(11),
-                  boxShadow: [
-                    BoxShadow(
-                      color: c.withOpacity(0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: Text(
                   label,
@@ -2918,13 +2931,16 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final rateColor = rate >= 85
         ? _P.success
         : rate >= 70
-            ? _P.blue
+            ? _P.primary
             : rate >= 50
                 ? _P.gold
                 : _P.danger;
 
     final sum = occupied + available + maintenance;
     final donutTotal = math.max(total, sum).toDouble();
+
+    // blue-family cycle for per-property bars
+    const propColors = [_P.primary, _P.sky, _P.indigo, _P.teal];
 
     Widget legend(String name, int v, Color c) {
       final pctv = donutTotal > 0 ? v / donutTotal * 100 : 0.0;
@@ -2944,8 +2960,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             Expanded(
               child: Text(
                 name,
-                style: GoogleFonts.poppins(
-                    fontSize: 12, color: _P.sub(isDark)),
+                style:
+                    GoogleFonts.poppins(fontSize: 12, color: _P.sub(isDark)),
               ),
             ),
             Text(
@@ -2961,8 +2977,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               child: Text(
                 '${_trim(pctv)}%',
                 textAlign: TextAlign.right,
-                style: GoogleFonts.poppins(
-                    fontSize: 10.5, color: _P.sub(isDark)),
+                style:
+                    GoogleFonts.poppins(fontSize: 10.5, color: _P.sub(isDark)),
               ),
             ),
           ],
@@ -2978,7 +2994,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
           _secHead(
             isDark,
             Icons.home_work_rounded,
-            rateColor,
+            _P.primary,
             'Occupancy',
             sub: '$total rooms across your properties',
             trailing: label.isEmpty ? null : _pill(label, rateColor),
@@ -2990,8 +3006,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               child: Center(
                 child: Text(
                   'Add rooms to see occupancy insights',
-                  style: GoogleFonts.poppins(
-                      fontSize: 12.5, color: _P.sub(isDark)),
+                  style:
+                      GoogleFonts.poppins(fontSize: 12.5, color: _P.sub(isDark)),
                 ),
               ),
             )
@@ -3005,7 +3021,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     available.toDouble(),
                     maintenance.toDouble(),
                   ],
-                  colors: const [_P.primary, _P.teal, _P.gold],
+                  colors: const [_P.primary, _P.sky, _P.gold],
                   total: donutTotal,
                   track: _P.soft(isDark),
                   center: Column(
@@ -3034,7 +3050,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                   child: Column(
                     children: [
                       legend('Occupied', occupied, _P.primary),
-                      legend('Available', available, _P.teal),
+                      legend('Available', available, _P.sky),
                       if (maintenance > 0)
                         legend('Maintenance', maintenance, _P.gold),
                       legend('Total', total, _P.sub(isDark)),
@@ -3087,12 +3103,13 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               ),
             ),
             const SizedBox(height: 10),
-            ...byProperty.take(4).map((p) {
+            ...List.generate(math.min(4, byProperty.length), (i) {
+              final p = byProperty[i];
               final title = _ds(() => p.propertyTitle, 'Property');
               final tr = _di(() => p.totalRooms);
               final orr = _di(() => p.occupiedRooms);
               final pr = _dn(() => p.occupancyRate);
-              final pc = _hex(_ds(() => p.color), _P.primary);
+              final pc = propColors[i % propColors.length];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Column(
@@ -3135,8 +3152,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             if (byProperty.length > 4)
               Text(
                 '+${byProperty.length - 4} more properties',
-                style: GoogleFonts.poppins(
-                    fontSize: 11, color: _P.sub(isDark)),
+                style:
+                    GoogleFonts.poppins(fontSize: 11, color: _P.sub(isDark)),
               ),
           ],
         ],
@@ -3160,10 +3177,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
           _secHead(
             isDark,
             Icons.event_rounded,
-            _P.pink,
+            _P.primary,
             "Today's Schedule",
             sub: DateFormat('EEEE, d MMM').format(DateTime.now()),
-            trailing: _pill('$total', _P.pink),
+            trailing: _pill('$total', _P.primary),
           ),
           const SizedBox(height: 16),
           for (int i = 0; i < shown.length; i++)
@@ -3173,8 +3190,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 '+${events.length - 4} more today',
-                style: GoogleFonts.poppins(
-                    fontSize: 11, color: _P.sub(isDark)),
+                style:
+                    GoogleFonts.poppins(fontSize: 11, color: _P.sub(isDark)),
               ),
             ),
         ],
@@ -3183,7 +3200,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   Widget _scheduleTile(bool isDark, dynamic item, bool last) {
-    final c = _hex(_ds(() => item.color));
+    const c = _P.primary;
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3234,7 +3251,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               child: Container(
                 padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
-                  color: c.withOpacity(isDark ? 0.10 : 0.07),
+                  color: c.withOpacity(isDark ? 0.10 : 0.06),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Row(
@@ -3316,8 +3333,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             const SizedBox(height: 2),
             Text(
               label,
-              style:
-                  GoogleFonts.poppins(fontSize: 10, color: _P.sub(isDark)),
+              style: GoogleFonts.poppins(fontSize: 10, color: _P.sub(isDark)),
             ),
           ],
         ),
@@ -3327,7 +3343,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final placeholder = Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [_P.primaryDeep, _P.primary],
+          colors: [_P.primaryDeep, _P.primaryLight],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -3341,10 +3357,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       scale: 0.985,
       onTap: () => _navigateTo(const OwnerPropertyManagementPage()),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        margin: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
         decoration: _cardDeco(isDark),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -3384,8 +3400,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                              colors: [_P.gold, _P.pink]),
+                          color: _P.primary,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -3472,7 +3487,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                                     fontSize: 26,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: -0.5,
-                                    color: _P.success,
+                                    color: _P.primary,
                                     height: 1.2,
                                   ),
                                 ),
@@ -3506,7 +3521,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                                 : '—',
                             'Rating',
                           ),
-                          metric(Icons.visibility_rounded, _P.blue,
+                          metric(Icons.visibility_rounded, _P.sky,
                               _compact(views.toDouble()), 'Views'),
                         ],
                       ),
@@ -3533,7 +3548,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     const SizedBox(height: 8),
                     _AnimBar(
                       value: occ / 100,
-                      color: _P.success,
+                      color: _P.primary,
                       track: _P.soft(isDark),
                       height: 8,
                     ),
@@ -3557,7 +3572,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _secHead(isDark, Icons.history_rounded, _P.teal, 'Recent Activity',
+          _secHead(isDark, Icons.history_rounded, _P.primary, 'Recent Activity',
               sub: 'Latest updates across your properties'),
           const SizedBox(height: 14),
           for (int i = 0; i < list.length; i++) ...[
@@ -3571,14 +3586,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   Widget _activityTile(bool isDark, dynamic item) {
-    final c = _hex(_ds(() => item.color));
+    const c = _P.primary;
     return Row(
       children: [
         Container(
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: c.withOpacity(0.13),
+            color: c.withOpacity(isDark ? 0.18 : 0.10),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(_iconFor(_ds(() => item.icon)), color: c, size: 18),
@@ -3602,8 +3617,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 _ds(() => item.description),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                    fontSize: 10.5, color: _P.sub(isDark)),
+                style:
+                    GoogleFonts.poppins(fontSize: 10.5, color: _P.sub(isDark)),
               ),
             ],
           ),
@@ -3640,22 +3655,20 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             scale: Tween<double>(begin: 0.97, end: 1).animate(a), child: c),
       ),
       child: hasUpi
+          // ---------- ACTIVE: clean card with green status ----------
           ? Container(
               key: const ValueKey('upi_on'),
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              margin: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF16A34A), Color(0xFF0D9488)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(22),
+                color: _P.card(isDark),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _P.success.withOpacity(0.35)),
                 boxShadow: [
                   BoxShadow(
-                    color: _P.success.withOpacity(0.30),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                    color: _P.success.withOpacity(isDark ? 0.10 : 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
@@ -3665,11 +3678,11 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: _P.success.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Icon(Icons.verified_rounded,
-                        color: Colors.white, size: 24),
+                        color: _P.success, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -3681,7 +3694,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                           style: GoogleFonts.poppins(
                             fontSize: 14.5,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            color: _P.ink(isDark),
                           ),
                         ),
                         Text(
@@ -3692,42 +3705,21 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
                             fontSize: 11,
-                            color: Colors.white.withOpacity(0.85),
+                            color: _P.sub(isDark),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check_rounded,
-                            color: Colors.white, size: 13),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Active',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(width: 8),
+                  _pill('Active', _P.success, icon: Icons.check_rounded),
                 ],
               ),
             )
+          // ---------- SETUP: brand blue gradient ----------
           : Container(
               key: const ValueKey('upi_off'),
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              margin: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -3735,7 +3727,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
                     color: _P.primary.withOpacity(0.35),
@@ -3890,7 +3882,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     prefixIcon: const Icon(Icons.alternate_email_rounded),
                     filled: true,
                     fillColor:
-                        isDark ? _P.darkSurface : const Color(0xFFF4F5F9),
+                        isDark ? _P.darkSurface : const Color(0xFFF1F4FB),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -3916,8 +3908,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               ElevatedButton(
                 onPressed: () async {
                   final upiId = upiController.text.trim();
-                  final valid =
-                      RegExp(r'^[\w.\-]{2,256}@[a-zA-Z]{2,64}$').hasMatch(upiId);
+                  final valid = RegExp(r'^[\w.\-]{2,256}@[a-zA-Z]{2,64}$')
+                      .hasMatch(upiId);
                   if (!valid) {
                     setD(() => error = 'Please enter a valid UPI ID');
                     return;
@@ -3954,7 +3946,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     if (!mounted) return;
 
     if (result['success'] == true) {
-      // ✅ Provider se mark kar
       final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
       await ownerProvider.setPayoutUpiSaved();
 
@@ -4002,7 +3993,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         'label': 'Properties',
         'value': _dn(() => stats.totalProperties),
         'icon': Icons.apartment_rounded,
-        'color': _P.blue,
+        'color': _P.primary,
       },
       {
         'label': 'Published',
@@ -4014,25 +4005,25 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         'label': 'Rooms',
         'value': _dn(() => stats.totalRooms),
         'icon': Icons.meeting_room_rounded,
-        'color': _P.primary,
+        'color': _P.indigo,
       },
       {
         'label': 'Available',
         'value': _dn(() => stats.availableRooms),
         'icon': Icons.bed_rounded,
-        'color': _P.teal,
+        'color': _P.sky,
       },
       {
         'label': 'Bookings',
         'value': _dn(() => stats.totalBookingRequests),
         'icon': Icons.book_online_rounded,
-        'color': _P.gold,
+        'color': _P.primaryLight,
       },
       {
         'label': 'Pending',
         'value': _dn(() => stats.pendingRequests),
         'icon': Icons.schedule_rounded,
-        'color': _P.pink,
+        'color': _P.gold,
       },
       {
         'label': 'Rating',
@@ -4045,7 +4036,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         'label': 'Views',
         'value': _dn(() => stats.totalViews),
         'icon': Icons.visibility_rounded,
-        'color': _P.primaryLight,
+        'color': _P.teal,
         'compact': true,
       },
     ];
@@ -4157,7 +4148,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             : 'Admin reviews within 24-48 hours';
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      margin: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: color.withOpacity(isDark ? 0.12 : 0.07),
@@ -4263,7 +4254,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             days: accessDays,
             totalDays: accessTotal,
             endLabel: accessEnd,
-            color: _P.blue,
+            color: _P.primary,
             icon: Icons.home_work_rounded,
             onTap: _navigateToPropertyAccess,
           ),
@@ -4277,7 +4268,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             days: listDays,
             totalDays: 30,
             endLabel: listEnd,
-            color: _P.primary,
+            color: _P.indigo,
             icon: Icons.rocket_launch_rounded,
             onTap: _navigateToListingSubscription,
           ),
@@ -4338,7 +4329,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
+                    color: color.withOpacity(0.14),
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Icon(icon, color: color, size: 20),
@@ -4435,14 +4426,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       isDark,
       padding: EdgeInsets.zero,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(18),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFFDB2777), Color(0xFFF59E0B)],
+                  colors: [_P.primaryDeep, _P.primary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -4453,7 +4444,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.22),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Icon(Icons.movie_creation_rounded,
@@ -4500,14 +4491,14 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.upload_rounded,
-                              size: 16, color: Color(0xFFDB2777)),
+                              size: 16, color: _P.primary),
                           const SizedBox(width: 5),
                           Text(
                             'Upload',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFFDB2777),
+                              color: _P.primary,
                             ),
                           ),
                         ],
@@ -4526,7 +4517,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     Icons.video_library_rounded,
                     'My Reels',
                     'View & manage',
-                    _P.pink,
+                    _P.primary,
                     () => _navigateTo(const OwnerMyReelsScreen()),
                   ),
                   const SizedBox(width: 10),
@@ -4535,7 +4526,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                     Icons.analytics_rounded,
                     'Insights',
                     'Views & reach',
-                    _P.primary,
+                    _P.sky,
                     () => _navigateTo(const OwnerMyReelsScreen()),
                   ),
                 ],
@@ -4567,7 +4558,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: color.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: Icon(icon, color: color, size: 18),
@@ -4621,7 +4612,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             ? '$properties ${properties == 1 ? 'listing' : 'listings'}'
             : 'Manage listings',
         'icon': Icons.apartment_rounded,
-        'color': _P.blue,
+        'color': _P.primary,
         'badge': 0,
         'onTap': () => _navigateTo(const OwnerPropertyManagementPage()),
       },
@@ -4629,7 +4620,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         'label': 'Bookings',
         'sub': pending > 0 ? '$pending pending' : 'All caught up',
         'icon': Icons.book_online_rounded,
-        'color': _P.gold,
+        'color': _P.sky,
         'badge': pending,
         'onTap': () => _navigateTo(const OwnerBookingManagementPage()),
       },
@@ -4637,7 +4628,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         'label': 'Chat',
         'sub': messages > 0 ? '$messages unread' : 'Messages',
         'icon': Icons.chat_bubble_rounded,
-        'color': _P.success,
+        'color': _P.indigo,
         'badge': messages,
         'onTap': () => _navigateTo(const ChatListScreen()),
       },
@@ -4645,7 +4636,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         'label': 'Alerts',
         'sub': notifications > 0 ? '$notifications new' : 'Notifications',
         'icon': Icons.notifications_rounded,
-        'color': _P.primary,
+        'color': _P.teal,
         'badge': notifications,
         'onTap': () => _navigateTo(const NotificationScreen()),
       },
@@ -4676,7 +4667,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: c.withOpacity(0.16),
+                        color: c.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(13),
                       ),
                       child: Icon(a['icon'] as IconData, color: c, size: 20),
@@ -4720,8 +4711,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                   a['sub'] as String,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                      fontSize: 10.5, color: _P.sub(isDark)),
+                  style:
+                      GoogleFonts.poppins(fontSize: 10.5, color: _P.sub(isDark)),
                 ),
               ],
             ),
@@ -4766,6 +4757,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final total = counts['TOTAL'] ?? 0;
     final decided = accepted + rejected;
     final acceptance = decided > 0 ? accepted / decided * 100 : 0.0;
+    const slate = Color(0xFF94A3B8);
 
     Widget stat(String label, int v, IconData icon, Color c) {
       return Expanded(
@@ -4821,11 +4813,16 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             const SizedBox(width: 5),
             Text(
               '$label $v',
-              style: GoogleFonts.poppins(
-                  fontSize: 10.5, color: _P.sub(isDark)),
+              style: GoogleFonts.poppins(fontSize: 10.5, color: _P.sub(isDark)),
             ),
           ],
         );
+
+    final accColor = acceptance >= 70
+        ? _P.success
+        : acceptance >= 40
+            ? _P.gold
+            : _P.danger;
 
     return _cardBox(
       isDark,
@@ -4835,7 +4832,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
           _secHead(
             isDark,
             Icons.pending_actions_rounded,
-            _P.gold,
+            _P.primary,
             'Booking Overview',
             sub: '$total total requests',
             trailing: _Tap(
@@ -4865,8 +4862,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               _P.gold,
               _P.success,
               _P.danger,
-              Color(0xFF94A3B8),
-              _P.teal,
+              slate,
+              _P.sky,
             ],
           ),
           const SizedBox(height: 10),
@@ -4877,9 +4874,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
               legend('Pending', pending, _P.gold),
               legend('Accepted', accepted, _P.success),
               legend('Rejected', rejected, _P.danger),
-              if (cancelled > 0)
-                legend('Cancelled', cancelled, const Color(0xFF94A3B8)),
-              if (completed > 0) legend('Completed', completed, _P.teal),
+              if (cancelled > 0) legend('Cancelled', cancelled, slate),
+              if (completed > 0) legend('Completed', completed, _P.sky),
             ],
           ),
           const SizedBox(height: 16),
@@ -4919,11 +4915,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
-                          color: acceptance >= 70
-                              ? _P.success
-                              : acceptance >= 40
-                                  ? _P.gold
-                                  : _P.danger,
+                          color: accColor,
                         ),
                       ),
                     ],
@@ -4931,11 +4923,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                   const SizedBox(height: 8),
                   _AnimBar(
                     value: acceptance / 100,
-                    color: acceptance >= 70
-                        ? _P.success
-                        : acceptance >= 40
-                            ? _P.gold
-                            : _P.danger,
+                    color: accColor,
                     track: _P.hair(isDark),
                     height: 7,
                   ),

@@ -252,10 +252,18 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     if (mounted) setState(() => _isCheckingBooking = false);
   }
 
+  // ✅ CHANGED — a room is bookable only if it is open AND still has a free bed
   List<Room> get _availableRoomsForUser => _rooms
-      .where(
-          (r) => r.status == 'AVAILABLE' && !_bookedRoomIds.contains(r.roomId))
+      .where((r) =>
+          r.isAvailable &&
+          r.hasAvailableBeds &&
+          !_bookedRoomIds.contains(r.roomId))
       .toList();
+
+  // ✅ NEW — total free beds across the property (student-safe number)
+  int get _totalBedsFree => _rooms
+      .where((r) => !r.isUnderMaintenance)
+      .fold<int>(0, (sum, r) => sum + r.bedsLeft);
 
   BookingRequest? _bookingForRoom(int roomId) {
     for (final b in _myBookings) {
@@ -437,7 +445,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     }
   }
 
-  Future<void> _bookNow() async {
+  // ✅ CHANGED — optional preselectRoomId (used by the room detail sheet)
+  Future<void> _bookNow({int? preselectRoomId}) async {
     if (!_isUserLoggedIn) {
       _showLoginPrompt();
       return;
@@ -468,6 +477,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
         property: _property!,
         rooms: _rooms,
         bookedRoomIds: _bookedRoomIds,
+        initialRoomId: preselectRoomId,
         onSuccess: () {
           _showSnack(
             icon: Icons.check_circle,
@@ -1853,10 +1863,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                 color: const Color(0xFF11998E).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
+              // ✅ CHANGED — rooms open + beds free
               child: Text(
-                '${_rooms.where((r) => r.status == 'AVAILABLE').length} available',
+                '${_rooms.where((r) => r.isAvailable).length} rooms • $_totalBedsFree beds free',
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: const Color(0xFF11998E),
                 ),
@@ -1892,6 +1903,35 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
+  // ✅ NEW — one icon per bed (red = taken, green = free). No tenant info.
+  Widget _bedDots(Room room) {
+    final total = room.capacity.clamp(1, 12);
+    final textColor = Colors.grey[600];
+
+    return Wrap(
+      spacing: 3,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ...List.generate(total, (i) {
+          final Color c;
+          if (room.isUnderMaintenance) {
+            c = Colors.orange;
+          } else if (i < room.occupiedCount) {
+            c = Colors.redAccent;
+          } else {
+            c = const Color(0xFF11998E);
+          }
+          return Icon(Icons.bed_rounded, size: 14, color: c);
+        }),
+        const SizedBox(width: 3),
+        Text(
+          '${room.capacity} bed${room.capacity == 1 ? '' : 's'}',
+          style: GoogleFonts.poppins(fontSize: 10.5, color: textColor),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRoomCard(Room room, bool isDark) {
     final isAvailable = room.status == 'AVAILABLE';
     final isBooked = _bookedRoomIds.contains(room.roomId);
@@ -1900,208 +1940,422 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     final needsPay = _needsPayment(booking);
     final paid = _isPaid(booking);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B1B2F) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.22 : 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+    // ✅ NEW — tap a room to see its (student-safe) details
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _showRoomSheet(room),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1B1B2F) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.22 : 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(
+            color: isBooked
+                ? bookedColor.withOpacity(0.4)
+                : (isAvailable
+                    ? const Color(0xFF11998E).withOpacity(0.25)
+                    : Colors.transparent),
+            width: isBooked ? 1.5 : 1,
           ),
-        ],
-        border: Border.all(
-          color: isBooked
-              ? bookedColor.withOpacity(0.4)
-              : (isAvailable
-                  ? const Color(0xFF11998E).withOpacity(0.25)
-                  : Colors.transparent),
-          width: isBooked ? 1.5 : 1,
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: isBooked
-                    ? [bookedColor, bookedColor.withOpacity(0.6)]
-                    : (isAvailable
-                        ? [const Color(0xFF11998E), const Color(0xFF38EF7D)]
-                        : [Colors.grey, Colors.grey.shade400]),
-              ),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Room ${room.roomNumber ?? room.roomId}',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.5,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ),
-                    if (isBooked) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: bookedColor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          paid ? 'PAID' : 'YOURS',
-                          style: GoogleFonts.poppins(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            color: bookedColor,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    Text(
-                      room.roomType,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    if (room.hasAc) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'AC',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue,
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (room.hasAttachedBathroom) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.teal.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Bath',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.teal,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '₹${room.monthlyRent.toStringAsFixed(0)}',
-                style: GoogleFonts.poppins(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: isBooked
-                      ? bookedColor
-                      : (isAvailable ? _primary : Colors.grey),
-                ),
-              ),
-              Text(
-                '/month',
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  color: Colors.grey[500],
-                ),
-              ),
-              const SizedBox(height: 3),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isBooked
-                      ? bookedColor.withOpacity(0.15)
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 44,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isBooked
+                      ? [bookedColor, bookedColor.withOpacity(0.6)]
                       : (isAvailable
-                          ? const Color(0xFF11998E).withOpacity(0.1)
-                          : Colors.grey.withOpacity(0.1)),
-                  borderRadius: BorderRadius.circular(6),
+                          ? [const Color(0xFF11998E), const Color(0xFF38EF7D)]
+                          : [Colors.grey, Colors.grey.shade400]),
                 ),
-                child: Text(
-                  isBooked
-                      ? _roomStateLabel(booking)
-                      : (isAvailable ? 'Available' : 'Occupied'),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Room ${room.roomNumber ?? room.roomId}',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
+                      if (isBooked) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: bookedColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            paid ? 'PAID' : 'YOURS',
+                            style: GoogleFonts.poppins(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              color: bookedColor,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Text(
+                        room.roomType,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      if (room.hasAc) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'AC',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (room.hasAttachedBathroom) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Bath',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.teal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  // ✅ NEW — bed icons
+                  const SizedBox(height: 6),
+                  _bedDots(room),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '₹${room.monthlyRent.toStringAsFixed(0)}',
                   style: GoogleFonts.poppins(
-                    fontSize: 9,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
                     color: isBooked
                         ? bookedColor
-                        : (isAvailable
-                            ? const Color(0xFF11998E)
-                            : Colors.grey),
-                    fontWeight: FontWeight.w600,
+                        : (isAvailable ? _primary : Colors.grey),
                   ),
                 ),
-              ),
-              if (needsPay) ...[
-                const SizedBox(height: 6),
-                ElevatedButton(
-                  onPressed: () => _payForBooking(booking!),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    minimumSize: const Size(0, 28),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                Text(
+                  '/month',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: Colors.grey[500],
                   ),
+                ),
+                const SizedBox(height: 3),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isBooked
+                        ? bookedColor.withOpacity(0.15)
+                        : (isAvailable
+                            ? const Color(0xFF11998E).withOpacity(0.1)
+                            : Colors.grey.withOpacity(0.1)),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  // ✅ CHANGED — "1 bed left" / "Fully Booked" / "Under Maintenance"
                   child: Text(
-                    'Pay Now',
+                    isBooked ? _roomStateLabel(booking) : room.availabilityLabel,
                     style: GoogleFonts.poppins(
-                      fontSize: 11.5,
+                      fontSize: 9,
+                      color: isBooked
+                          ? bookedColor
+                          : (isAvailable
+                              ? const Color(0xFF11998E)
+                              : Colors.grey),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                if (needsPay) ...[
+                  const SizedBox(height: 6),
+                  ElevatedButton(
+                    onPressed: () => _payForBooking(booking!),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      minimumSize: const Size(0, 28),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Pay Now',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ NEW — student-safe room sheet (beds, rent, features, book). No tenant data.
+  void _showRoomSheet(Room room) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final alreadyMine = _bookedRoomIds.contains(room.roomId);
+    final canBook =
+        room.isAvailable && room.hasAvailableBeds && !alreadyMine;
+
+    final Color statusColor = room.isUnderMaintenance
+        ? Colors.orange
+        : (room.hasAvailableBeds ? const Color(0xFF11998E) : Colors.red);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF15152A) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Room ${room.roomNumber ?? room.roomId}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        Text(
+                          '${room.roomTypeDisplay} • Floor ${room.floorNumber ?? 0}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.5,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(100),
+                      border: Border.all(color: statusColor.withOpacity(0.35)),
+                    ),
+                    child: Text(
+                      room.availabilityLabel,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: statusColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                '₹${room.monthlyRent.toStringAsFixed(0)} / month',
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: _primary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Beds',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: List.generate(room.capacity.clamp(1, 20), (i) {
+                  final Color c;
+                  final String tag;
+                  if (room.isUnderMaintenance) {
+                    c = Colors.orange;
+                    tag = 'Unavailable';
+                  } else if (i < room.occupiedCount) {
+                    c = Colors.redAccent;
+                    tag = 'Booked';
+                  } else {
+                    c = const Color(0xFF11998E);
+                    tag = 'Free';
+                  }
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: c.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: c.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bed_rounded, size: 16, color: c),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Bed ${i + 1} • $tag',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: c,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+              if (room.hasAc || room.hasAttachedBathroom) ...[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (room.hasAc)
+                      _buildTag('AC', Colors.blue),
+                    if (room.hasAttachedBathroom)
+                      _buildTag('Attached Bathroom', Colors.teal),
+                  ],
+                ),
+              ],
+              if (room.description != null &&
+                  room.description!.trim().isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Text(
+                  room.description!,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12.5,
+                    height: 1.6,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              if (canBook)
+                _gradientButton(
+                  icon: Icons.bolt,
+                  label: 'Book this room',
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    _bookNow(preselectRoomId: room.roomId);
+                  },
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    alreadyMine
+                        ? 'You already have a booking in this room'
+                        : (room.isUnderMaintenance
+                            ? 'Room is under maintenance'
+                            : 'This room is fully booked'),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2448,6 +2702,8 @@ class BookingBottomSheet extends StatefulWidget {
   final List<Room> rooms;
   final Set<int> bookedRoomIds;
   final VoidCallback onSuccess;
+  // ✅ NEW — room to preselect (when opened from the room detail sheet)
+  final int? initialRoomId;
 
   const BookingBottomSheet({
     super.key,
@@ -2455,6 +2711,7 @@ class BookingBottomSheet extends StatefulWidget {
     required this.rooms,
     this.bookedRoomIds = const {},
     required this.onSuccess,
+    this.initialRoomId,
   });
 
   @override
@@ -2497,6 +2754,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
   void initState() {
     super.initState();
     _selectedDate = DateTime.now().add(const Duration(days: 7));
+    _selectedRoomId = widget.initialRoomId;
   }
 
   @override
@@ -2868,16 +3126,17 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
               enabled: canBook,
               isBooked: isBooked,
               title: 'Room ${room.roomNumber ?? room.roomId}',
+              // ✅ CHANGED — bed info in the subtitle
               subtitle: isBooked
                   ? 'Already booked by you'
                   : (isAvailable
-                      ? '${room.roomType}${room.hasAc ? ' • AC' : ''}${room.hasAttachedBathroom ? ' • Bath' : ''}'
-                      : '${room.roomType}${room.hasAc ? ' • AC' : ''} • Occupied'),
+                      ? '${room.roomType}${room.hasAc ? ' • AC' : ''}${room.hasAttachedBathroom ? ' • Bath' : ''} • ${room.availabilityLabel}'
+                      : '${room.roomType}${room.hasAc ? ' • AC' : ''} • ${room.isUnderMaintenance ? 'Under maintenance' : 'Fully booked'}'),
               trailing: isBooked
                   ? 'Booked'
                   : (isAvailable
                       ? '₹${room.monthlyRent.toStringAsFixed(0)}/mo'
-                      : 'Unavailable'),
+                      : (room.isUnderMaintenance ? 'Maintenance' : 'Full')),
               onTap: canBook
                   ? () => setState(() => _selectedRoomId = room.roomId)
                   : null,

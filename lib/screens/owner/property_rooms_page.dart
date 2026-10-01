@@ -5,6 +5,49 @@ import 'package:provider/provider.dart';
 import '../../models/property_model.dart';
 import '../../models/room_model.dart';
 import '../../providers/owner_provider.dart';
+import 'bulk_add_rooms_page.dart';
+import 'room_detail_page.dart';
+
+// ══════════════════════════════════════════════════════════════
+// DESIGN TOKENS — Blue premium (matches other owner pages)
+// ══════════════════════════════════════════════════════════════
+class _C {
+  static const accent = Color(0xFF2563EB);
+  static const accentDark = Color(0xFF1D4ED8);
+  static const accentLight = Color(0xFF3B82F6);
+  static const accentSoft = Color(0xFFEBF1FF);
+  static const ink = Color(0xFF0F172A);
+
+  static const success = Color(0xFF10B981);
+  static const successLight = Color(0xFF22C55E);
+  static const warning = Color(0xFFF59E0B);
+  static const danger = Color(0xFFEF4444);
+  static const info = Color(0xFF3B82F6);
+  static const teal = Color(0xFF14B8A6);
+  static const purple = Color(0xFF8B5CF6);
+
+  // Dark (unchanged)
+  static const darkBg = Color(0xFF0B1020);
+  static const darkSurface = Color(0xFF131A2E);
+  static const darkSurfaceAlt = Color(0xFF1C2540);
+
+  // Light (blue-tinted)
+  static const lightBg = Color(0xFFF6F8FC);
+  static const lightBorder = Color(0xFFE5EAF3);
+  static const lightText = Color(0xFF0F172A);
+  static const lightTextSec = Color(0xFF64748B);
+  static const lightTextTer = Color(0xFF94A3B8);
+
+  static Color bg(bool d) => d ? darkBg : lightBg;
+  static Color surface(bool d) => d ? darkSurface : Colors.white;
+  static Color surfaceAlt(bool d) => d ? darkSurfaceAlt : const Color(0xFFF1F4FA);
+  static Color border(bool d) => d ? Colors.white.withOpacity(0.07) : lightBorder;
+  static Color text(bool d) => d ? Colors.white : lightText;
+  static Color textSec(bool d) => d ? Colors.white60 : lightTextSec;
+  static Color textTer(bool d) => d ? Colors.white38 : lightTextTer;
+
+  static Color accentSoftBg(bool d) => d ? accent.withOpacity(0.15) : accentSoft;
+}
 
 class PropertyRoomsPage extends StatefulWidget {
   final Property property;
@@ -54,31 +97,20 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
     if (mounted) _staggerController.forward(from: 0);
   }
 
-  // ================= ADD/EDIT SHEET =================
-  void _openRoomSheet({Room? room}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _RoomFormSheet(
-        propertyId: widget.property.propertyId,
-        room: room,
-      ),
-    ).then((success) {
-      if (success == true) _loadRooms();
-    });
-  }
+  double _bottomPad(BuildContext ctx) => MediaQuery.of(ctx).padding.bottom;
 
-  // ================= STATUS SHEET =================
-  Future<void> _openStatusSheet(Room room) async {
+  // ================= ADD CHOOSER =================
+  Future<void> _openAddChooser() async {
+    HapticFeedback.selectionClick();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selected = await showModalBottomSheet<String>(
+
+    final choice = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      builder: (ctx) => Container(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + _bottomPad(ctx)),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121729) : Colors.white,
+          color: _C.surface(isDark),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
@@ -94,78 +126,62 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
             ),
             const SizedBox(height: 20),
             Text(
-              'Change Room Status',
+              'Add Rooms',
               style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w700,
                 fontSize: 17,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                color: _C.text(isDark),
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              'Room ${room.roomNumber ?? room.roomId}',
+              widget.property.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                color: _C.textSec(isDark),
               ),
             ),
             const SizedBox(height: 20),
-            ...[
-              _statusOption(
-                value: 'AVAILABLE',
-                label: 'Available',
-                subtitle: 'Room is ready for booking',
-                icon: Icons.check_circle_rounded,
-                color: const Color(0xFF22C55E),
-                isSelected: room.status == 'AVAILABLE',
-                isDark: isDark,
-              ),
-              _statusOption(
-                value: 'OCCUPIED',
-                label: 'Occupied',
-                subtitle: 'Room is currently booked',
-                icon: Icons.person_rounded,
-                color: const Color(0xFFEF4444),
-                isSelected: room.status == 'OCCUPIED',
-                isDark: isDark,
-              ),
-              _statusOption(
-                value: 'MAINTENANCE',
-                label: 'Maintenance',
-                subtitle: 'Room is under repair',
-                icon: Icons.build_rounded,
-                color: const Color(0xFFF59E0B),
-                isSelected: room.status == 'MAINTENANCE',
-                isDark: isDark,
-              ),
-            ],
+            _chooserTile(
+              value: 'bulk',
+              label: 'Add rooms in bulk',
+              subtitle: 'Create 10, 20 or 40 rooms in one go',
+              icon: Icons.dynamic_feed_rounded,
+              color: _C.accent,
+              badge: 'Recommended',
+              isDark: isDark,
+            ),
+            _chooserTile(
+              value: 'single',
+              label: 'Add a single room',
+              subtitle: 'Add one room with custom details',
+              icon: Icons.add_home_work_rounded,
+              color: _C.teal,
+              isDark: isDark,
+            ),
           ],
         ),
       ),
     );
 
-    if (selected != null && selected != room.status && mounted) {
-      final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
-      final ok = await ownerProvider.updateRoomStatus(
-        widget.property.propertyId,
-        room.roomId,
-        selected,
-      );
-      if (ok && mounted) {
-        _showSnack('Status updated successfully');
-        _loadRooms();
-      }
+    if (!mounted) return;
+    if (choice == 'single') {
+      _openRoomSheet();
+    } else if (choice == 'bulk') {
+      _openBulkAdd();
     }
   }
 
-  Widget _statusOption({
+  Widget _chooserTile({
     required String value,
     required String label,
     required String subtitle,
     required IconData icon,
     required Color color,
-    required bool isSelected,
     required bool isDark,
+    String? badge,
   }) {
     return GestureDetector(
       onTap: () => Navigator.pop(context, value),
@@ -173,16 +189,9 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected
-              ? color.withOpacity(0.08)
-              : (isDark ? const Color(0xFF1A1F33) : const Color(0xFFF8F9FC)),
+          color: color.withOpacity(0.07),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? color
-                : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
-            width: isSelected ? 1.8 : 1.2,
-          ),
+          border: Border.all(color: color.withOpacity(0.30), width: 1.4),
         ),
         child: Row(
           children: [
@@ -190,7 +199,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withOpacity(0.14),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 22),
@@ -200,39 +209,101 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: _C.text(isDark),
+                          ),
+                        ),
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            badge,
+                            style: GoogleFonts.poppins(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   Text(
                     subtitle,
                     style: GoogleFonts.poppins(
                       fontSize: 11.5,
-                      color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                      color: _C.textSec(isDark),
                     ),
                   ),
                 ],
               ),
             ),
-            if (isSelected)
-              Icon(Icons.check_circle_rounded, color: color, size: 22),
+            Icon(Icons.chevron_right_rounded, color: color),
           ],
         ),
       ),
     );
   }
 
-  // ================= DELETE =================
+  Future<void> _openBulkAdd() async {
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BulkAddRoomsPage(property: widget.property),
+      ),
+    );
+    if (created == true && mounted) _loadRooms();
+  }
+
+  Future<void> _openRoomDetail(Room room) async {
+    HapticFeedback.selectionClick();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RoomDetailPage(
+          propertyId: widget.property.propertyId,
+          roomId: room.roomId,
+          roomLabel: 'Room ${room.roomNumber ?? room.roomId}',
+        ),
+      ),
+    );
+    if (mounted) _loadRooms();
+  }
+
+  void _openRoomSheet({Room? room}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RoomFormSheet(
+        propertyId: widget.property.propertyId,
+        room: room,
+      ),
+    ).then((success) {
+      if (success == true) _loadRooms();
+    });
+  }
+
   Future<void> _confirmDelete(Room room) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF121729) : Colors.white,
+        backgroundColor: _C.surface(isDark),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -243,12 +314,12 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  color: _C.danger.withOpacity(0.10),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.delete_outline_rounded,
-                  color: Color(0xFFEF4444),
+                  color: _C.danger,
                   size: 30,
                 ),
               ),
@@ -258,7 +329,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: 18,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  color: _C.text(isDark),
                 ),
               ),
               const SizedBox(height: 8),
@@ -267,7 +338,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 12.5,
-                  color: isDark ? Colors.white60 : const Color(0xFF8A8FA3),
+                  color: _C.textSec(isDark),
                   height: 1.5,
                 ),
               ),
@@ -281,11 +352,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: isDark
-                                ? Colors.white12
-                                : const Color(0xFFE8E8F0),
-                          ),
+                          side: BorderSide(color: _C.border(isDark)),
                         ),
                       ),
                       child: Text(
@@ -293,7 +360,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color: isDark ? Colors.white70 : const Color(0xFF666680),
+                          color: _C.textSec(isDark),
                         ),
                       ),
                     ),
@@ -303,7 +370,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context, true),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444),
+                        backgroundColor: _C.danger,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -334,18 +401,21 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
         widget.property.propertyId,
         room.roomId,
       );
-      if (ok && mounted) {
+      if (!mounted) return;
+      if (ok) {
         _showSnack('Room deleted');
         _loadRooms();
+      } else {
+        _showSnack(ownerProvider.error ?? 'Could not delete room', error: true);
       }
     }
   }
 
-  void _showSnack(String msg) {
+  void _showSnack(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
-        backgroundColor: const Color(0xFF22C55E),
+        backgroundColor: error ? _C.danger : _C.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         margin: const EdgeInsets.all(16),
@@ -359,7 +429,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF7F8FC),
+      backgroundColor: _C.bg(isDark),
       body: SafeArea(
         child: Consumer<OwnerProvider>(
           builder: (context, provider, _) {
@@ -371,16 +441,17 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
             final occupied = rooms.where((r) => r.status == 'OCCUPIED').length;
             final maintenance =
                 rooms.where((r) => r.status == 'MAINTENANCE').length;
+            final totalBeds = rooms.fold<int>(0, (s, r) => s + r.capacity);
+            final filledBeds = rooms.fold<int>(0, (s, r) => s + r.occupiedCount);
 
             return Column(
               children: [
-                _buildHeader(isDark, total, available, occupied),
+                _buildHeader(isDark),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: _loadRooms,
-                    color: const Color(0xFF7C3AED),
-                    backgroundColor:
-                        isDark ? const Color(0xFF1A1F33) : Colors.white,
+                    color: _C.accent,
+                    backgroundColor: _C.surface(isDark),
                     child: provider.isLoading && rooms.isEmpty
                         ? _buildSkeleton(isDark)
                         : rooms.isEmpty
@@ -392,7 +463,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                                     parent: AlwaysScrollableScrollPhysics(),
                                   ),
                                   padding: const EdgeInsets.fromLTRB(
-                                      16, 6, 16, 100),
+                                      14, 4, 14, 100),
                                   children: [
                                     _buildStatsRow(
                                       isDark,
@@ -401,7 +472,10 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                                       occupied,
                                       maintenance,
                                     ),
-                                    const SizedBox(height: 18),
+                                    const SizedBox(height: 12),
+                                    _buildBedSummary(
+                                        isDark, filledBeds, totalBeds),
+                                    const SizedBox(height: 20),
                                     Row(
                                       children: [
                                         Text(
@@ -409,9 +483,8 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                                           style: GoogleFonts.poppins(
                                             fontWeight: FontWeight.w700,
                                             fontSize: 15,
-                                            color: isDark
-                                                ? Colors.white
-                                                : const Color(0xFF1A1A2E),
+                                            letterSpacing: -0.2,
+                                            color: _C.text(isDark),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -419,8 +492,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF7C3AED)
-                                                .withOpacity(0.12),
+                                            color: _C.accentSoftBg(isDark),
                                             borderRadius:
                                                 BorderRadius.circular(100),
                                           ),
@@ -429,7 +501,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                                             style: GoogleFonts.poppins(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF7C3AED),
+                                              color: _C.accent,
                                             ),
                                           ),
                                         ),
@@ -437,18 +509,20 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                                     ),
                                     const SizedBox(height: 10),
                                     ...List.generate(rooms.length, (i) {
-                                      final delay = i * 0.06;
+                                      final delay = (i * 0.06).clamp(0.0, 0.6);
                                       return AnimatedBuilder(
                                         animation: _staggerController,
                                         builder: (context, child) {
-                                          final t = Curves.easeOutCubic.transform(
-                                            ((_staggerController.value - delay)
-                                                    .clamp(0.0, 1.0))
-                                                .toDouble(),
-                                          );
+                                          final t = Curves.easeOutCubic
+                                              .transform(((_staggerController
+                                                          .value -
+                                                      delay)
+                                                  .clamp(0.0, 1.0))
+                                              .toDouble());
                                           return Transform.translate(
                                             offset: Offset(0, 20 * (1 - t)),
-                                            child: Opacity(opacity: t, child: child),
+                                            child: Opacity(
+                                                opacity: t, child: child),
                                           );
                                         },
                                         child: _buildRoomCard(
@@ -470,10 +544,9 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
   }
 
   // ================= HEADER =================
-  Widget _buildHeader(
-      bool isDark, int total, int available, int occupied) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+  Widget _buildHeader(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       child: Row(
         children: [
           _circleIconBtn(
@@ -491,7 +564,8 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
                     fontSize: 19,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    letterSpacing: -0.3,
+                    color: _C.text(isDark),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -501,7 +575,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 11.5,
-                    color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                    color: _C.textSec(isDark),
                   ),
                 ),
               ],
@@ -524,19 +598,18 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+          color: _C.surface(isDark),
           shape: BoxShape.circle,
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.08)
-                : const Color(0xFFE8E8F0),
-          ),
+          border: Border.all(color: _C.border(isDark)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.20 : 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
-        child: Icon(
-          icon,
-          size: 20,
-          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-        ),
+        child: Icon(icon, size: 20, color: _C.text(isDark)),
       ),
     );
   }
@@ -546,12 +619,14 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF7C3AED), Color(0xFF4ECDC4)],
+          colors: [_C.accent, _C.accentLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withOpacity(0.4),
+            color: _C.accent.withOpacity(0.40),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -560,7 +635,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _openRoomSheet(),
+          onTap: _openAddChooser,
           borderRadius: BorderRadius.circular(18),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -570,7 +645,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                 const Icon(Icons.add_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 6),
                 Text(
-                  'Add Room',
+                  'Add Rooms',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
                     fontSize: 13.5,
@@ -590,17 +665,15 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
       int maintenance) {
     return Row(
       children: [
-        _statCard('Total', total, Icons.meeting_room_rounded,
-            const Color(0xFF7C3AED), isDark),
+        _statCard('Total', total, Icons.meeting_room_rounded, _C.accent, isDark),
         const SizedBox(width: 8),
-        _statCard('Free', available, Icons.check_circle_rounded,
-            const Color(0xFF22C55E), isDark),
+        _statCard('Open', available, Icons.check_circle_rounded, _C.success,
+            isDark),
         const SizedBox(width: 8),
-        _statCard('Booked', occupied, Icons.person_rounded,
-            const Color(0xFFEF4444), isDark),
+        _statCard('Full', occupied, Icons.person_rounded, _C.danger, isDark),
         const SizedBox(width: 8),
-        _statCard('Repair', maintenance, Icons.build_rounded,
-            const Color(0xFFF59E0B), isDark),
+        _statCard('Repair', maintenance, Icons.build_rounded, _C.warning,
+            isDark),
       ],
     );
   }
@@ -609,16 +682,14 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
       String label, int value, IconData icon, Color color, bool isDark) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121729) : Colors.white,
+          color: _C.surface(isDark),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF0F0F8),
-          ),
+          border: Border.all(color: _C.border(isDark)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+              color: Colors.black.withOpacity(isDark ? 0.20 : 0.03),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -635,21 +706,23 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
               ),
               child: Icon(icon, color: color, size: 15),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               '$value',
               style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                height: 1,
+                color: _C.text(isDark),
               ),
             ),
+            const SizedBox(height: 2),
             Text(
               label,
               style: GoogleFonts.poppins(
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                color: _C.textSec(isDark),
               ),
             ),
           ],
@@ -658,39 +731,104 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
     );
   }
 
+  // ✅ BED SUMMARY
+  Widget _buildBedSummary(bool isDark, int filled, int total) {
+    final ratio = total == 0 ? 0.0 : filled / total;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _C.surface(isDark),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _C.border(isDark)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.20 : 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _C.accentSoftBg(isDark),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.bed_rounded,
+                    size: 14, color: _C.accent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$filled of $total beds filled',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                    color: _C.text(isDark),
+                  ),
+                ),
+              ),
+              Text(
+                '${(ratio * 100).round()}%',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: _C.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(100),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 7,
+              backgroundColor:
+                  isDark ? Colors.white12 : const Color(0xFFE8E8F0),
+              valueColor: const AlwaysStoppedAnimation<Color>(_C.accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ================= ROOM CARD =================
   Widget _buildRoomCard(BuildContext context, Room room, bool isDark) {
-    final statusConfig = {
-      'AVAILABLE': {
-        'color': const Color(0xFF22C55E),
-        'label': 'Available',
-        'icon': Icons.check_circle_rounded,
-      },
-      'OCCUPIED': {
-        'color': const Color(0xFFEF4444),
-        'label': 'Occupied',
-        'icon': Icons.person_rounded,
-      },
-      'MAINTENANCE': {
-        'color': const Color(0xFFF59E0B),
-        'label': 'Maintenance',
-        'icon': Icons.build_rounded,
-      },
-    };
+    final Color color;
+    final String label;
+    final IconData icon;
 
-    final cfg = statusConfig[room.status] ?? statusConfig['AVAILABLE']!;
-    final color = cfg['color'] as Color;
-    final label = cfg['label'] as String;
-    final icon = cfg['icon'] as IconData;
+    if (room.isUnderMaintenance) {
+      color = _C.warning;
+      label = 'Maintenance';
+      icon = Icons.build_rounded;
+    } else if (room.isFull) {
+      color = _C.danger;
+      label = 'Fully Booked';
+      icon = Icons.person_rounded;
+    } else if (room.isPartiallyOccupied) {
+      color = _C.accent;
+      label = room.availabilityLabel;
+      icon = Icons.people_alt_rounded;
+    } else {
+      color = _C.success;
+      label = room.availabilityLabel;
+      icon = Icons.check_circle_rounded;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121729) : Colors.white,
+        color: _C.surface(isDark),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF0F0F8),
-        ),
+        border: Border.all(color: _C.border(isDark)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
@@ -699,192 +837,238 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top row
-            Row(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => _openRoomDetail(room),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [color.withOpacity(0.15), color.withOpacity(0.05)],
+                // Top row
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: color.withOpacity(0.20)),
+                      ),
+                      child: Icon(icon, color: color, size: 22),
                     ),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              'Room ${room.roomNumber ?? room.roomId}',
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF1A1A2E),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Room ${room.roomNumber ?? room.roomId}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                    letterSpacing: -0.2,
+                                    color: _C.text(isDark),
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _C.accentSoftBg(isDark),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  room.roomType,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: _C.accent,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF7C3AED).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              room.roomType,
-                              style: GoogleFonts.poppins(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF7C3AED),
-                              ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Floor ${room.floorNumber ?? 0} • Capacity ${room.capacity}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11.5,
+                              color: _C.textSec(isDark),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Floor ${room.floorNumber ?? 0} • Capacity ${room.capacity}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11.5,
-                          color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
-                        ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(color: color.withOpacity(0.30)),
                       ),
-                    ],
-                  ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            label,
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(100),
-                    border: Border.all(color: color.withOpacity(0.3)),
+
+                const SizedBox(height: 14),
+
+                // Bed bar
+                _bedBar(room, color, isDark),
+
+                const SizedBox(height: 14),
+
+                // Tags
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _miniTag(
+                      '₹${room.monthlyRent.toStringAsFixed(0)}/mo',
+                      Icons.currency_rupee_rounded,
+                      _C.accent,
+                      isDark,
+                    ),
+                    if (room.hasAc)
+                      _miniTag('AC', Icons.ac_unit_rounded, _C.info, isDark),
+                    if (room.hasAttachedBathroom)
+                      _miniTag('Attached Bath', Icons.bathtub_rounded,
+                          _C.purple, isDark),
+                  ],
+                ),
+
+                if (room.description != null &&
+                    room.description!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    room.description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.5,
+                      color: _C.textSec(isDark),
+                      height: 1.4,
+                    ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                        ),
+                ],
+
+                const SizedBox(height: 14),
+
+                // Actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: _actionBtn(
+                        icon: Icons.groups_rounded,
+                        label: 'Details',
+                        color: _C.accent,
+                        isDark: isDark,
+                        onTap: () => _openRoomDetail(room),
                       ),
-                      const SizedBox(width: 5),
-                      Text(
-                        label,
-                        style: GoogleFonts.poppins(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: color,
-                        ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _actionBtn(
+                        icon: Icons.edit_rounded,
+                        label: 'Edit',
+                        color: _C.info,
+                        isDark: isDark,
+                        onTap: () => _openRoomSheet(room: room),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _actionBtn(
+                        icon: Icons.delete_outline_rounded,
+                        label: 'Delete',
+                        color: _C.danger,
+                        isDark: isDark,
+                        onTap: () => _confirmDelete(room),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-
-            const SizedBox(height: 12),
-
-            // Tags row
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _miniTag(
-                  '₹${room.monthlyRent.toStringAsFixed(0)}/mo',
-                  Icons.currency_rupee_rounded,
-                  const Color(0xFF7C3AED),
-                  isDark,
-                ),
-                if (room.hasAc)
-                  _miniTag(
-                    'AC',
-                    Icons.ac_unit_rounded,
-                    const Color(0xFF3B82F6),
-                    isDark,
-                  ),
-                if (room.hasAttachedBathroom)
-                  _miniTag(
-                    'Attached Bath',
-                    Icons.bathtub_rounded,
-                    const Color(0xFF8B5CF6),
-                    isDark,
-                  ),
-              ],
-            ),
-
-            if (room.description != null && room.description!.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                room.description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                  fontSize: 11.5,
-                  color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
-                  height: 1.4,
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 14),
-
-            // Action row
-            Row(
-              children: [
-                Expanded(
-                  child: _actionBtn(
-                    icon: Icons.edit_rounded,
-                    label: 'Edit',
-                    color: const Color(0xFF3B82F6),
-                    isDark: isDark,
-                    onTap: () => _openRoomSheet(room: room),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _actionBtn(
-                    icon: Icons.swap_horiz_rounded,
-                    label: 'Status',
-                    color: const Color(0xFF7C3AED),
-                    isDark: isDark,
-                    onTap: () => _openStatusSheet(room),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _actionBtn(
-                    icon: Icons.delete_outline_rounded,
-                    label: 'Delete',
-                    color: const Color(0xFFEF4444),
-                    isDark: isDark,
-                    onTap: () => _confirmDelete(room),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  // ✅ Enhanced bed bar with rounded segments
+  Widget _bedBar(Room room, Color color, bool isDark) {
+    final segments = room.capacity.clamp(1, 12);
+    final trackColor = isDark ? Colors.white12 : const Color(0xFFE8EDF5);
+
+    return Row(
+      children: [
+        Expanded(
+          child: Row(
+            children: List.generate(segments, (i) {
+              final filled = i < room.occupiedCount;
+              return Expanded(
+                child: Container(
+                  height: 7,
+                  margin: EdgeInsets.only(right: i < segments - 1 ? 4 : 0),
+                  decoration: BoxDecoration(
+                    gradient: filled
+                        ? LinearGradient(
+                            colors: [color, color.withOpacity(0.85)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: filled ? null : trackColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          '${room.occupiedCount}/${room.capacity}',
+          style: GoogleFonts.poppins(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: _C.textSec(isDark),
+          ),
+        ),
+      ],
     );
   }
 
@@ -930,7 +1114,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
           decoration: BoxDecoration(
             color: color.withOpacity(0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.2), width: 1.2),
+            border: Border.all(color: color.withOpacity(0.20), width: 1.2),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -956,7 +1140,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
   Widget _buildSkeleton(bool isDark) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
       children: [
         Row(
           children: List.generate(
@@ -966,11 +1150,19 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                 margin: EdgeInsets.only(right: i < 3 ? 8 : 0),
                 height: 86,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF121729) : Colors.white,
+                  color: _C.surface(isDark),
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          height: 70,
+          decoration: BoxDecoration(
+            color: _C.surface(isDark),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         const SizedBox(height: 18),
@@ -980,7 +1172,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
             margin: const EdgeInsets.only(bottom: 12),
             height: 170,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF121729) : Colors.white,
+              color: _C.surface(isDark),
               borderRadius: BorderRadius.circular(20),
             ),
           ),
@@ -1004,17 +1196,13 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF7C3AED).withOpacity(0.15),
-                    const Color(0xFF4ECDC4).withOpacity(0.08),
-                  ],
-                ),
+                color: _C.accent.withOpacity(0.10),
+                border: Border.all(color: _C.accent.withOpacity(0.15), width: 2),
               ),
               child: const Icon(
                 Icons.meeting_room_outlined,
                 size: 56,
-                color: Color(0xFF7C3AED),
+                color: _C.accent,
               ),
             ),
             const SizedBox(height: 24),
@@ -1023,33 +1211,34 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
               style: GoogleFonts.poppins(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                letterSpacing: -0.3,
+                color: _C.text(isDark),
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Start adding rooms to this property\nso students can book them.',
+              'Add all your rooms at once in bulk,\nor one by one, so students can book them.',
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 12.5,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                color: _C.textSec(isDark),
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 28),
             GestureDetector(
-              onTap: () => _openRoomSheet(),
+              onTap: _openAddChooser,
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF7C3AED), Color(0xFF4ECDC4)],
+                    colors: [_C.accent, _C.accentLight],
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF7C3AED).withOpacity(0.35),
+                      color: _C.accent.withOpacity(0.35),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -1062,7 +1251,7 @@ class _PropertyRoomsPageState extends State<PropertyRoomsPage>
                         color: Colors.white, size: 18),
                     const SizedBox(width: 8),
                     Text(
-                      'Add First Room',
+                      'Add Rooms',
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -1108,6 +1297,12 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
 
   bool get _isEdit => widget.room != null;
 
+  static const Map<String, int> _fixedBeds = {
+    'SINGLE': 1,
+    'DOUBLE': 2,
+    'TRIPLE': 3,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -1135,6 +1330,18 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
     _floorCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
+  }
+
+  void _onTypeSelected(String type) {
+    setState(() {
+      _roomType = type;
+      final beds = _fixedBeds[type];
+      if (beds != null) {
+        _capacityCtrl.text = '$beds';
+      } else if ((int.tryParse(_capacityCtrl.text) ?? 0) < 4) {
+        _capacityCtrl.text = '4';
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -1171,7 +1378,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
             _isEdit ? 'Room updated successfully' : 'Room added successfully',
             style: GoogleFonts.poppins(fontSize: 13),
           ),
-          backgroundColor: const Color(0xFF22C55E),
+          backgroundColor: _C.success,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -1186,7 +1393,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
             ownerProvider.error ?? 'Something went wrong',
             style: GoogleFonts.poppins(fontSize: 13),
           ),
-          backgroundColor: const Color(0xFFEF4444),
+          backgroundColor: _C.danger,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -1200,11 +1407,12 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final capacityLocked = !_isEdit && _roomType != 'DORMITORY';
 
     return Container(
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F1320) : Colors.white,
+        color: _C.surface(isDark),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: DraggableScrollableSheet(
@@ -1214,7 +1422,6 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
         maxChildSize: 0.95,
         builder: (_, scrollController) => Column(
           children: [
-            // Handle bar
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
               width: 40,
@@ -1224,7 +1431,6 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                 borderRadius: BorderRadius.circular(100),
               ),
             ),
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 12, 16),
               child: Row(
@@ -1234,9 +1440,16 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                     height: 44,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                        colors: [_C.accent, _C.accentLight],
                       ),
                       borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _C.accent.withOpacity(0.30),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Icon(
                       _isEdit ? Icons.edit_rounded : Icons.add_rounded,
@@ -1254,16 +1467,14 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w700,
                             fontSize: 18,
-                            color:
-                                isDark ? Colors.white : const Color(0xFF1A1A2E),
+                            color: _C.text(isDark),
                           ),
                         ),
                         Text(
                           'Fill room details below',
                           style: GoogleFonts.poppins(
                             fontSize: 11.5,
-                            color:
-                                isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                            color: _C.textSec(isDark),
                           ),
                         ),
                       ],
@@ -1273,19 +1484,23 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                     onPressed: () => Navigator.pop(context, false),
                     icon: Icon(
                       Icons.close_rounded,
-                      color: isDark ? Colors.white70 : const Color(0xFF666680),
+                      color: _C.textSec(isDark),
                     ),
                   ),
                 ],
               ),
             ),
-            // Content
             Expanded(
               child: Form(
                 key: _formKey,
                 child: ListView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    0,
+                    20,
+                    24 + _bottomPad(context),
+                  ),
                   physics: const BouncingScrollPhysics(),
                   children: [
                     _sectionTitle('Basic Details', isDark),
@@ -1324,17 +1539,23 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                         Expanded(
                           child: _textField(
                             controller: _capacityCtrl,
-                            label: 'Capacity',
+                            label: capacityLocked ? 'Beds (auto)' : 'Beds',
                             hint: '1',
                             icon: Icons.people_rounded,
                             isDark: isDark,
+                            readOnly: capacityLocked,
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly
                             ],
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Required'
-                                : null,
+                            validator: (v) {
+                              final n = int.tryParse((v ?? '').trim());
+                              if (n == null || n < 1) return 'Required';
+                              if (!_isEdit && _roomType == 'DORMITORY' && n < 4) {
+                                return 'Min 4';
+                              }
+                              return null;
+                            },
                           ),
                         ),
                       ],
@@ -1360,7 +1581,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                             label: 'AC',
                             value: _hasAc,
                             onChanged: (v) => setState(() => _hasAc = v),
-                            color: const Color(0xFF3B82F6),
+                            color: _C.info,
                             isDark: isDark,
                           ),
                         ),
@@ -1371,7 +1592,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                             label: 'Attached Bath',
                             value: _hasBathroom,
                             onChanged: (v) => setState(() => _hasBathroom = v),
-                            color: const Color(0xFF8B5CF6),
+                            color: _C.purple,
                             isDark: isDark,
                           ),
                         ),
@@ -1401,11 +1622,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                                   const EdgeInsets.symmetric(vertical: 15),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
-                                side: BorderSide(
-                                  color: isDark
-                                      ? Colors.white12
-                                      : const Color(0xFFE8E8F0),
-                                ),
+                                side: BorderSide(color: _C.border(isDark)),
                               ),
                             ),
                             child: Text(
@@ -1413,9 +1630,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13.5,
-                                color: isDark
-                                    ? Colors.white70
-                                    : const Color(0xFF666680),
+                                color: _C.textSec(isDark),
                               ),
                             ),
                           ),
@@ -1431,16 +1646,15 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                                       Color(0xFFCCCCCC)
                                     ])
                                   : const LinearGradient(colors: [
-                                      Color(0xFF7C3AED),
-                                      Color(0xFF4ECDC4)
+                                      _C.accent,
+                                      _C.accentLight,
                                     ]),
                               borderRadius: BorderRadius.circular(14),
                               boxShadow: _loading
                                   ? null
                                   : [
                                       BoxShadow(
-                                        color: const Color(0xFF7C3AED)
-                                            .withOpacity(0.35),
+                                        color: _C.accent.withOpacity(0.35),
                                         blurRadius: 16,
                                         offset: const Offset(0, 6),
                                       ),
@@ -1490,6 +1704,8 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
     );
   }
 
+  double _bottomPad(BuildContext ctx) => MediaQuery.of(ctx).padding.bottom;
+
   Widget _sectionTitle(String text, bool isDark) {
     return Text(
       text,
@@ -1497,7 +1713,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
         fontWeight: FontWeight.w700,
         fontSize: 12,
         letterSpacing: 0.4,
-        color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+        color: _C.textSec(isDark),
       ),
     );
   }
@@ -1509,67 +1725,61 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'Room Type',
+            _isEdit ? 'Room Type (cannot be changed)' : 'Room Type',
             style: GoogleFonts.poppins(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white70 : const Color(0xFF666680),
+              color: _C.textSec(isDark),
             ),
           ),
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _roomTypes.map((t) {
-            final isSel = _roomType == t;
-            return GestureDetector(
-              onTap: () => setState(() => _roomType = t),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: isSel
-                      ? const LinearGradient(
-                          colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
-                        )
-                      : null,
-                  color: isSel
-                      ? null
-                      : (isDark
-                          ? const Color(0xFF1A1F33)
-                          : const Color(0xFFF8F9FC)),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSel
-                        ? Colors.transparent
-                        : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
-                    width: 1.4,
+        Opacity(
+          opacity: _isEdit ? 0.6 : 1,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _roomTypes.map((t) {
+              final isSel = _roomType == t;
+              return GestureDetector(
+                onTap: _isEdit ? null : () => _onTypeSelected(t),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: isSel
+                        ? const LinearGradient(
+                            colors: [_C.accent, _C.accentLight],
+                          )
+                        : null,
+                    color: isSel ? null : _C.surfaceAlt(isDark),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSel ? Colors.transparent : _C.border(isDark),
+                      width: 1.4,
+                    ),
+                    boxShadow: isSel
+                        ? [
+                            BoxShadow(
+                              color: _C.accent.withOpacity(0.30),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
                   ),
-                  boxShadow: isSel
-                      ? [
-                          BoxShadow(
-                            color:
-                                const Color(0xFF7C3AED).withOpacity(0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  t,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isSel
-                        ? Colors.white
-                        : (isDark ? Colors.white70 : const Color(0xFF666680)),
+                  child: Text(
+                    t,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSel ? Colors.white : _C.textSec(isDark),
+                    ),
                   ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ],
     );
@@ -1589,14 +1799,10 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: value
-              ? color.withOpacity(0.08)
-              : (isDark ? const Color(0xFF1A1F33) : const Color(0xFFF8F9FC)),
+          color: value ? color.withOpacity(0.08) : _C.surfaceAlt(isDark),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: value
-                ? color
-                : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
+            color: value ? color : _C.border(isDark),
             width: value ? 1.8 : 1.2,
           ),
         ),
@@ -1609,9 +1815,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                 color: value ? color : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: value
-                      ? color
-                      : (isDark ? Colors.white24 : const Color(0xFFCCCCDD)),
+                  color: value ? color : _C.textTer(isDark),
                   width: 2,
                 ),
               ),
@@ -1622,8 +1826,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
             ),
             const SizedBox(width: 10),
             Icon(icon,
-                size: 16,
-                color: value ? color : (isDark ? Colors.white54 : Colors.grey)),
+                size: 16, color: value ? color : _C.textSec(isDark)),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -1631,9 +1834,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
                 style: GoogleFonts.poppins(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: value
-                      ? color
-                      : (isDark ? Colors.white70 : const Color(0xFF666680)),
+                  color: value ? color : _C.textSec(isDark),
                 ),
               ),
             ),
@@ -1650,6 +1851,7 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
     required IconData icon,
     required bool isDark,
     int maxLines = 1,
+    bool readOnly = false,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
@@ -1664,64 +1866,60 @@ class _RoomFormSheetState extends State<_RoomFormSheet> {
             style: GoogleFonts.poppins(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white70 : const Color(0xFF666680),
+              color: _C.textSec(isDark),
             ),
           ),
         ),
         TextFormField(
           controller: controller,
           maxLines: maxLines,
+          readOnly: readOnly,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           validator: validator,
+          cursorColor: _C.accent,
           style: GoogleFonts.poppins(
             fontSize: 13.5,
-            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            color: _C.text(isDark),
           ),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: GoogleFonts.poppins(
               fontSize: 13,
-              color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+              color: _C.textTer(isDark),
             ),
             prefixIcon: Icon(
               icon,
               size: 18,
-              color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+              color: _C.textSec(isDark),
             ),
             filled: true,
-            fillColor:
-                isDark ? const Color(0xFF1A1F33) : const Color(0xFFF8F9FC),
+            fillColor: readOnly
+                ? (isDark
+                    ? const Color(0xFF151A2B)
+                    : const Color(0xFFF0F1F6))
+                : _C.surfaceAlt(isDark),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: isDark ? Colors.white12 : const Color(0xFFE8E8F0),
-                width: 1.4,
-              ),
+              borderSide: BorderSide(color: _C.border(isDark), width: 1.4),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: isDark ? Colors.white12 : const Color(0xFFE8E8F0),
-                width: 1.4,
-              ),
+              borderSide: BorderSide(color: _C.border(isDark), width: 1.4),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  const BorderSide(color: Color(0xFF7C3AED), width: 1.8),
+              borderSide: const BorderSide(color: _C.accent, width: 1.8),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+              borderSide: const BorderSide(color: _C.danger, width: 1.8),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+              borderSide: const BorderSide(color: _C.danger, width: 1.8),
             ),
           ),
         ),

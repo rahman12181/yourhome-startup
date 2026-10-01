@@ -8,6 +8,43 @@ import 'package:provider/provider.dart';
 import '../../models/property_model.dart';
 import '../../providers/owner_provider.dart';
 
+// ══════════════════════════════════════════════════════════════
+// DESIGN TOKENS — Blue premium
+// ══════════════════════════════════════════════════════════════
+class _C {
+  static const accent = Color(0xFF2563EB);
+  static const accentDark = Color(0xFF1D4ED8);
+  static const accentLight = Color(0xFF3B82F6);
+  static const accentSoft = Color(0xFFEBF1FF);
+
+  static const success = Color(0xFF10B981);
+  static const successLight = Color(0xFF22C55E);
+  static const warning = Color(0xFFF59E0B);
+  static const danger = Color(0xFFEF4444);
+  static const info = Color(0xFF3B82F6);
+  static const purple = Color(0xFF8B5CF6);
+  static const teal = Color(0xFF14B8A6);
+
+  static const darkBg = Color(0xFF0B1020);
+  static const darkSurface = Color(0xFF131A2E);
+  static const darkSurfaceAlt = Color(0xFF1C2540);
+
+  static const lightBg = Color(0xFFF6F8FC);
+  static const lightBorder = Color(0xFFE5EAF3);
+  static const lightText = Color(0xFF0F172A);
+  static const lightTextSec = Color(0xFF64748B);
+  static const lightTextTer = Color(0xFF94A3B8);
+
+  static Color bg(bool d) => d ? darkBg : lightBg;
+  static Color surface(bool d) => d ? darkSurface : Colors.white;
+  static Color surfaceAlt(bool d) => d ? darkSurfaceAlt : const Color(0xFFF1F4FA);
+  static Color border(bool d) => d ? Colors.white.withOpacity(0.07) : lightBorder;
+  static Color text(bool d) => d ? Colors.white : lightText;
+  static Color textSec(bool d) => d ? Colors.white60 : lightTextSec;
+  static Color textTer(bool d) => d ? Colors.white38 : lightTextTer;
+  static Color accentSoftBg(bool d) => d ? accent.withOpacity(0.15) : accentSoft;
+}
+
 class AddEditPropertyPage extends StatefulWidget {
   final Property? property;
   const AddEditPropertyPage({super.key, this.property});
@@ -20,18 +57,34 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     with TickerProviderStateMixin {
   // ================= STEPS =================
   static const List<String> _steps = [
-    'Basic Info',
+    'Basic',
     'Location',
     'Pricing',
     'Media',
-    'Review',
+    'Done',
   ];
 
-  static const List<String> _propertyTypes = ['PG', 'HOSTEL', 'HOTEL', 'FLAT', 'ROOM'];
+  static const List<String> _propertyTypes = [
+    'PG',
+    'HOSTEL',
+    'HOTEL',
+    'FLAT',
+    'ROOM'
+  ];
   static const List<String> _genders = ['BOYS', 'GIRLS', 'BOTH'];
   static const List<String> _allAmenities = [
-    'WiFi', 'AC', 'Meals', 'Laundry', 'CCTV', 'Parking', 'Gym',
-    'Hot Water', 'Power Backup', 'Security', 'TV', 'Fridge',
+    'WiFi',
+    'AC',
+    'Meals',
+    'Laundry',
+    'CCTV',
+    'Parking',
+    'Gym',
+    'Hot Water',
+    'Power Backup',
+    'Security',
+    'TV',
+    'Fridge',
   ];
 
   // ================= STATE =================
@@ -41,7 +94,6 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
   bool _submitted = false;
   int? _createdPropertyId;
 
-  // Controllers
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
@@ -54,24 +106,20 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
   final _rentMaxCtrl = TextEditingController();
   final _depositCtrl = TextEditingController();
 
-  // Form values
   String _propertyType = '';
   String _genderAllowed = '';
   bool _isNegotiable = false;
   final List<String> _selectedAmenities = [];
 
-  // Media
   final List<_MediaItem> _mediaFiles = [];
   final ImagePicker _picker = ImagePicker();
 
-  // Errors
   final Map<String, String> _errors = {};
 
   bool get _isEdit => widget.property != null;
 
   late final AnimationController _fadeController;
 
-  // ================= INIT =================
   @override
   void initState() {
     super.initState();
@@ -123,18 +171,30 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
 
     if (_currentStep == 0) {
       if (_titleCtrl.text.trim().isEmpty) errs['title'] = 'Title is required';
-      if (_propertyType.isEmpty) errs['propertyType'] = 'Property type is required';
-      if (_genderAllowed.isEmpty) errs['genderAllowed'] = 'Gender is required';
+      if (_propertyType.isEmpty) {
+        errs['propertyType'] = 'Property type is required';
+      }
+      if (_genderAllowed.isEmpty) {
+        errs['genderAllowed'] = 'Gender is required';
+      }
     }
     if (_currentStep == 1) {
-      if (_addressCtrl.text.trim().isEmpty) errs['address'] = 'Address is required';
+      if (_addressCtrl.text.trim().isEmpty) {
+        errs['address'] = 'Address is required';
+      }
       if (_cityCtrl.text.trim().isEmpty) errs['city'] = 'City is required';
       if (_stateCtrl.text.trim().isEmpty) errs['state'] = 'State is required';
-      if (_pincodeCtrl.text.trim().isEmpty) errs['pincode'] = 'Pincode is required';
+      if (_pincodeCtrl.text.trim().isEmpty) {
+        errs['pincode'] = 'Pincode is required';
+      }
     }
     if (_currentStep == 2) {
-      if (_rentMinCtrl.text.trim().isEmpty) errs['rentMin'] = 'Min rent required';
-      if (_rentMaxCtrl.text.trim().isEmpty) errs['rentMax'] = 'Max rent required';
+      if (_rentMinCtrl.text.trim().isEmpty) {
+        errs['rentMin'] = 'Min rent required';
+      }
+      if (_rentMaxCtrl.text.trim().isEmpty) {
+        errs['rentMax'] = 'Max rent required';
+      }
     }
 
     setState(() {
@@ -148,7 +208,6 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
   Future<void> _handleNext() async {
     if (!_validateStep()) return;
 
-    // On Media step (index 3), submit property + upload media
     if (_currentStep == 3) {
       await _submitAll();
       return;
@@ -169,7 +228,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     }
   }
 
-  // ================= SUBMIT (uses YOUR OwnerProvider) =================
+  // ================= SUBMIT =================
   Future<void> _submitAll() async {
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
 
@@ -186,8 +245,10 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         'city': _cityCtrl.text.trim(),
         'state': _stateCtrl.text.trim(),
         'pincode': _pincodeCtrl.text.trim(),
-        if (_latCtrl.text.isNotEmpty) 'latitude': double.tryParse(_latCtrl.text),
-        if (_lngCtrl.text.isNotEmpty) 'longitude': double.tryParse(_lngCtrl.text),
+        if (_latCtrl.text.isNotEmpty)
+          'latitude': double.tryParse(_latCtrl.text),
+        if (_lngCtrl.text.isNotEmpty)
+          'longitude': double.tryParse(_lngCtrl.text),
         if (_rentMinCtrl.text.isNotEmpty)
           'monthlyRentMin': double.tryParse(_rentMinCtrl.text),
         if (_rentMaxCtrl.text.isNotEmpty)
@@ -200,7 +261,6 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
       int? propertyId;
 
       if (_isEdit) {
-        // ---- EDIT MODE ----
         final ok = await ownerProvider.updateProperty(
           widget.property!.propertyId,
           body,
@@ -208,7 +268,6 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         if (!ok) throw Exception(ownerProvider.error ?? 'Update failed');
         propertyId = widget.property!.propertyId;
       } else {
-        // ---- ADD MODE ----
         final Property? created = await ownerProvider.addProperty(body);
         if (created == null) {
           throw Exception(ownerProvider.error ?? 'Failed to add property');
@@ -218,7 +277,6 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
 
       _createdPropertyId = propertyId;
 
-      // ---- Upload media (works in both modes) ----
       if (_mediaFiles.isNotEmpty && propertyId != null) {
         setState(() => _uploadingMedia = true);
 
@@ -231,9 +289,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
               mediaType: m.isVideo ? 'VIDEO' : 'IMAGE',
               isPrimary: i == 0,
             );
-          } catch (_) {
-            // skip failed media, continue with others
-          }
+          } catch (_) {}
         }
 
         setState(() => _uploadingMedia = false);
@@ -258,7 +314,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     }
   }
 
-  // ================= MEDIA PICKERS =================
+  // ================= MEDIA =================
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 80);
     if (picked.isEmpty) return;
@@ -289,8 +345,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
-        backgroundColor:
-            isError ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
+        backgroundColor: isError ? _C.danger : _C.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         margin: const EdgeInsets.all(16),
@@ -304,6 +359,8 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     }
   }
 
+  double _bottomPad(BuildContext ctx) => MediaQuery.of(ctx).padding.bottom;
+
   // ================= BUILD =================
   @override
   Widget build(BuildContext context) {
@@ -315,9 +372,9 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         if (!didPop && !_loading && !_uploadingMedia) _handleBack();
       },
       child: Scaffold(
-        backgroundColor:
-            isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF7F8FC),
+        backgroundColor: _C.bg(isDark),
         body: SafeArea(
+          bottom: false,
           child: Column(
             children: [
               _buildHeader(isDark),
@@ -327,7 +384,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                   opacity: _fadeController,
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     child: _buildStepContent(isDark),
                   ),
                 ),
@@ -343,7 +400,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
   // ---------- HEADER ----------
   Widget _buildHeader(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       child: Row(
         children: [
           _iconButton(
@@ -360,15 +417,17 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                   _isEdit ? 'Edit Property' : 'Add New Property',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    fontSize: 19,
+                    letterSpacing: -0.3,
+                    color: _C.text(isDark),
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  'Step ${_currentStep + 1} of ${_steps.length}',
+                  'Step ${_currentStep + 1} of ${_steps.length} • ${_steps[_currentStep]}',
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: isDark ? Colors.white60 : const Color(0xFF8A8FA3),
+                    fontSize: 11,
+                    color: _C.textSec(isDark),
                   ),
                 ),
               ],
@@ -391,19 +450,18 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+          color: _C.surface(isDark),
           shape: BoxShape.circle,
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.08)
-                : const Color(0xFFE8E8F0),
-          ),
+          border: Border.all(color: _C.border(isDark)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.20 : 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
-        child: Icon(
-          icon,
-          size: 20,
-          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-        ),
+        child: Icon(icon, size: 20, color: _C.text(isDark)),
       ),
     );
   }
@@ -411,21 +469,21 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
   // ---------- STEP INDICATOR ----------
   Widget _buildStepIndicator(bool isDark) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      margin: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121729) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: _C.surface(isDark),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _C.border(isDark)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(isDark ? 0.20 : 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: List.generate(_steps.length, (i) {
           final isActive = i == _currentStep;
           final isDone = i < _currentStep;
@@ -437,40 +495,36 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                   children: [
                     if (i > 0)
                       Expanded(
-                        child: Container(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
                           height: 2,
                           color: i <= _currentStep
-                              ? const Color(0xFF22C55E)
-                              : (isDark
-                                  ? Colors.white12
-                                  : const Color(0xFFEDEDF5)),
+                              ? _C.accent
+                              : _C.border(isDark),
                         ),
                       ),
-                    Container(
-                      width: 32,
-                      height: 32,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: isActive
                             ? const LinearGradient(
-                                colors: [
-                                  Color(0xFF7C3AED),
-                                  Color(0xFF4ECDC4)
-                                ],
+                                colors: [_C.accent, _C.accentLight],
                               )
                             : null,
                         color: isDone
-                            ? const Color(0xFF22C55E)
+                            ? _C.accent
                             : (isActive
                                 ? null
                                 : (isDark
                                     ? const Color(0xFF1E2540)
-                                    : const Color(0xFFF0F0F5))),
+                                    : const Color(0xFFF0F1F6))),
                         boxShadow: isActive
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFF7C3AED)
-                                      .withOpacity(0.4),
+                                  color: _C.accent.withOpacity(0.40),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -481,7 +535,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                         child: isDone
                             ? const Icon(
                                 Icons.check_rounded,
-                                size: 16,
+                                size: 15,
                                 color: Colors.white,
                               )
                             : Text(
@@ -491,22 +545,19 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                                   fontSize: 12,
                                   color: isActive
                                       ? Colors.white
-                                      : (isDark
-                                          ? Colors.white38
-                                          : const Color(0xFF8A8FA3)),
+                                      : _C.textTer(isDark),
                                 ),
                               ),
                       ),
                     ),
                     if (i < _steps.length - 1)
                       Expanded(
-                        child: Container(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
                           height: 2,
                           color: i < _currentStep
-                              ? const Color(0xFF22C55E)
-                              : (isDark
-                                  ? Colors.white12
-                                  : const Color(0xFFEDEDF5)),
+                              ? _C.accent
+                              : _C.border(isDark),
                         ),
                       ),
                   ],
@@ -518,12 +569,8 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                     fontSize: 9.5,
                     fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                     color: isActive
-                        ? const Color(0xFF7C3AED)
-                        : (isDone
-                            ? const Color(0xFF22C55E)
-                            : (isDark
-                                ? Colors.white38
-                                : const Color(0xFF8A8FA3))),
+                        ? _C.accent
+                        : (isDone ? _C.accent : _C.textTer(isDark)),
                   ),
                 ),
               ],
@@ -607,7 +654,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
               _errorText(_errors['genderAllowed']!),
             const SizedBox(height: 16),
             _label('Amenities', isDark: isDark),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -624,21 +671,17 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                        horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
                       color: selected
-                          ? const Color(0xFF7C3AED).withOpacity(0.12)
-                          : (isDark
-                              ? const Color(0xFF1A1F33)
-                              : Colors.white),
+                          ? _C.accentSoftBg(isDark)
+                          : _C.surfaceAlt(isDark),
                       borderRadius: BorderRadius.circular(100),
                       border: Border.all(
                         color: selected
-                            ? const Color(0xFF7C3AED)
-                            : (isDark
-                                ? Colors.white12
-                                : const Color(0xFFE8E8F0)),
-                        width: 1.6,
+                            ? _C.accent
+                            : _C.border(isDark),
+                        width: 1.4,
                       ),
                     ),
                     child: Row(
@@ -648,7 +691,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                           const Icon(
                             Icons.check_rounded,
                             size: 13,
-                            color: Color(0xFF7C3AED),
+                            color: _C.accent,
                           ),
                           const SizedBox(width: 4),
                         ],
@@ -658,10 +701,8 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: selected
-                                ? const Color(0xFF7C3AED)
-                                : (isDark
-                                    ? Colors.white70
-                                    : const Color(0xFF666666)),
+                                ? _C.accent
+                                : _C.textSec(isDark),
                           ),
                         ),
                       ],
@@ -757,8 +798,8 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                     controller: _latCtrl,
                     hint: 'Latitude',
                     isDark: isDark,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -767,8 +808,8 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                     controller: _lngCtrl,
                     hint: 'Longitude',
                     isDark: isDark,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
                   ),
                 ),
               ],
@@ -778,17 +819,18 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED).withOpacity(0.08),
+                color: _C.accentSoftBg(isDark),
                 borderRadius: BorderRadius.circular(12),
-                border:
-                    Border.all(color: const Color(0xFF7C3AED).withOpacity(0.15)),
+                border: Border.all(
+                  color: _C.accent.withOpacity(0.20),
+                ),
               ),
               child: Row(
                 children: [
                   const Icon(
                     Icons.location_on_rounded,
                     size: 16,
-                    color: Color(0xFF7C3AED),
+                    color: _C.accent,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -796,7 +838,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                       'Add coordinates for location-based search results',
                       style: GoogleFonts.poppins(
                         fontSize: 11.5,
-                        color: const Color(0xFF7C3AED),
+                        color: _C.accent,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -875,22 +917,25 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         const SizedBox(height: 14),
         GestureDetector(
           onTap: () => setState(() => _isNegotiable = !_isNegotiable),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF121729) : Colors.white,
+              color: _isNegotiable
+                  ? _C.accentSoftBg(isDark)
+                  : _C.surface(isDark),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: _isNegotiable
-                    ? const Color(0xFF7C3AED)
-                    : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
+                    ? _C.accent
+                    : _C.border(isDark),
                 width: 1.6,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(isDark ? 0.20 : 0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
@@ -901,16 +946,12 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: _isNegotiable
-                        ? const Color(0xFF7C3AED)
-                        : Colors.transparent,
+                    color: _isNegotiable ? _C.accent : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
                       color: _isNegotiable
-                          ? const Color(0xFF7C3AED)
-                          : (isDark
-                              ? Colors.white24
-                              : const Color(0xFFCCCCDD)),
+                          ? _C.accent
+                          : _C.textTer(isDark),
                       width: 2,
                     ),
                   ),
@@ -932,17 +973,15 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
-                          color:
-                              isDark ? Colors.white : const Color(0xFF1A1A2E),
+                          color: _C.text(isDark),
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         'Students will see "Negotiable" badge on your listing',
                         style: GoogleFonts.poppins(
                           fontSize: 11.5,
-                          color: isDark
-                              ? Colors.white54
-                              : const Color(0xFF8A8FA3),
+                          color: _C.textSec(isDark),
                         ),
                       ),
                     ],
@@ -964,20 +1003,34 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         _sectionCard(
           isDark: isDark,
           children: [
-            Text(
-              'Photos & Videos',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: _C.accentSoftBg(isDark),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded,
+                      size: 14, color: _C.accent),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Photos & Videos',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: _C.text(isDark),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               'Upload property photos and videos (max 30 sec). First photo will be the cover.',
               style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                fontSize: 11.5,
+                color: _C.textSec(isDark),
                 height: 1.5,
               ),
             ),
@@ -1005,20 +1058,42 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
             ),
             if (_mediaFiles.isNotEmpty) ...[
               const SizedBox(height: 18),
-              Text(
-                '${_mediaFiles.length} file${_mediaFiles.length != 1 ? 's' : ''} selected',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : const Color(0xFF666680),
-                ),
+              Row(
+                children: [
+                  Text(
+                    '${_mediaFiles.length} file${_mediaFiles.length != 1 ? 's' : ''}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _C.text(isDark),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _C.accentSoftBg(isDark),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'First = Cover',
+                      style: GoogleFonts.poppins(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        color: _C.accent,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _mediaFiles.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
@@ -1057,18 +1132,23 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                                 horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF7C3AED),
-                                  Color(0xFF4ECDC4)
-                                ],
+                                colors: [_C.accent, _C.accentLight],
                               ),
                               borderRadius: BorderRadius.circular(100),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _C.accent.withOpacity(0.40),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: Text(
-                              'Cover',
+                              'COVER',
                               style: GoogleFonts.poppins(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
                                 color: Colors.white,
                               ),
                             ),
@@ -1085,6 +1165,10 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.65),
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 1,
+                              ),
                             ),
                             child: const Icon(
                               Icons.close_rounded,
@@ -1116,12 +1200,11 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 22),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : const Color(0xFFF5F3FF),
+          color: _C.accentSoftBg(isDark),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF7C3AED).withOpacity(0.25),
+            color: _C.accent.withOpacity(0.25),
             width: 1.6,
-            style: BorderStyle.solid,
           ),
         ),
         child: Column(
@@ -1130,18 +1213,18 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED).withOpacity(0.15),
+                color: _C.accent.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: const Color(0xFF7C3AED), size: 22),
+              child: Icon(icon, color: _C.accent, size: 22),
             ),
             const SizedBox(height: 10),
             Text(
               title,
               style: GoogleFonts.poppins(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF7C3AED),
+                fontWeight: FontWeight.w700,
+                color: _C.accent,
               ),
             ),
           ],
@@ -1162,11 +1245,11 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
+                colors: [_C.successLight, _C.success],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF22C55E).withOpacity(0.35),
+                  color: _C.success.withOpacity(0.35),
                   blurRadius: 30,
                   offset: const Offset(0, 10),
                 ),
@@ -1180,12 +1263,13 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
           ),
           const SizedBox(height: 28),
           Text(
-            _isEdit ? 'Property Updated! ✅' : 'Property Submitted! 🎉',
+            _isEdit ? 'Property Updated!' : 'Property Submitted!',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
               fontWeight: FontWeight.w800,
               fontSize: 24,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              letterSpacing: -0.5,
+              color: _C.text(isDark),
             ),
           ),
           const SizedBox(height: 12),
@@ -1197,9 +1281,9 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                   : 'Your property has been submitted for review. Admin will verify and publish it within 24 hours.',
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
-                fontSize: 13.5,
-                color: isDark ? Colors.white60 : const Color(0xFF8A8FA3),
-                height: 1.6,
+                fontSize: 13,
+                color: _C.textSec(isDark),
+                height: 1.55,
               ),
             ),
           ),
@@ -1248,12 +1332,20 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
   // ---------- BOTTOM NAV ----------
   Widget _buildBottomNav(bool isDark) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        12 + _bottomPad(context),
+      ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F1320) : Colors.white,
+        color: _C.surface(isDark),
+        border: Border(
+          top: BorderSide(color: _C.border(isDark), width: 1),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+            color: Colors.black.withOpacity(isDark ? 0.30 : 0.05),
             blurRadius: 20,
             offset: const Offset(0, -6),
           ),
@@ -1276,7 +1368,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
             child: _gradientButton(
               label: _currentStep == 3
                   ? (_loading || _uploadingMedia
-                      ? 'Submitting...'
+                      ? 'Submitting…'
                       : (_isEdit ? 'Update Property' : 'Submit Property'))
                   : 'Next',
               icon: _currentStep == 3
@@ -1291,29 +1383,30 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     );
   }
 
-  // ---------- REUSABLE WIDGETS ----------
-  Widget _sectionCard({required bool isDark, required List<Widget> children}) {
+  // ---------- REUSABLE ----------
+  Widget _sectionCard({
+    required bool isDark,
+    required List<Widget> children,
+  }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121729) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: _C.surface(isDark),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _C.border(isDark)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
-            blurRadius: 20,
+            color: Colors.black.withOpacity(isDark ? 0.20 : 0.04),
+            blurRadius: 16,
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.06)
-              : const Color(0xFFF0F0F8),
-        ),
       ),
-      child:
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
     );
   }
 
@@ -1324,15 +1417,15 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         text: TextSpan(
           text: text,
           style: GoogleFonts.poppins(
-            fontSize: 13,
+            fontSize: 12.5,
             fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            color: _C.text(isDark),
           ),
           children: [
             if (required)
               TextSpan(
                 text: ' *',
-                style: GoogleFonts.poppins(color: const Color(0xFFEF4444)),
+                style: GoogleFonts.poppins(color: _C.danger),
               ),
           ],
         ),
@@ -1359,43 +1452,39 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           onChanged: onChanged,
+          cursorColor: _C.accent,
           style: GoogleFonts.poppins(
             fontSize: 13.5,
-            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            color: _C.text(isDark),
           ),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: GoogleFonts.poppins(
-              fontSize: 13,
-              color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+              fontSize: 12.5,
+              color: _C.textTer(isDark),
             ),
             filled: true,
-            fillColor: isDark ? const Color(0xFF1A1F33) : const Color(0xFFF8F9FC),
+            fillColor: _C.surfaceAlt(isDark),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
-                color: error != null
-                    ? const Color(0xFFEF4444)
-                    : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
+                color: error != null ? _C.danger : _C.border(isDark),
                 width: error != null ? 1.8 : 1.4,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
-                color: error != null
-                    ? const Color(0xFFEF4444)
-                    : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
+                color: error != null ? _C.danger : _C.border(isDark),
                 width: error != null ? 1.8 : 1.4,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
-                color:
-                    error != null ? const Color(0xFFEF4444) : const Color(0xFF7C3AED),
+                color: error != null ? _C.danger : _C.accent,
                 width: 1.8,
               ),
             ),
@@ -1411,7 +1500,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
       padding: const EdgeInsets.only(top: 6, left: 4),
       child: Text(
         msg,
-        style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFFEF4444)),
+        style: GoogleFonts.poppins(fontSize: 11, color: _C.danger),
       ),
     );
   }
@@ -1431,27 +1520,24 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
           onTap: () => onSelect(item),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               gradient: isSel
                   ? const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                      colors: [_C.accent, _C.accentLight],
                     )
                   : null,
-              color: isSel
-                  ? null
-                  : (isDark ? const Color(0xFF1A1F33) : Colors.white),
+              color: isSel ? null : _C.surfaceAlt(isDark),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSel
-                    ? Colors.transparent
-                    : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
+                color: isSel ? Colors.transparent : _C.border(isDark),
                 width: 1.4,
               ),
               boxShadow: isSel
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF7C3AED).withOpacity(0.3),
+                        color: _C.accent.withOpacity(0.30),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -1463,9 +1549,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
               style: GoogleFonts.poppins(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: isSel
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : const Color(0xFF666680)),
+                color: isSel ? Colors.white : _C.textSec(isDark),
               ),
             ),
           ),
@@ -1480,26 +1564,27 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     VoidCallback? onTap,
     bool loading = false,
   }) {
+    final disabled = onTap == null;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         height: 52,
         decoration: BoxDecoration(
-          gradient: onTap == null
+          gradient: disabled
               ? const LinearGradient(
                   colors: [Color(0xFFBBBBBB), Color(0xFFCCCCCC)])
               : const LinearGradient(
-                  colors: [Color(0xFF7C3AED), Color(0xFF4ECDC4)],
+                  colors: [_C.accent, _C.accentLight],
                 ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: onTap == null
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: disabled
               ? null
               : [
                   BoxShadow(
-                    color: const Color(0xFF7C3AED).withOpacity(0.35),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                    color: _C.accent.withOpacity(0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
         ),
@@ -1520,7 +1605,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                       label,
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700,
-                        fontSize: 14.5,
+                        fontSize: 14,
                         color: Colors.white,
                       ),
                     ),
@@ -1544,29 +1629,22 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
       child: Container(
         height: 52,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? Colors.white12 : const Color(0xFFE8E8F0),
-            width: 1.4,
-          ),
+          color: _C.surface(isDark),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _C.border(isDark), width: 1.4),
         ),
         child: Center(
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isDark ? Colors.white70 : const Color(0xFF666680),
-              ),
+              Icon(icon, size: 18, color: _C.textSec(isDark)),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: isDark ? Colors.white70 : const Color(0xFF666680),
+                  fontSize: 13.5,
+                  color: _C.textSec(isDark),
                 ),
               ),
             ],

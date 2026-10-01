@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,14 +13,12 @@ import 'package:yourhome/providers/notification_provider.dart';
 import 'package:yourhome/screens/admin/admin_profile_screen.dart';
 import 'package:yourhome/screens/admin/admin_users_screen.dart';
 import 'package:yourhome/screens/booking/first_booking_discount_screen.dart';
-import 'package:yourhome/screens/owner/owner_profile_screen.dart';
 import 'package:yourhome/screens/reels/reels_feed_screen.dart';
 import 'package:yourhome/screens/refer_and_earn_screen.dart';
 import 'package:yourhome/screens/rental/my_rentals_screen.dart';
 import 'package:yourhome/utils/constants.dart';
 
 import '../providers/auth_provider.dart';
-import '../providers/theme_provider.dart';
 import '../providers/property_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/chat_provider.dart';
@@ -26,7 +26,6 @@ import '../providers/referral_provider.dart';
 import '../providers/user_dashboard_provider.dart';
 
 import 'properties_screen.dart';
-import 'favorites_screen.dart';
 import 'profile_screen.dart';
 import 'property_detail_screen.dart';
 import 'chat/chat_list_screen.dart';
@@ -39,33 +38,53 @@ import 'owner/owner_booking_management_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'admin/admin_property_management_page.dart';
 
+// ══════════════════════════════════════════════════════════════
+// GLOBAL ROUTE OBSERVER
+// ══════════════════════════════════════════════════════════════
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
+
+// ══════════════════════════════════════════════════════════════
+// PALETTE
+// ══════════════════════════════════════════════════════════════
 class _HP {
-  static const studentPrimary = Color(0xFF2563EB);
-  static const studentPrimaryLight = Color(0xFF3B82F6);
-  static const studentPrimarySoft = Color(0xFF60A5FA);
+  static const primary = Color(0xFF1E5EFF);
+  static const primaryLight = Color(0xFF4B7BFF);
+  static const primarySoft = Color(0xFFEBF1FF);
+
+  // Student nav active blue
+  static const navBlue = Color(0xFF0F13E4);
+  static const navDarkBg = Color(0xFF15192B);
+
   static const ownerPrimary = Color(0xFFF59E0B);
-  static const ownerPrimaryLight = Color(0xFFFBBF24);
   static const ownerGold = Color(0xFFD4AF37);
   static const adminPrimary = Color(0xFF7C3AED);
   static const adminPrimaryLight = Color(0xFF8B5CF6);
+
   static const success = Color(0xFF16A34A);
-  static const successLight = Color(0xFF22C55E);
   static const danger = Color(0xFFDC2626);
-  static const dangerLight = Color(0xFFEF4444);
-  static const gold = Color(0xFFD4AF37);
   static const purple = Color(0xFF8B5CF6);
   static const purpleLight = Color(0xFF9F7AEA);
   static const pink = Color(0xFFEC4899);
   static const orange = Color(0xFFF59E0B);
   static const teal = Color(0xFF14B8A6);
+  static const cyan = Color(0xFF06B6D4);
+
   static const darkBg = Color(0xFF0A0E1A);
   static const darkSurface = Color(0xFF141A2C);
   static const darkSurfaceElevated = Color(0xFF1B2338);
-  static const darkCard = Color(0xFF1A1F33);
+
   static const lightBg = Color(0xFFF7F8FC);
   static const lightSurface = Color(0xFFFFFFFF);
+  static const lightBorder = Color(0xFFEDEFF5);
+  static const lightTextPrimary = Color(0xFF0B1220);
+  static const lightTextSecondary = Color(0xFF6B7280);
+  static const lightTextTertiary = Color(0xFF9CA3AF);
 }
 
+// ══════════════════════════════════════════════════════════════
+// HOME SCREEN (Root)
+// ══════════════════════════════════════════════════════════════
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -77,17 +96,22 @@ class HomeScreen extends StatefulWidget {
 }
 
 class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  static const int tabHome = 0;
+  static const int tabExplore = 1;
+  static const int tabReels = 2;
+  static const int tabProfile = 3;
+
   int _selectedIndex = 0;
   DateTime? _lastPressed;
 
-  late AnimationController _navAnimationController;
-  late Animation<double> _navAnimation;
+  late final AnimationController _navAnimationController;
+  late final Animation<double> _navAnimation;
 
   @override
   void initState() {
     super.initState();
     _navAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 450),
       vsync: this,
     );
     _navAnimation = CurvedAnimation(
@@ -104,10 +128,20 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void changeTab(int index) {
+    if (_selectedIndex == index) return;
+    HapticFeedback.selectionClick();
     setState(() => _selectedIndex = index);
   }
 
   Future<bool> _onWillPop() async {
+    final role =
+        Provider.of<AuthProvider>(context, listen: false).user?.role ??
+            'STUDENT';
+    if (_selectedIndex != 0 && role != 'ADMIN' && role != 'OWNER') {
+      setState(() => _selectedIndex = 0);
+      return false;
+    }
+
     final now = DateTime.now();
     if (_lastPressed == null ||
         now.difference(_lastPressed!) > const Duration(seconds: 2)) {
@@ -116,16 +150,18 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.info_outline, color: Colors.white),
-              const SizedBox(width: 12),
-              Text('Press back again to exit', style: GoogleFonts.poppins()),
+              const Icon(Icons.info_outline_rounded,
+                  color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Text('Press back again to exit',
+                  style: GoogleFonts.poppins(fontSize: 13)),
             ],
           ),
           duration: const Duration(seconds: 2),
-          backgroundColor: Colors.grey[800],
+          backgroundColor: const Color(0xFF1E293B),
           behavior: SnackBarBehavior.floating,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -134,23 +170,12 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return true;
   }
 
-  Color _getPrimaryColor(String role) {
-    switch (role) {
-      case 'ADMIN':
-        return _HP.adminPrimary;
-      case 'OWNER':
-        return _HP.ownerPrimary;
-      default:
-        return _HP.studentPrimary;
-    }
-  }
-
   List<Widget> _getPages(String role) {
     switch (role) {
       case 'ADMIN':
         return const [
           AdminDashboardPage(),
-          AdminUsersScreen(), // Assuming you have a users management page for admin
+          AdminUsersScreen(),
           AdminPropertyManagementPage(),
           AdminProfileScreen(),
         ];
@@ -166,502 +191,151 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           HomePage(),
           PropertiesScreen(),
           ReelsFeedScreen(),
-          FavoritesScreen(),
-          ChatListScreen(),
+          ProfileScreen(),
         ];
     }
   }
 
-  List<String> _getLabels(String role) {
+  List<_NavSpec> _getNavSpecs(String role) {
     switch (role) {
       case 'ADMIN':
-        return ['Dashboard', 'Users', 'Properties', 'Profile'];
-      case 'OWNER':
-        return ['Dashboard', 'Properties', 'Bookings', 'Chat'];
-      default:
-        return ['Home', 'Explore', 'Reels', 'Saved', 'Chat'];
-    }
-  }
-
-  List<IconData> _getIcons(String role) {
-    switch (role) {
-      case 'ADMIN':
-        return [
-          Icons.dashboard_outlined,
-          Icons.people_outlined,
-          Icons.apartment_outlined,
-          Icons.person_outlined,
+        return const [
+          _NavSpec('Dashboard', Icons.dashboard_outlined,
+              Icons.dashboard_rounded),
+          _NavSpec('Users', Icons.people_outline_rounded,
+              Icons.people_rounded),
+          _NavSpec('Properties', Icons.apartment_outlined,
+              Icons.apartment_rounded),
+          _NavSpec('Profile', Icons.person_outline_rounded,
+              Icons.person_rounded),
         ];
       case 'OWNER':
-        return [
-          Icons.dashboard_outlined,
-          Icons.apartment_outlined,
-          Icons.book_online_outlined,
-          Icons.chat_bubble_outline_outlined,
+        return const [
+          _NavSpec('Dashboard', Icons.dashboard_outlined,
+              Icons.dashboard_rounded),
+          _NavSpec('Properties', Icons.apartment_outlined,
+              Icons.apartment_rounded),
+          _NavSpec('Bookings', Icons.book_online_outlined,
+              Icons.book_online_rounded),
+          _NavSpec('Chat', Icons.chat_bubble_outline_rounded,
+              Icons.chat_bubble_rounded),
         ];
       default:
-        return [
-          Icons.home_outlined,
-          Icons.search_outlined,
-          Icons.movie_creation_outlined,
-          Icons.favorite_border_outlined,
-          Icons.chat_bubble_outline_outlined,
+        return const [
+          _NavSpec('Home', Icons.home_outlined, Icons.home_rounded),
+          _NavSpec('Explore', Icons.search_rounded, Icons.search_rounded),
+          _NavSpec('Reels', Icons.movie_creation_outlined,
+              Icons.movie_creation_rounded),
+          _NavSpec('Profile', Icons.person_outline_rounded,
+              Icons.person_rounded),
         ];
     }
-  }
-
-  List<IconData> _getActiveIcons(String role) {
-    switch (role) {
-      case 'ADMIN':
-        return [
-          Icons.dashboard_rounded,
-          Icons.people_rounded,
-          Icons.apartment_rounded,
-          Icons.person_rounded,
-        ];
-      case 'OWNER':
-        return [
-          Icons.dashboard_rounded,
-          Icons.apartment_rounded,
-          Icons.book_online_rounded,
-          Icons.person_rounded,
-        ];
-      default:
-        return [
-          Icons.home_rounded,
-          Icons.search_rounded,
-          Icons.movie_creation_rounded,
-          Icons.favorite_rounded,
-          Icons.chat_bubble_rounded,
-        ];
-    }
-  }
-
-  // ============================================================
-  // PROFESSIONAL STUDENT BOTTOM NAV
-  // ============================================================
-  Widget _buildStudentBottomNav(
-    bool isDark,
-    List<Widget> pages,
-    List<String> labels,
-    List<IconData> icons,
-    List<IconData> activeIcons,
-  ) {
-    final bool isReelsTab = _selectedIndex == 2;
-    final bool useDark = isReelsTab ? true : isDark;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (isReelsTab) {
-        SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-          systemNavigationBarColor: Color(0xFF1A1F33),
-          systemNavigationBarIconBrightness: Brightness.light,
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-        ));
-      } else {
-        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-          systemNavigationBarColor:
-              isDark ? const Color(0xFF0A0E1A) : Colors.white,
-          systemNavigationBarIconBrightness:
-              isDark ? Brightness.light : Brightness.dark,
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness:
-              isDark ? Brightness.light : Brightness.dark,
-        ));
-      }
-    });
-
-    return Container(
-      decoration: BoxDecoration(
-        color: useDark
-            ? const Color(0xFF15192B)
-            : (isDark ? _HP.darkSurface : Colors.white),
-        border: Border(
-          top: BorderSide(
-            color: useDark
-                ? Colors.white.withOpacity(0.05)
-                : Colors.black.withOpacity(0.04),
-            width: 1,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(useDark ? 0.4 : 0.06),
-            blurRadius: 24,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(pages.length, (index) {
-              final isSelected = _selectedIndex == index;
-              final primaryColor = _HP.studentPrimary;
-              final bool isReels = index == 2;
-              final Color selectedColor =
-                  isReels ? _HP.orange : primaryColor;
-
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    setState(() => _selectedIndex = index);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? selectedColor.withOpacity(0.1)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedScale(
-                          duration: const Duration(milliseconds: 250),
-                          scale: isSelected ? 1.1 : 1.0,
-                          child: Icon(
-                            isSelected ? activeIcons[index] : icons[index],
-                            color: isSelected
-                                ? selectedColor
-                                : (useDark
-                                    ? Colors.grey[500]
-                                    : Colors.grey[400]),
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 200),
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: isSelected
-                                ? selectedColor
-                                : (useDark
-                                    ? Colors.grey[500]
-                                    : Colors.grey[400]),
-                          ),
-                          child: Text(labels[index]),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // PROFESSIONAL OWNER BOTTOM NAV
-  // ============================================================
-  Widget _buildOwnerBottomNav(
-    bool isDark,
-    List<Widget> pages,
-    List<String> labels,
-    List<IconData> icons,
-    List<IconData> activeIcons,
-  ) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 12 + bottomInset),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            height: 72,
-            decoration: BoxDecoration(
-              color: (isDark ? _HP.darkSurfaceElevated : Colors.white)
-                  .withOpacity(isDark ? 0.82 : 0.95),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: _HP.ownerPrimary.withOpacity(0.2),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: _HP.ownerPrimary.withOpacity(0.15),
-                  blurRadius: 28,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final itemWidth = constraints.maxWidth / pages.length;
-                return Stack(
-                  children: [
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 320),
-                      curve: Curves.easeOutCubic,
-                      left: itemWidth * _selectedIndex + 10,
-                      top: 10,
-                      width: itemWidth - 20,
-                      height: 52,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [_HP.ownerPrimary, _HP.ownerGold],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _HP.ownerPrimary.withOpacity(0.45),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: List.generate(pages.length, (index) {
-                        final isSelected = _selectedIndex == index;
-                        return Expanded(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() => _selectedIndex = index);
-                            },
-                            child: SizedBox(
-                              height: 72,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isSelected
-                                        ? activeIcons[index]
-                                        : icons[index],
-                                    color: isSelected
-                                        ? Colors.white
-                                        : (isDark
-                                            ? Colors.grey[400]
-                                            : Colors.grey[500]),
-                                    size: 22,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  AnimatedDefaultTextStyle(
-                                    duration: const Duration(
-                                        milliseconds: 200),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 9.5,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : (isDark
-                                              ? Colors.grey[400]
-                                              : Colors.grey[500]),
-                                    ),
-                                    child: Text(labels[index]),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // PROFESSIONAL ADMIN BOTTOM NAV
-  // ============================================================
-  Widget _buildAdminBottomNav(
-    bool isDark,
-    List<Widget> pages,
-    List<String> labels,
-    List<IconData> icons,
-    List<IconData> activeIcons,
-  ) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 12 + bottomInset),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            height: 72,
-            decoration: BoxDecoration(
-              color: (isDark ? _HP.darkSurfaceElevated : Colors.white)
-                  .withOpacity(isDark ? 0.82 : 0.95),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: _HP.adminPrimary.withOpacity(0.2),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: _HP.adminPrimary.withOpacity(0.15),
-                  blurRadius: 28,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final itemWidth = constraints.maxWidth / pages.length;
-                return Stack(
-                  children: [
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 320),
-                      curve: Curves.easeOutCubic,
-                      left: itemWidth * _selectedIndex + 10,
-                      top: 10,
-                      width: itemWidth - 20,
-                      height: 52,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              _HP.adminPrimary,
-                              _HP.adminPrimaryLight
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _HP.adminPrimary.withOpacity(0.45),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: List.generate(pages.length, (index) {
-                        final isSelected = _selectedIndex == index;
-                        return Expanded(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() => _selectedIndex = index);
-                            },
-                            child: SizedBox(
-                              height: 72,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isSelected
-                                        ? activeIcons[index]
-                                        : icons[index],
-                                    color: isSelected
-                                        ? Colors.white
-                                        : (isDark
-                                            ? Colors.grey[400]
-                                            : Colors.grey[500]),
-                                    size: 22,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  AnimatedDefaultTextStyle(
-                                    duration: const Duration(
-                                        milliseconds: 200),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 9.5,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : (isDark
-                                              ? Colors.grey[400]
-                                              : Colors.grey[500]),
-                                    ),
-                                    child: Text(labels[index]),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final authProvider = Provider.of<AuthProvider>(context);
-    final userRole = authProvider.user?.role ?? 'STUDENT';
+    final profileProvider = Provider.of<ProfileProvider>(context);
+    final user = authProvider.user;
+    final userRole = user?.role ?? 'STUDENT';
+    final isStudent = userRole != 'OWNER' && userRole != 'ADMIN';
 
     final pages = _getPages(userRole);
-    final labels = _getLabels(userRole);
-    final icons = _getIcons(userRole);
-    final activeIcons = _getActiveIcons(userRole);
+    final specs = _getNavSpecs(userRole);
 
-    Widget bottomNav;
+    if (_selectedIndex >= pages.length) _selectedIndex = 0;
+
+    final bool reelsOpen = isStudent && _selectedIndex == tabReels;
+    final bool navDark = reelsOpen ? true : isDark;
+    final Color scaffoldBg = reelsOpen
+        ? Colors.black
+        : (isDark ? _HP.darkBg : _HP.lightBg);
+
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: navDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: navDark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: scaffoldBg,
+      systemNavigationBarIconBrightness:
+          navDark ? Brightness.light : Brightness.dark,
+    ));
+
+    final Widget bottomNav;
     switch (userRole) {
       case 'OWNER':
-        bottomNav =
-            _buildOwnerBottomNav(isDark, pages, labels, icons, activeIcons);
+        bottomNav = _RoleNavBar(
+          specs: specs,
+          selectedIndex: _selectedIndex,
+          isDark: isDark,
+          accent: _HP.ownerPrimary,
+          gradient: const [_HP.ownerPrimary, _HP.ownerGold],
+          onTap: changeTab,
+        );
         break;
       case 'ADMIN':
-        bottomNav =
-            _buildAdminBottomNav(isDark, pages, labels, icons, activeIcons);
+        bottomNav = _RoleNavBar(
+          specs: specs,
+          selectedIndex: _selectedIndex,
+          isDark: isDark,
+          accent: _HP.adminPrimary,
+          gradient: const [_HP.adminPrimary, _HP.adminPrimaryLight],
+          onTap: changeTab,
+        );
         break;
       default:
-        bottomNav =
-            _buildStudentBottomNav(isDark, pages, labels, icons, activeIcons);
+        bottomNav = _StudentNavBar(
+          specs: specs,
+          selectedIndex: _selectedIndex,
+          dark: navDark,
+          profileIndex: tabProfile,
+          profileImage: profileProvider.profile?.profilePic,
+          userInitial: (user?.name?.isNotEmpty == true)
+              ? user!.name[0].toUpperCase()
+              : 'U',
+          onTap: (i) {
+            HapticFeedback.lightImpact();
+            changeTab(i);
+          },
+        );
     }
 
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         key: HomeScreen.navigatorKey,
+        backgroundColor: scaffoldBg,
         extendBody: userRole == 'OWNER',
         body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 320),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.02),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            );
+          },
           child: KeyedSubtree(
             key: ValueKey('${userRole}_$_selectedIndex'),
             child: pages[_selectedIndex],
           ),
         ),
-        bottomNavigationBar: ScaleTransition(
-          scale: _navAnimation,
-          child: bottomNav,
+        bottomNavigationBar: FadeTransition(
+          opacity: _navAnimation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.4),
+              end: Offset.zero,
+            ).animate(_navAnimation),
+            child: bottomNav,
+          ),
         ),
       ),
     );
@@ -669,7 +343,347 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 }
 
 // ══════════════════════════════════════════════════════════════
-// HOME PAGE — RESTRUCTURED
+// NAV MODEL
+// ══════════════════════════════════════════════════════════════
+class _NavSpec {
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+  const _NavSpec(this.label, this.icon, this.activeIcon);
+}
+
+// ══════════════════════════════════════════════════════════════
+// STUDENT BOTTOM NAV — Blue active
+// ══════════════════════════════════════════════════════════════
+class _StudentNavBar extends StatelessWidget {
+  final List<_NavSpec> specs;
+  final int selectedIndex;
+  final bool dark;
+  final int profileIndex;
+  final String? profileImage;
+  final String userInitial;
+  final ValueChanged<int> onTap;
+
+  const _StudentNavBar({
+    required this.specs,
+    required this.selectedIndex,
+    required this.dark,
+    required this.profileIndex,
+    required this.profileImage,
+    required this.userInitial,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final barColor = dark ? _HP.navDarkBg : Colors.white;
+    final inactive =
+        dark ? const Color(0xFF8A93A6) : const Color(0xFF8E9BB5);
+
+    return SafeArea(
+      top: false,
+      left: false,
+      right: false,
+      minimum: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
+        child: Container(
+          height: 66,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: barColor,
+            borderRadius: BorderRadius.circular(34),
+            border: Border.all(
+              color: dark
+                  ? Colors.white.withOpacity(0.06)
+                  : Colors.transparent,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(dark ? 0.45 : 0.10),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(specs.length, (i) {
+              final selected = i == selectedIndex;
+              return _StudentNavItem(
+                spec: specs[i],
+                selected: selected,
+                inactiveColor: inactive,
+                isProfile: i == profileIndex,
+                profileImage: profileImage,
+                userInitial: userInitial,
+                onTap: () => onTap(i),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentNavItem extends StatelessWidget {
+  final _NavSpec spec;
+  final bool selected;
+  final Color inactiveColor;
+  final bool isProfile;
+  final String? profileImage;
+  final String userInitial;
+  final VoidCallback onTap;
+
+  const _StudentNavItem({
+    required this.spec,
+    required this.selected,
+    required this.inactiveColor,
+    required this.isProfile,
+    required this.profileImage,
+    required this.userInitial,
+    required this.onTap,
+  });
+
+  Widget _leading() {
+    if (!isProfile) {
+      return Icon(
+        selected ? spec.activeIcon : spec.icon,
+        size: 24,
+        color: selected ? Colors.white : inactiveColor,
+      );
+    }
+
+    final hasImage = profileImage != null && profileImage!.isNotEmpty;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: hasImage
+            ? Colors.transparent
+            : (selected ? Colors.white24 : inactiveColor.withOpacity(0.18)),
+        border: Border.all(
+          color: selected ? Colors.white : inactiveColor.withOpacity(0.6),
+          width: 1.6,
+        ),
+        image: hasImage
+            ? DecorationImage(
+                image: CachedNetworkImageProvider(profileImage!,
+                    cacheKey: profileImage),
+                fit: BoxFit.cover,
+              )
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: hasImage
+          ? null
+          : Text(
+              userInitial,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : inactiveColor,
+              ),
+            ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        height: 48,
+        padding: EdgeInsets.symmetric(horizontal: selected ? 18 : 14),
+        decoration: BoxDecoration(
+          color: selected ? _HP.navBlue : Colors.transparent,
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: _HP.navBlue.withOpacity(0.40),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _leading(),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              child: selected
+                  ? Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text(
+                        spec.label,
+                        maxLines: 1,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// OWNER / ADMIN NAV
+// ══════════════════════════════════════════════════════════════
+class _RoleNavBar extends StatelessWidget {
+  final List<_NavSpec> specs;
+  final int selectedIndex;
+  final bool isDark;
+  final Color accent;
+  final List<Color> gradient;
+  final ValueChanged<int> onTap;
+
+  const _RoleNavBar({
+    required this.specs,
+    required this.selectedIndex,
+    required this.isDark,
+    required this.accent,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final idleColor = isDark ? Colors.grey[400] : _HP.lightTextTertiary;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 8 + bottomInset),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            height: 72,
+            decoration: BoxDecoration(
+              color: (isDark ? _HP.darkSurfaceElevated : Colors.white)
+                  .withOpacity(isDark ? 0.82 : 0.96),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: accent.withOpacity(isDark ? 0.20 : 0.15),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withOpacity(isDark ? 0.15 : 0.10),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth / specs.length;
+                return Stack(
+                  children: [
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 340),
+                      curve: Curves.easeOutCubic,
+                      left: itemWidth * selectedIndex + 10,
+                      top: 10,
+                      width: itemWidth - 20,
+                      height: 52,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: gradient,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withOpacity(0.45),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: List.generate(specs.length, (index) {
+                        final selected = selectedIndex == index;
+                        final color = selected ? Colors.white : idleColor;
+                        return Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              onTap(index);
+                            },
+                            child: SizedBox(
+                              height: 72,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  AnimatedScale(
+                                    duration:
+                                        const Duration(milliseconds: 260),
+                                    curve: Curves.easeOutCubic,
+                                    scale: selected ? 1.1 : 1.0,
+                                    child: Icon(
+                                      selected
+                                          ? specs[index].activeIcon
+                                          : specs[index].icon,
+                                      color: color,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  AnimatedDefaultTextStyle(
+                                    duration:
+                                        const Duration(milliseconds: 220),
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 9.5,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: color,
+                                    ),
+                                    child: Text(specs[index].label),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// HOME PAGE
 // ══════════════════════════════════════════════════════════════
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -678,24 +692,28 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
-  late AnimationController _staggerController;
+class _HomePageState extends State<HomePage>
+    with TickerProviderStateMixin, RouteAware {
+  late final AnimationController _staggerController;
 
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'PG', 'image': 'assets/images/pg.jpg', 'color': _HP.studentPrimary},
+  // ✅ UPDATED: 4px — same as hero card (SafeArea ke andar almost full width)
+  static const double _hPad = 4.0;
+
+  static const List<Map<String, dynamic>> _categories = [
+    {'name': 'PG', 'image': 'assets/images/pg.jpg', 'color': _HP.primary},
     {'name': 'Hostel', 'image': 'assets/images/hostel.jpg', 'color': _HP.purple},
     {'name': 'Hotel', 'image': 'assets/images/hotel.jpg', 'color': _HP.orange},
     {'name': 'Flat', 'image': 'assets/images/flats.png', 'color': _HP.success},
-    {'name': 'Villa', 'image': 'assets/images/villa.png', 'color': const Color(0xFF06B6D4)},
+    {'name': 'Villa', 'image': 'assets/images/villa.png', 'color': _HP.cyan},
     {'name': 'Resort', 'image': 'assets/images/restourent.png', 'color': _HP.pink},
   ];
 
-  final List<Map<String, dynamic>> _popularCities = [
-    {'name': 'Delhi', 'emoji': '🏛️', 'count': '240+ PGs'},
-    {'name': 'Noida', 'emoji': '🏙️', 'count': '180+ PGs'},
-    {'name': 'Gurgaon', 'emoji': '🌆', 'count': '210+ PGs'},
-    {'name': 'Mumbai', 'emoji': '🌊', 'count': '320+ PGs'},
-    {'name': 'Bangalore', 'emoji': '🌴', 'count': '450+ PGs'},
+  static const List<Map<String, dynamic>> _popularCities = [
+    {'name': 'Delhi', 'icon': Icons.account_balance_rounded, 'count': '240+ PGs'},
+    {'name': 'Noida', 'icon': Icons.location_city_rounded, 'count': '180+ PGs'},
+    {'name': 'Gurgaon', 'icon': Icons.apartment_rounded, 'count': '210+ PGs'},
+    {'name': 'Mumbai', 'icon': Icons.water_rounded, 'count': '320+ PGs'},
+    {'name': 'Bangalore', 'icon': Icons.park_rounded, 'count': '450+ PGs'},
   ];
 
   @override
@@ -708,6 +726,35 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _loadAll();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    _staggerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    _refreshProfile();
+  }
+
+  Future<void> _refreshProfile() async {
+    if (!mounted) return;
+    try {
+      await Provider.of<ProfileProvider>(context, listen: false).getProfile();
+    } catch (_) {}
+  }
+
   Future<void> _loadAll() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -718,30 +765,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         propertyProvider.searchProperties();
       }
 
-      final userDashboard =
-          Provider.of<UserDashboardProvider>(context, listen: false);
-      await userDashboard.loadSummary(showLoader: false);
+      final profileProvider =
+          Provider.of<ProfileProvider>(context, listen: false);
+      if (profileProvider.profile == null) {
+        try {
+          await profileProvider.getProfile();
+        } catch (_) {}
+      }
 
-      final notifProvider =
-          Provider.of<NotificationProvider>(context, listen: false);
-      await notifProvider.loadUnreadCount();
+      if (!mounted) return;
+      await Provider.of<UserDashboardProvider>(context, listen: false)
+          .loadSummary(showLoader: false);
 
-      final chatProvider =
-          Provider.of<ChatProvider>(context, listen: false);
-      await chatProvider.loadUnreadCount();
+      if (!mounted) return;
+      await Provider.of<NotificationProvider>(context, listen: false)
+          .loadUnreadCount();
 
-      final referralProvider =
-          Provider.of<ReferralProvider>(context, listen: false);
-      await referralProvider.fetchReferralInfo();
+      if (!mounted) return;
+      await Provider.of<ChatProvider>(context, listen: false)
+          .loadUnreadCount();
+
+      if (!mounted) return;
+      await Provider.of<ReferralProvider>(context, listen: false)
+          .fetchReferralInfo();
 
       if (mounted) _staggerController.forward(from: 0);
     });
-  }
-
-  @override
-  void dispose() {
-    _staggerController.dispose();
-    super.dispose();
   }
 
   String _greeting() {
@@ -752,8 +801,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void _navigateToTab(int index) {
-    final homeState = HomeScreen.navigatorKey.currentState;
-    if (homeState != null) homeState.changeTab(index);
+    HomeScreen.navigatorKey.currentState?.changeTab(index);
   }
 
   void _navigateToScreen(Widget screen) {
@@ -765,12 +813,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           return FadeTransition(
             opacity: animation,
             child: ScaleTransition(
-              scale: Tween<double>(begin: 0.95, end: 1.0).animate(animation),
+              scale: Tween<double>(begin: 0.96, end: 1.0).animate(
+                CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                ),
+              ),
               child: child,
             ),
           );
         },
-        transitionDuration: const Duration(milliseconds: 350),
+        transitionDuration: const Duration(milliseconds: 360),
       ),
     );
   }
@@ -781,20 +834,96 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       animation: _staggerController,
       builder: (_, __) {
         final raw = _staggerController.value - delay;
-        final t = Curves.easeOutCubic.transform(raw.clamp(0.0, 1.0).toDouble());
+        final t =
+            Curves.easeOutCubic.transform(raw.clamp(0.0, 1.0).toDouble());
         return Transform.translate(
-          offset: Offset(0, 20 * (1 - t)),
+          offset: Offset(0, 24 * (1 - t)),
           child: Opacity(opacity: t, child: child),
         );
       },
     );
   }
 
+  Color _surface(bool isDark) =>
+      isDark ? _HP.darkSurface : _HP.lightSurface;
+  Color _border(bool isDark) =>
+      isDark ? Colors.white.withOpacity(0.06) : _HP.lightBorder;
+  Color _textPrimary(bool isDark) =>
+      isDark ? Colors.white : _HP.lightTextPrimary;
+  Color _textSecondary(bool isDark) =>
+      isDark ? Colors.white70 : _HP.lightTextSecondary;
+  Color _textTertiary(bool isDark) =>
+      isDark ? Colors.white38 : _HP.lightTextTertiary;
+
+  BoxDecoration _cardDeco(bool isDark,
+      {double radius = 20, double shadow = 0.04}) {
+    return BoxDecoration(
+      color: _surface(isDark),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: _border(isDark)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(isDark ? 0.20 : shadow),
+          blurRadius: 14,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionHeader(
+    bool isDark, {
+    required String title,
+    IconData? icon,
+    Color? iconColor,
+    VoidCallback? onAction,
+    String actionLabel = 'See All',
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: iconColor ?? _HP.primary, size: 20),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: _textPrimary(isDark),
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+        if (onAction != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 0),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              actionLabel,
+              style: GoogleFonts.poppins(
+                color: _HP.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.user;
+    final user = Provider.of<AuthProvider>(context).user;
     final profileProvider = Provider.of<ProfileProvider>(context);
     final profileImage = profileProvider.profile?.profilePic;
     final dashboard = Provider.of<UserDashboardProvider>(context);
@@ -802,14 +931,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: isDark ? _HP.darkBg : _HP.lightBg,
       body: SafeArea(
+        left: false,
+        right: false,
         bottom: false,
         child: RefreshIndicator(
           onRefresh: () async {
             final pp = Provider.of<PropertyProvider>(context, listen: false);
             await pp.searchProperties();
+            await profileProvider.getProfile();
             await dashboard.loadSummary(showLoader: false);
           },
-          color: _HP.studentPrimary,
+          color: _HP.primary,
+          backgroundColor: isDark ? _HP.darkSurface : Colors.white,
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),
@@ -818,57 +951,37 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. HEADER
-                _animated(0,
-                    _buildHeader(context, isDark, user, profileImage, dashboard)),
+                _animated(
+                  0,
+                  _buildTopBar(context, isDark, user, profileImage, dashboard),
+                ),
                 const SizedBox(height: 20),
-
-                // 2. ACTIVE RENTAL (if exists)
+                _animated(1, _buildHeroCard(context, isDark)),
+                const SizedBox(height: 22),
                 if (dashboard.hasActiveTenancy) ...[
-                  _animated(1,
-                      _buildActiveRentalCard(context, isDark, dashboard)),
-                  const SizedBox(height: 20),
+                  _animated(
+                      2, _buildRentalWidget(context, isDark, dashboard)),
+                  const SizedBox(height: 22),
                 ],
-
-                // 3. QUICK ACTIONS
-                _animated(2, _buildQuickActions(context, isDark)),
-                const SizedBox(height: 20),
-
-                // 4. WALLET
-                _animated(3, _buildWalletCard(context, isDark, dashboard)),
-                const SizedBox(height: 20),
-
-                // 5. OFFERS
-                _animated(4, _buildOfferBanner(context, isDark)),
-                const SizedBox(height: 20),
-
-                // 6. CATEGORIES
-                _animated(5, _buildCategories(context, isDark)),
-                const SizedBox(height: 24),
-
-                // 7. TRENDING
-                _animated(6, _buildTrendingSection(context, isDark)),
-                const SizedBox(height: 24),
-
-                // 8. ANALYTICS
-                _animated(7, _buildAnalyticsCard(context, isDark, dashboard)),
-                const SizedBox(height: 24),
-
-                // 9. RECENT ACTIVITY
-                _animated(8,
-                    _buildRecentActivity(context, isDark, dashboard)),
-                const SizedBox(height: 24),
-
-                // 10. POPULAR CITIES
-                _animated(9, _buildPopularCities(context, isDark)),
-                const SizedBox(height: 24),
-
-                // 11. TRUST BADGES
-                _animated(10, _buildTrustBadges(context, isDark)),
-                const SizedBox(height: 24),
-
-                // 12. SUPPORT
-                _animated(11, _buildSupportCTA(context, isDark)),
+                _animated(3, _buildQuickActions(context, isDark)),
+                const SizedBox(height: 22),
+                _animated(4, _buildWalletCard(context, isDark, dashboard)),
+                const SizedBox(height: 22),
+                _animated(5, _buildOfferBanner(context, isDark)),
+                const SizedBox(height: 26),
+                _animated(6, _buildCategories(context, isDark)),
+                const SizedBox(height: 26),
+                _animated(7, _buildTrendingSection(context, isDark)),
+                const SizedBox(height: 26),
+                _animated(8, _buildAnalyticsCard(context, isDark, dashboard)),
+                const SizedBox(height: 26),
+                _animated(9, _buildRecentActivity(context, isDark, dashboard)),
+                const SizedBox(height: 26),
+                _animated(10, _buildPopularCities(context, isDark)),
+                const SizedBox(height: 26),
+                _animated(11, _buildTrustBadges(context, isDark)),
+                const SizedBox(height: 26),
+                _animated(12, _buildSupportCTA(context, isDark)),
               ],
             ),
           ),
@@ -878,9 +991,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ============================================================
-  // 1. HEADER
+  // TOP BAR
   // ============================================================
-  Widget _buildHeader(
+  Widget _buildTopBar(
     BuildContext context,
     bool isDark,
     dynamic user,
@@ -890,35 +1003,43 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final hasImage = profileImage != null && profileImage.isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(_hPad + 12, 12, _hPad + 12, 0),
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => _navigateToScreen(const ProfileScreen()),
+            onTap: () => _navigateToTab(HomeScreenState.tabProfile),
             child: Container(
+              padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: hasImage
                     ? null
                     : const LinearGradient(
-                        colors: [
-                          _HP.studentPrimary,
-                          _HP.studentPrimaryLight
-                        ],
+                        colors: [_HP.primary, _HP.primaryLight],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                color: hasImage ? _surface(isDark) : null,
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : _HP.lightBorder,
+                  width: 2,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: _HP.studentPrimary.withOpacity(0.25),
+                    color: _HP.primary.withOpacity(isDark ? 0.25 : 0.15),
                     blurRadius: 14,
-                    offset: const Offset(0, 4),
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: CircleAvatar(
-                radius: 26,
+                radius: 23,
                 backgroundColor: Colors.transparent,
                 backgroundImage: hasImage
-                    ? CachedNetworkImageProvider(profileImage!)
+                    ? CachedNetworkImageProvider(profileImage,
+                        cacheKey: profileImage)
                     : null,
                 child: hasImage
                     ? null
@@ -926,10 +1047,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         user?.name?.isNotEmpty == true
                             ? user!.name[0].toUpperCase()
                             : 'U',
-                        style: const TextStyle(
+                        style: GoogleFonts.poppins(
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
                         ),
                       ),
               ),
@@ -945,16 +1066,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.grey[400] : Colors.grey[500],
+                    color: _textSecondary(isDark),
+                    letterSpacing: 0.2,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   user?.name?.isNotEmpty == true ? user!.name : 'Guest',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 20,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: _textPrimary(isDark),
+                    letterSpacing: -0.3,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -967,9 +1090,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             badge: dashboard.unreadMessages,
             badgeColor: _HP.success,
             isDark: isDark,
-            onTap: () => _navigateToTab(4),
+            onTap: () => _navigateToScreen(const ChatListScreen()),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           _iconBtn(
             icon: Icons.notifications_outlined,
             badge: dashboard.unreadNotifications,
@@ -995,11 +1118,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: isDark ? _HP.darkSurface : Colors.white,
+          color: _surface(isDark),
           shape: BoxShape.circle,
+          border: Border.all(color: _border(isDark)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+              color: Colors.black.withOpacity(isDark ? 0.20 : 0.03),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -1011,8 +1135,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             Center(
               child: Icon(
                 icon,
-                color: isDark ? Colors.white70 : const Color(0xFF4B5563),
-                size: 21,
+                color: isDark ? Colors.white70 : _HP.lightTextPrimary,
+                size: 20,
               ),
             ),
             if (badge > 0)
@@ -1049,9 +1173,110 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ============================================================
-  // 2. ACTIVE RENTAL CARD (PROFESSIONAL)
+  // HERO CARD — full width, rounded, SafeArea ke andar
   // ============================================================
-  Widget _buildActiveRentalCard(
+  Widget _buildHeroCard(BuildContext context, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [const Color(0xFF1B2338), const Color(0xFF141A2C)]
+                : [_HP.primary, _HP.primaryLight],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: (isDark ? Colors.black : _HP.primary)
+                  .withOpacity(isDark ? 0.30 : 0.28),
+              blurRadius: 26,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -50,
+              right: -40,
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(isDark ? 0.03 : 0.08),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -70,
+              left: -30,
+              child: Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(isDark ? 0.02 : 0.06),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Welcome to Nestora',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: isDark
+                          ? Colors.white70
+                          : Colors.white.withOpacity(0.85),
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Find your perfect\nstay today',
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      height: 1.2,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Handpicked PGs, hostels, flats & more\nacross India',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w400,
+                      color: isDark
+                          ? Colors.white60
+                          : Colors.white.withOpacity(0.80),
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // RENTAL WIDGET
+  // ============================================================
+  Widget _buildRentalWidget(
     BuildContext context,
     bool isDark,
     UserDashboardProvider dashboard,
@@ -1063,357 +1288,418 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final totalTransactions = dashboard.totalTransactions;
     final monthlyRent = (tenancy['monthlyRent'] as num? ?? 0).toDouble();
 
-    final bool firstMonthAlreadyPaid = totalTransactions == 1 &&
-        totalPaid >= monthlyRent &&
-        totalPaid > 0;
+    final bool firstMonthAlreadyPaid =
+        totalTransactions == 1 && totalPaid >= monthlyRent && totalPaid > 0;
 
     final bool rentDue = tenancy['rentDue'] == true && !firstMonthAlreadyPaid;
     final bool showAsOverdue = rentDue && daysUntilDue < 0;
 
-    final int adjustedDaysUntilDue = firstMonthAlreadyPaid
-        ? (daysUntilDue.abs() + 30)
-        : daysUntilDue;
+    final int adjustedDaysUntilDue =
+        firstMonthAlreadyPaid ? (daysUntilDue.abs() + 30) : daysUntilDue;
 
-    final gradient = showAsOverdue
-        ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-        : [const Color(0xFF7C3AED), const Color(0xFF9F7AEA)];
+    final bool isDueSoon = !showAsOverdue &&
+        adjustedDaysUntilDue >= 0 &&
+        adjustedDaysUntilDue <= 5;
+
+    final Color statusColor;
+    final String statusLabel;
+    final IconData statusIcon;
+    final String statusSubtitle;
+
+    if (showAsOverdue) {
+      statusColor = _HP.danger;
+      statusLabel = 'Payment Overdue';
+      statusIcon = Icons.warning_amber_rounded;
+      statusSubtitle =
+          '${adjustedDaysUntilDue.abs()} days past due — pay now to avoid penalty';
+    } else if (isDueSoon) {
+      statusColor = _HP.orange;
+      statusLabel = 'Rent Due Soon';
+      statusIcon = Icons.schedule_rounded;
+      statusSubtitle = adjustedDaysUntilDue == 0
+          ? 'Due today — pay now'
+          : 'Due in $adjustedDaysUntilDue days';
+    } else {
+      statusColor = _HP.success;
+      statusLabel = 'All Paid';
+      statusIcon = Icons.check_circle_rounded;
+      statusSubtitle = adjustedDaysUntilDue == 0
+          ? 'Next rent due today'
+          : 'Next rent due in $adjustedDaysUntilDue days';
+    }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: gradient,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color:
-                  (showAsOverdue ? _HP.danger : _HP.purple).withOpacity(0.35),
-              blurRadius: 26,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Stack(
-            children: [
-              // Decorative circles
-              Positioned(
-                top: -50,
-                right: -40,
-                child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.06),
+        decoration: _cardDeco(isDark, radius: 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: _HP.primarySoft.withOpacity(isDark ? 0.15 : 1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.home_work_rounded,
+                        size: 14, color: _HP.primary),
                   ),
-                ),
-              ),
-              Positioned(
-                bottom: -60,
-                left: -30,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.04),
+                  const SizedBox(width: 8),
+                  Text(
+                    'YOUR RENTAL',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: _HP.primary,
+                    ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header row
-                    Row(
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: statusColor.withOpacity(0.25), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(9),
+                          width: 6,
+                          height: 6,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                            ),
-                          ),
-                          child: Icon(
-                            showAsOverdue
-                                ? Icons.warning_amber_rounded
-                                : Icons.home_rounded,
-                            color: Colors.white,
-                            size: 20,
+                            color: statusColor,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 11),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                showAsOverdue ? 'Rent Overdue' : 'Your Room',
+                        const SizedBox(width: 5),
+                        Text(
+                          statusLabel,
+                          style: GoogleFonts.poppins(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: statusColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [_HP.primary, _HP.primaryLight],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _HP.primary.withOpacity(0.30),
+                          blurRadius: 12,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.apartment_rounded,
+                        color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tenancy['propertyTitle'] ?? 'Property',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: _textPrimary(isDark),
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_rounded,
+                                size: 12, color: _textSecondary(isDark)),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                tenancy['propertyCity'] ?? '',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white.withOpacity(0.8),
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              Text(
-                                tenancy['propertyTitle'] ?? 'Property',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  fontSize: 11.5,
+                                  color: _textSecondary(isDark),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 9, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.25),
                             ),
-                          ),
-                          child: Text(
-                            tenancy['status'] ?? 'ACTIVE',
-                            style: GoogleFonts.poppins(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0.6,
+                            const SizedBox(width: 10),
+                            Container(
+                              width: 3,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: _textTertiary(isDark),
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Icon(Icons.meeting_room_rounded,
+                                size: 12, color: _textSecondary(isDark)),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Room ${tenancy['roomNumber'] ?? 'N/A'}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11.5,
+                                color: _textSecondary(isDark),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    // Location + Room
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_rounded,
-                            color: Colors.white70, size: 13),
-                        const SizedBox(width: 4),
-                        Text(
-                          tenancy['propertyCity'] ?? '',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11.5,
-                            color: Colors.white.withOpacity(0.85),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        const Icon(Icons.meeting_room_rounded,
-                            color: Colors.white70, size: 13),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Room ${tenancy['roomNumber'] ?? 'N/A'}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11.5,
-                            color: Colors.white.withOpacity(0.85),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Rent + Due info
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.14),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.15),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(isDark ? 0.10 : 0.07),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: statusColor.withOpacity(0.15), width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(statusIcon, size: 16, color: statusColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        statusSubtitle,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                          height: 1.4,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Next Rent',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.white70,
-                                    )),
-                                const SizedBox(height: 4),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '₹${(tenancy['nextRentAmount'] ?? 0)}',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                        height: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 40,
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text('Due',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.white70,
-                                    )),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Icon(
-                                      adjustedDaysUntilDue < 0
-                                          ? Icons.warning_amber_rounded
-                                          : Icons.schedule_rounded,
-                                      size: 14,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        adjustedDaysUntilDue < 0
-                                            ? '${adjustedDaysUntilDue.abs()} days late'
-                                            : adjustedDaysUntilDue == 0
-                                                ? 'Today'
-                                                : 'in $adjustedDaysUntilDue days',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    // Action buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 46,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                if (dashboard.upcomingPayments.isNotEmpty) {
-                                  final invoiceId = dashboard
-                                      .upcomingPayments.first['invoiceId'];
-                                  _showRentPaymentSheet(context, invoiceId);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: showAsOverdue
-                                    ? _HP.danger
-                                    : _HP.purple,
-                                elevation: 0,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.payment_rounded, size: 18),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Pay Rent Now',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          height: 46,
-                          width: 46,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              _navigateToScreen(const MyRentalsScreen());
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.2),
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.zero,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                side: BorderSide(
-                                  color: Colors.white.withOpacity(0.25),
-                                ),
-                              ),
-                            ),
-                            child: const Icon(Icons.description_rounded,
-                                size: 20),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _HP.primarySoft.withOpacity(isDark ? 0.10 : 1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _HP.primary.withOpacity(isDark ? 0.15 : 0.10),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'MONTHLY RENT',
+                            style: GoogleFonts.poppins(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.6,
+                              color: _HP.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '₹',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: _textPrimary(isDark),
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${(tenancy['nextRentAmount'] ?? 0)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                  color: _textPrimary(isDark),
+                                  height: 1,
+                                  letterSpacing: -0.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 44,
+                      color: _HP.primary.withOpacity(0.15),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'DUE DATE',
+                            style: GoogleFonts.poppins(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.6,
+                              color: _HP.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                showAsOverdue
+                                    ? Icons.warning_amber_rounded
+                                    : Icons.calendar_today_rounded,
+                                size: 16,
+                                color: statusColor,
+                              ),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  adjustedDaysUntilDue < 0
+                                      ? '${adjustedDaysUntilDue.abs()} days late'
+                                      : adjustedDaysUntilDue == 0
+                                          ? 'Today'
+                                          : 'in ${adjustedDaysUntilDue}d',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: _textPrimary(isDark),
+                                    letterSpacing: -0.2,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (dashboard.upcomingPayments.isNotEmpty) {
+                            final invoiceId =
+                                dashboard.upcomingPayments.first['invoiceId'];
+                            _showRentPaymentSheet(context, invoiceId);
+                          }
+                        },
+                        icon: const Icon(Icons.payment_rounded, size: 18),
+                        label: Text(
+                          'Pay Rent',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _HP.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shadowColor: _HP.primary.withOpacity(0.40),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 48,
+                    width: 48,
+                    child: Material(
+                      color: _HP.primarySoft.withOpacity(isDark ? 0.10 : 1),
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        onTap: () =>
+                            _navigateToScreen(const MyRentalsScreen()),
+                        borderRadius: BorderRadius.circular(14),
+                        child: const Icon(Icons.description_rounded,
+                            color: _HP.primary, size: 22),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   // ============================================================
-  // 3. QUICK ACTIONS (NEW — professional chips row)
+  // QUICK ACTIONS
   // ============================================================
   Widget _buildQuickActions(BuildContext context, bool isDark) {
-    final actions = [
+    final actions = <Map<String, dynamic>>[
       {
         'icon': Icons.search_rounded,
         'label': 'Explore',
-        'color': _HP.studentPrimary,
-        'onTap': () => _navigateToTab(1),
+        'color': _HP.primary,
+        'onTap': () => _navigateToTab(HomeScreenState.tabExplore),
       },
       {
         'icon': Icons.movie_creation_rounded,
         'label': 'Reels',
         'color': _HP.pink,
-        'onTap': () => _navigateToTab(2),
+        'onTap': () => _navigateToTab(HomeScreenState.tabReels),
       },
       {
         'icon': Icons.book_online_rounded,
@@ -1430,11 +1716,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: Row(
-        children: actions.asMap().entries.map((entry) {
-          final index = entry.key;
-          final action = entry.value;
+        children: List.generate(actions.length, (index) {
+          final action = actions[index];
           final color = action['color'] as Color;
 
           return Expanded(
@@ -1448,45 +1733,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   (action['onTap'] as VoidCallback)();
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: isDark ? _HP.darkSurface : Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.06)
-                          : Colors.black.withOpacity(0.04),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black
-                            .withOpacity(isDark ? 0.2 : 0.04),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                  decoration: _cardDeco(isDark, radius: 18, shadow: 0.03),
                   child: Column(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              color.withOpacity(0.18),
-                              color.withOpacity(0.08),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: color.withOpacity(isDark ? 0.15 : 0.10),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          action['icon'] as IconData,
-                          color: color,
-                          size: 20,
-                        ),
+                        child: Icon(action['icon'] as IconData,
+                            color: color, size: 20),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -1494,9 +1753,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         style: GoogleFonts.poppins(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? Colors.white
-                              : const Color(0xFF1A1A2E),
+                          color: _textPrimary(isDark),
                         ),
                       ),
                     ],
@@ -1505,13 +1762,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
             ),
           );
-        }).toList(),
+        }),
       ),
     );
   }
 
   // ============================================================
-  // 4. WALLET CARD
+  // WALLET
   // ============================================================
   Widget _buildWalletCard(
     BuildContext context,
@@ -1519,43 +1776,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     UserDashboardProvider dashboard,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: GestureDetector(
         onTap: () => _navigateToScreen(const ReferAndEarnScreen()),
         child: Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: _HP.purple.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
+          decoration: _cardDeco(isDark),
           child: Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: _HP.primarySoft,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
-                  ),
                 ),
-                child: const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                child: const Icon(Icons.account_balance_wallet_rounded,
+                    color: _HP.primary, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1567,29 +1804,30 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       style: GoogleFonts.poppins(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w500,
-                        color: Colors.white.withOpacity(0.85),
+                        color: _textSecondary(isDark),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
                           '₹',
                           style: GoogleFonts.poppins(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.85),
+                            color: _textSecondary(isDark),
                           ),
                         ),
-                        const SizedBox(width: 3),
+                        const SizedBox(width: 2),
                         Text(
                           dashboard.walletBalance.toStringAsFixed(2),
                           style: GoogleFonts.poppins(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
-                            color: Colors.white,
+                            color: _textPrimary(isDark),
                             height: 1,
+                            letterSpacing: -0.5,
                           ),
                         ),
                       ],
@@ -1597,33 +1835,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.share_rounded,
-                      color: Color(0xFF7C3AED),
-                      size: 15,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Refer',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF7C3AED),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _primaryChip(icon: Icons.share_rounded, text: 'Refer'),
             ],
           ),
         ),
@@ -1631,27 +1843,63 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
+  Widget _primaryChip({
+    required IconData icon,
+    required String text,
+    double radius = 12,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: _HP.primary,
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          BoxShadow(
+            color: _HP.primary.withOpacity(0.30),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ============================================================
-  // 5. OFFER BANNER
+  // OFFER BANNER
   // ============================================================
   Widget _buildOfferBanner(BuildContext context, bool isDark) {
-    final offers = [
+    final offers = <Map<String, dynamic>>[
       {
-        'title': '🎉 20% OFF First Booking!',
-        'subtitle': 'Use code: FIRST20',
-        'color': _HP.purple,
+        'title': '20% OFF First Booking',
+        'subtitle': 'Use code FIRST20',
+        'color': _HP.primary,
         'icon': Icons.local_offer_rounded,
         'type': 'FIRST',
       },
       {
-        'title': '🏠 Refer & Earn ₹19!',
+        'title': 'Refer & Earn ₹19',
         'subtitle': 'Share with friends',
-        'color': _HP.studentPrimary,
+        'color': _HP.purple,
         'icon': Icons.share_rounded,
         'type': 'REFER',
       },
       {
-        'title': '🌟 Premium at 10% OFF',
+        'title': 'Premium at 10% OFF',
         'subtitle': 'Limited time offer',
         'color': _HP.orange,
         'icon': Icons.workspace_premium_rounded,
@@ -1660,14 +1908,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     ];
 
     return SizedBox(
-      height: 100,
+      height: 84,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: _hPad),
         itemCount: offers.length,
         itemBuilder: (context, index) {
           final offer = offers[index];
+          final color = offer['color'] as Color;
           return GestureDetector(
             onTap: () {
               final type = offer['type'];
@@ -1676,44 +1925,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               } else if (type == 'FIRST') {
                 _navigateToScreen(const FirstBookingDiscountScreen());
               } else {
-                _navigateToTab(1);
+                _navigateToTab(HomeScreenState.tabExplore);
               }
             },
             child: Container(
-              width: MediaQuery.of(context).size.width - 80,
+              width: MediaQuery.of(context).size.width - 72,
               margin: const EdgeInsets.only(right: 12),
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    offer['color'] as Color,
-                    (offer['color'] as Color).withOpacity(0.75),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: (offer['color'] as Color).withOpacity(0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
+              decoration: _cardDeco(isDark, radius: 18),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(11),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: color.withOpacity(0.10),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      offer['icon'] as IconData,
-                      color: Colors.white,
-                      size: 22,
-                    ),
+                    child: Icon(offer['icon'] as IconData,
+                        color: color, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1724,27 +1953,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         Text(
                           offer['title'] as String,
                           style: GoogleFonts.poppins(
-                            color: Colors.white,
+                            color: _textPrimary(isDark),
                             fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           offer['subtitle'] as String,
                           style: GoogleFonts.poppins(
-                            color: Colors.white70,
+                            color: _textSecondary(isDark),
                             fontSize: 10.5,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: Colors.white70,
-                    size: 14,
-                  ),
+                  Icon(Icons.arrow_forward_ios_rounded,
+                      color: _textSecondary(isDark), size: 13),
                 ],
               ),
             ),
@@ -1755,45 +1982,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ============================================================
-  // 6. CATEGORIES
+  // CATEGORIES
   // ============================================================
   Widget _buildCategories(BuildContext context, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Browse by Type',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                ),
-              ),
-              TextButton(
-                onPressed: () => _navigateToTab(1),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                ),
-                child: Text(
-                  'See All',
-                  style: GoogleFonts.poppins(
-                    color: _HP.studentPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
+          _sectionHeader(
+            isDark,
+            title: 'Browse by Type',
+            onAction: () => _navigateToTab(HomeScreenState.tabExplore),
           ),
           const SizedBox(height: 14),
           SizedBox(
-            height: 90,
+            height: 92,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -1821,25 +2025,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       onTap: () {
         Provider.of<PropertyProvider>(context, listen: false)
             .searchProperties(type: name);
-        _navigateToTab(1);
+        _navigateToTab(HomeScreenState.tabExplore);
       },
       child: Container(
-        width: 72,
+        width: 76,
         margin: const EdgeInsets.only(right: 12),
         child: Column(
           children: [
             Container(
               width: 58,
               height: 58,
-              padding: const EdgeInsets.all(3),
+              padding: const EdgeInsets.all(2.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                color: _surface(isDark),
                 border: Border.all(color: color.withOpacity(0.25), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withOpacity(0.15),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: color.withOpacity(isDark ? 0.20 : 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
@@ -1849,19 +2054,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   imagePath,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
-                    color: color.withOpacity(0.1),
+                    color: color.withOpacity(0.10),
                     child: Icon(Icons.home_rounded, color: color, size: 24),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 7),
             Text(
               name,
               style: GoogleFonts.poppins(
                 fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                fontWeight: FontWeight.w600,
+                color: _textSecondary(isDark),
               ),
             ),
           ],
@@ -1871,7 +2076,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ============================================================
-  // 7. TRENDING
+  // TRENDING
   // ============================================================
   Widget _buildTrendingSection(BuildContext context, bool isDark) {
     final provider = Provider.of<PropertyProvider>(context);
@@ -1881,42 +2086,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (trending.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.local_fire_department_rounded,
-                      color: Colors.orange[600], size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Trending Now',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                    ),
-                  ),
-                ],
-              ),
-              TextButton(
-                onPressed: () => _navigateToTab(1),
-                style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
-                child: Text(
-                  'See All',
-                  style: GoogleFonts.poppins(
-                    color: _HP.studentPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
+          _sectionHeader(
+            isDark,
+            title: 'Trending Now',
+            icon: Icons.local_fire_department_rounded,
+            iconColor: Colors.orange[600],
+            onAction: () => _navigateToTab(HomeScreenState.tabExplore),
           ),
           const SizedBox(height: 12),
           GridView.builder(
@@ -1939,22 +2118,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Widget _trendingSquareCard(
       BuildContext context, Property property, bool isDark) {
+    final placeholderColor = isDark ? Colors.grey[600] : Colors.grey[400];
+
     return GestureDetector(
       onTap: () => _navigateToScreen(
           PropertyDetailScreen(propertyId: property.propertyId)),
       child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? _HP.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.orange.withOpacity(0.2), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        decoration: _cardDeco(isDark, radius: 18, shadow: 0.05),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1966,49 +2136,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   child: Container(
                     height: 110,
                     width: double.infinity,
-                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    color:
+                        isDark ? Colors.grey[800] : const Color(0xFFEEF2F8),
                     child: property.coverImage.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: property.coverImage,
                             fit: BoxFit.cover,
                             errorWidget: (_, __, ___) => Icon(
-                              Icons.home_rounded,
-                              size: 32,
-                              color: isDark
-                                  ? Colors.grey[600]
-                                  : Colors.grey[400],
-                            ),
+                                Icons.home_rounded,
+                                size: 32,
+                                color: placeholderColor),
                           )
-                        : Icon(
-                            Icons.home_rounded,
-                            size: 32,
-                            color:
-                                isDark ? Colors.grey[600] : Colors.grey[400],
-                          ),
+                        : Icon(Icons.home_rounded,
+                            size: 32, color: placeholderColor),
                   ),
                 ),
                 Positioned(
-                  top: 6,
-                  left: 6,
+                  top: 8,
+                  left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF6B35), Color(0xFFF7931E)],
-                      ),
+                      color: _HP.primary,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.local_fire_department_rounded,
-                            color: Colors.white, size: 9),
+                        const Icon(Icons.trending_up_rounded,
+                            color: Colors.white, size: 10),
                         const SizedBox(width: 2),
                         Text(
                           'TRENDING',
                           style: GoogleFonts.poppins(
-                            fontSize: 7,
+                            fontSize: 8,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                             letterSpacing: 0.3,
@@ -2019,25 +2181,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                 ),
                 Positioned(
-                  top: 6,
-                  right: 6,
+                  top: 8,
+                  right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(6),
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.visibility_rounded,
-                            color: Colors.white, size: 9),
-                        const SizedBox(width: 2),
+                            color: Colors.white, size: 10),
+                        const SizedBox(width: 3),
                         Text(
                           '${property.viewCount}',
                           style: GoogleFonts.poppins(
-                            fontSize: 8,
+                            fontSize: 9,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
                           ),
@@ -2058,7 +2220,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     style: GoogleFonts.poppins(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      color: _textPrimary(isDark),
                       height: 1.2,
                     ),
                     maxLines: 2,
@@ -2068,17 +2230,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   Row(
                     children: [
                       Icon(Icons.location_on_rounded,
-                          size: 10,
-                          color:
-                              isDark ? Colors.grey[500] : Colors.grey[500]),
+                          size: 11, color: _textSecondary(isDark)),
                       const SizedBox(width: 2),
                       Expanded(
                         child: Text(
                           property.city,
                           style: GoogleFonts.poppins(
-                            fontSize: 9.5,
-                            color:
-                                isDark ? Colors.grey[400] : Colors.grey[600],
+                            fontSize: 10,
+                            color: _textSecondary(isDark),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -2097,15 +2256,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
-                          color: _HP.studentPrimary,
+                          color: _HP.primary,
                         ),
                       ),
                       Text(
                         '/mo',
                         style: GoogleFonts.poppins(
                           fontSize: 9,
-                          color:
-                              isDark ? Colors.grey[500] : Colors.grey[500],
+                          color: _textSecondary(isDark),
                         ),
                       ),
                     ],
@@ -2120,46 +2278,33 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ============================================================
-  // 8. ANALYTICS
+  // ANALYTICS
   // ============================================================
   Widget _buildAnalyticsCard(
     BuildContext context,
     bool isDark,
     UserDashboardProvider dashboard,
   ) {
+    final growth = dashboard.monthlyGrowthPercent;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? _HP.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : const Color(0xFFF0F0F8),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
+        decoration: _cardDeco(isDark),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: _HP.studentPrimary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: _HP.primarySoft,
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: const Icon(Icons.insights_rounded,
-                      color: _HP.studentPrimary, size: 14),
+                      color: _HP.primary, size: 14),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -2167,41 +2312,33 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: _textPrimary(isDark),
                   ),
                 ),
                 const Spacer(),
-                if (dashboard.monthlyGrowthPercent != 0)
+                if (growth != 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: (dashboard.monthlyGrowthPercent > 0
-                              ? _HP.success
-                              : _HP.danger)
+                      color: (growth > 0 ? _HP.success : _HP.danger)
                           .withOpacity(0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
                         Icon(
-                          dashboard.monthlyGrowthPercent > 0
-                              ? Icons.trending_up
-                              : Icons.trending_down,
+                          growth > 0 ? Icons.trending_up : Icons.trending_down,
                           size: 11,
-                          color: dashboard.monthlyGrowthPercent > 0
-                              ? _HP.success
-                              : _HP.danger,
+                          color: growth > 0 ? _HP.success : _HP.danger,
                         ),
                         const SizedBox(width: 3),
                         Text(
-                          '${dashboard.monthlyGrowthPercent.toStringAsFixed(0)}%',
+                          '${growth.toStringAsFixed(0)}%',
                           style: GoogleFonts.poppins(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: dashboard.monthlyGrowthPercent > 0
-                                ? _HP.success
-                                : _HP.danger,
+                            color: growth > 0 ? _HP.success : _HP.danger,
                           ),
                         ),
                       ],
@@ -2217,7 +2354,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     label: 'Bookings',
                     value: '${dashboard.totalBookings}',
                     icon: Icons.book_online_rounded,
-                    color: _HP.studentPrimary,
+                    color: _HP.primary,
                     isDark: isDark,
                   ),
                 ),
@@ -2252,8 +2389,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color:
-                          isDark ? Colors.white70 : const Color(0xFF666680),
+                      color: _textSecondary(isDark),
                     ),
                   ),
                   const Spacer(),
@@ -2262,7 +2398,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: _HP.studentPrimary,
+                      color: _HP.primary,
                     ),
                   ),
                 ],
@@ -2289,7 +2425,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withOpacity(isDark ? 0.10 : 0.07),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withOpacity(0.15)),
       ),
@@ -2303,17 +2439,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              color: _textPrimary(isDark),
               height: 1,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 9,
+              fontSize: 9.5,
               fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+              color: _textSecondary(isDark),
             ),
           ),
         ],
@@ -2332,10 +2468,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: List.generate(trend.length, (i) {
-        final amount = values[i];
-        final ratio = maxVal > 0 ? amount / maxVal : 0.0;
+        final ratio = maxVal > 0 ? values[i] / maxVal : 0.0;
+        final rawMonth = trend[i]['month']?.toString() ?? '';
         final monthLabel =
-            trend[i]['month']?.toString().substring(0, 3) ?? '';
+            rawMonth.length >= 3 ? rawMonth.substring(0, 3) : rawMonth;
 
         return Expanded(
           child: Padding(
@@ -2346,16 +2482,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 Flexible(
                   child: Container(
                     width: double.infinity,
-                    height: (55 * ratio).clamp(4.0, 55.0),
+                    height: (55 * ratio).clamp(4.0, 55.0).toDouble(),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          _HP.studentPrimary,
-                          _HP.studentPrimaryLight
-                        ],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                      ),
+                      color: _HP.primary,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -2366,8 +2495,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   style: GoogleFonts.poppins(
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
-                    color:
-                        isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+                    color: _textTertiary(isDark),
                   ),
                 ),
               ],
@@ -2379,7 +2507,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ============================================================
-  // 9. RECENT ACTIVITY
+  // RECENT ACTIVITY
   // ============================================================
   Widget _buildRecentActivity(
     BuildContext context,
@@ -2390,35 +2518,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (activities.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isDark ? _HP.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : const Color(0xFFF0F0F8),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
+        padding: const EdgeInsets.all(16),
+        decoration: _cardDeco(isDark),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     color: _HP.teal.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: const Icon(Icons.history_rounded,
                       color: _HP.teal, size: 14),
@@ -2429,21 +2542,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: _textPrimary(isDark),
                   ),
                 ),
                 const Spacer(),
                 TextButton(
-                  onPressed: () =>
-                      _navigateToScreen(const MyRentalsScreen()),
+                  onPressed: () => _navigateToScreen(const MyRentalsScreen()),
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: Text(
                     'My Rentals',
                     style: GoogleFonts.poppins(
-                      color: _HP.teal,
+                      color: _HP.primary,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2452,10 +2565,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ],
             ),
             const SizedBox(height: 12),
-            ...activities
-                .take(5)
-                .map((a) => _activityTile(a, isDark))
-                .toList(),
+            ...activities.take(5).map((a) => _activityTile(a, isDark)),
           ],
         ),
       ),
@@ -2463,7 +2573,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _activityTile(Map<String, dynamic> item, bool isDark) {
-    final color = _hex(item['color']?.toString() ?? '#7C3AED');
+    final color = _hex(item['color']?.toString() ?? '#1E5EFF');
     final referenceType = item['referenceType']?.toString() ?? '';
 
     final bool isRentalActivity = referenceType == 'RENT_PAYMENT' ||
@@ -2471,20 +2581,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         item['activityType']?.toString() == 'RENT_PAID';
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
-        if (isRentalActivity) {
-          _navigateToScreen(const MyRentalsScreen());
-        }
+        if (isRentalActivity) _navigateToScreen(const MyRentalsScreen());
       },
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.only(bottom: 12),
         child: Row(
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withOpacity(0.10),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -2503,7 +2612,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      color: _textPrimary(isDark),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -2512,8 +2621,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     item['description']?.toString() ?? '',
                     style: GoogleFonts.poppins(
                       fontSize: 10,
-                      color:
-                          isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                      color: _textSecondary(isDark),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -2530,18 +2638,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   style: GoogleFonts.poppins(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w500,
-                    color:
-                        isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+                    color: _textTertiary(isDark),
                   ),
                 ),
                 if (isRentalActivity)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 10,
-                      color: _HP.teal,
-                    ),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Icon(Icons.arrow_forward_ios_rounded,
+                        size: 10, color: _HP.primary),
                   ),
               ],
             ),
@@ -2579,33 +2683,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       final h = hex.replaceAll('#', '');
       return Color(int.parse('FF$h', radix: 16));
     } catch (_) {
-      return _HP.purple;
+      return _HP.primary;
     }
   }
 
   // ============================================================
-  // 10. POPULAR CITIES
+  // POPULAR CITIES
   // ============================================================
   Widget _buildPopularCities(BuildContext context, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.location_city_rounded,
-                  color: _HP.studentPrimary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Popular Cities',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                ),
-              ),
-            ],
+          _sectionHeader(
+            isDark,
+            title: 'Popular Cities',
+            icon: Icons.location_city_rounded,
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -2626,31 +2720,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       onTap: () {
         Provider.of<PropertyProvider>(context, listen: false)
             .searchProperties(city: city['name']);
-        _navigateToTab(1);
+        _navigateToTab(HomeScreenState.tabExplore);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDark ? _HP.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.08)
-                : const Color(0xFFF0F0F8),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: _cardDeco(isDark, radius: 14, shadow: 0.03),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(city['emoji'], style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: _HP.primarySoft.withOpacity(isDark ? 0.12 : 1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(city['icon'] as IconData,
+                  size: 14, color: _HP.primary),
+            ),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2659,15 +2746,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: _textPrimary(isDark),
                   ),
                 ),
                 Text(
                   city['count'],
                   style: GoogleFonts.poppins(
-                    fontSize: 9,
-                    color:
-                        isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                    fontSize: 9.5,
+                    color: _textSecondary(isDark),
                   ),
                 ),
               ],
@@ -2679,10 +2765,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ============================================================
-  // 11. TRUST BADGES
+  // TRUST BADGES
   // ============================================================
   Widget _buildTrustBadges(BuildContext context, bool isDark) {
-    final badges = [
+    final badges = <Map<String, dynamic>>[
       {
         'icon': Icons.verified_user_rounded,
         'title': 'Verified Owners',
@@ -2691,7 +2777,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       {
         'icon': Icons.lock_rounded,
         'title': 'Secure Payments',
-        'color': _HP.studentPrimary,
+        'color': _HP.primary,
       },
       {
         'icon': Icons.support_agent_rounded,
@@ -2701,18 +2787,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isDark ? _HP.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : const Color(0xFFF0F0F8),
-          ),
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: _cardDeco(isDark, radius: 18, shadow: 0.02),
         child: Row(
           children: badges.map((b) {
             return Expanded(
@@ -2724,10 +2802,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   Text(
                     b['title'] as String,
                     style: GoogleFonts.poppins(
-                      fontSize: 9.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color:
-                          isDark ? Colors.white70 : const Color(0xFF666680),
+                      color: _textSecondary(isDark),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -2741,36 +2818,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   // ============================================================
-  // 12. SUPPORT CTA
+  // SUPPORT CTA
   // ============================================================
   Widget _buildSupportCTA(BuildContext context, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
       child: GestureDetector(
-        onTap: () => _navigateToTab(4),
+        onTap: () => _navigateToScreen(const ChatListScreen()),
         child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? [const Color(0xFF1A1F33), const Color(0xFF141A2C)]
-                  : [const Color(0xFFF0F4FF), const Color(0xFFE0E7FF)],
-            ),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: _HP.studentPrimary.withOpacity(0.15),
-            ),
-          ),
+          padding: const EdgeInsets.all(16),
+          decoration: _cardDeco(isDark, radius: 18, shadow: 0.03),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
-                  color: _HP.studentPrimary.withOpacity(0.12),
+                  color: _HP.primarySoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.support_agent_rounded,
-                    color: _HP.studentPrimary, size: 22),
+                    color: _HP.primary, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -2782,46 +2849,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color:
-                            isDark ? Colors.white : const Color(0xFF1A1A2E),
+                        color: _textPrimary(isDark),
                       ),
                     ),
                     Text(
                       'Chat with our support team 24x7',
                       style: GoogleFonts.poppins(
                         fontSize: 10.5,
-                        color: isDark
-                            ? Colors.white54
-                            : const Color(0xFF8A8FA3),
+                        color: _textSecondary(isDark),
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _HP.studentPrimary,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.chat_rounded,
-                        color: Colors.white, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Chat',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _primaryChip(
+                  icon: Icons.chat_rounded, text: 'Chat', radius: 10),
             ],
           ),
         ),
@@ -2840,7 +2882,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 }
 
 // ══════════════════════════════════════════════════════════════
-// RENT PAYMENT SHEET (unchanged)
+// RENT PAYMENT SHEET
 // ══════════════════════════════════════════════════════════════
 class _RentPaymentSheet extends StatefulWidget {
   final int invoiceId;
@@ -2855,7 +2897,6 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
   bool _isInitiating = false;
   bool _paymentSuccess = false;
   String? _errorMessage;
-  String? _utr;
 
   @override
   void initState() {
@@ -2898,6 +2939,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
           rawAmount < 10000 ? (rawAmount * 100).round() : rawAmount.round();
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final isDark = Theme.of(context).brightness == Brightness.dark;
 
       final options = {
         'key': AppConstants.razorpayKeyId,
@@ -2910,11 +2952,8 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
           'contact': authProvider.user?.phone ?? '',
           'email': authProvider.user?.email ?? '',
         },
-        'theme': {'color': '#7C3AED'},
-        'retry': {
-          'enabled': true,
-          'max_count': 2,
-        },
+        'theme': {'color': isDark ? '#7C3AED' : '#1E5EFF'},
+        'retry': {'enabled': true, 'max_count': 2},
         'timeout': 300,
       };
 
@@ -2924,7 +2963,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
       if (mounted) {
         setState(() {
           _isInitiating = false;
-          _errorMessage = e.toString();
+          _errorMessage = 'Something went wrong. Please try again.';
         });
       }
     }
@@ -2935,9 +2974,9 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
         Provider.of<UserDashboardProvider>(context, listen: false);
 
     final confirmed = await provider.confirmRentPayment(
-      razorpayOrderId: response.orderId!,
-      razorpayPaymentId: response.paymentId!,
-      razorpaySignature: response.signature!,
+      razorpayOrderId: response.orderId ?? '',
+      razorpayPaymentId: response.paymentId ?? '',
+      razorpaySignature: response.signature ?? '',
     );
 
     if (!mounted) return;
@@ -2957,6 +2996,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
   }
 
   void _onPaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
     setState(() {
       _isInitiating = false;
       _errorMessage = response.message ?? 'Payment failed';
@@ -2966,12 +3006,18 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? _HP.darkSurface : Colors.white;
+    final textPrimary = isDark ? Colors.white : _HP.lightTextPrimary;
+    final textSecondary = isDark ? Colors.white54 : _HP.lightTextSecondary;
+    final primaryAccent = isDark ? _HP.purple : _HP.primary;
+    final primaryAccentLight = isDark ? _HP.purpleLight : _HP.primaryLight;
 
     if (_paymentSuccess) {
       return Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(
+            24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
         decoration: BoxDecoration(
-          color: isDark ? _HP.darkSurface : Colors.white,
+          color: surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
@@ -2980,7 +3026,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: _HP.success.withOpacity(0.1),
+                color: _HP.success.withOpacity(0.10),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.check_circle_rounded,
@@ -2992,7 +3038,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
               style: GoogleFonts.poppins(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                color: textPrimary,
               ),
             ),
             const SizedBox(height: 6),
@@ -3001,37 +3047,33 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 13,
-                color: Colors.grey[500],
+                color: textSecondary,
+                height: 1.4,
               ),
             ),
-            if (_utr != null) ...[
-              const SizedBox(height: 4),
-              Text('Ref: $_utr',
-                  style: GoogleFonts.poppins(
-                      fontSize: 11, color: Colors.grey[400])),
-            ],
             const SizedBox(height: 28),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context, true);
-                  Navigator.push(
-                    context,
+                  final nav = Navigator.of(context);
+                  nav.pop(true);
+                  nav.push(
                     MaterialPageRoute(
-                      builder: (_) => const MyRentalsScreen(),
-                    ),
+                        builder: (_) => const MyRentalsScreen()),
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _HP.purple,
+                  backgroundColor: primaryAccent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
                 child: Text('View My Rentals',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600, fontSize: 13)),
               ),
             ),
             const SizedBox(height: 8),
@@ -3042,7 +3084,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
                 child: Text('Done',
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
+                      color: textSecondary,
                     )),
               ),
             ),
@@ -3053,10 +3095,12 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
 
     return Container(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            12,
       ),
       decoration: BoxDecoration(
-        color: isDark ? _HP.darkSurface : Colors.white,
+        color: surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Padding(
@@ -3070,7 +3114,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : const Color(0xFFE0E0E8),
+                  color: isDark ? Colors.white24 : const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
@@ -3081,10 +3125,19 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                    gradient: LinearGradient(
+                      colors: [primaryAccent, primaryAccentLight],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryAccent.withOpacity(0.30),
+                        blurRadius: 12,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
                   ),
                   child: const Icon(Icons.payment_rounded,
                       color: Colors.white, size: 22),
@@ -3095,7 +3148,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: textPrimary,
                   ),
                 ),
               ],
@@ -3105,7 +3158,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
               'You will be redirected to Razorpay secure checkout to complete the payment.',
               style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                color: textSecondary,
                 height: 1.5,
               ),
             ),
@@ -3114,7 +3167,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: _HP.danger.withOpacity(0.1),
+                  color: _HP.danger.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -3141,9 +3194,10 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
               child: ElevatedButton(
                 onPressed: _isInitiating ? null : _initiatePayment,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _HP.purple,
+                  backgroundColor: primaryAccent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
@@ -3153,8 +3207,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation(Colors.white),
+                          valueColor: AlwaysStoppedAnimation(Colors.white),
                         ),
                       )
                     : Text(
@@ -3176,8 +3229,7 @@ class _RentPaymentSheetState extends State<_RentPaymentSheet> {
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color:
-                        isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                    color: textSecondary,
                   ),
                 ),
               ),

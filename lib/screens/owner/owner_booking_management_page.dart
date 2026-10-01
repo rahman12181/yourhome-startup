@@ -12,6 +12,51 @@ import '../../providers/owner_provider.dart';
 import '../../models/booking_model.dart';
 import '../../models/booking_stats_model.dart';
 
+// ══════════════════════════════════════════════════════════════
+// DESIGN TOKENS — Blue premium theme (matches OwnerPropertyManagementPage)
+// ══════════════════════════════════════════════════════════════
+class _C {
+  static const accent = Color(0xFF2563EB);
+  static const accentDark = Color(0xFF1D4ED8);
+  static const accentLight = Color(0xFF3B82F6);
+  static const accentSoft = Color(0xFFEBF1FF);
+  static const ink = Color(0xFF0F172A);
+
+  static const success = Color(0xFF10B981);
+  static const successLight = Color(0xFF22C55E);
+  static const warning = Color(0xFFF59E0B);
+  static const danger = Color(0xFFEF4444);
+  static const info = Color(0xFF3B82F6);
+  static const teal = Color(0xFF14B8A6);
+  static const whatsapp = Color(0xFF25D366);
+
+  // Dark theme (unchanged)
+  static const darkBg = Color(0xFF0B1020);
+  static const darkSurface = Color(0xFF131A2E);
+  static const darkSurfaceAlt = Color(0xFF1C2540);
+
+  // Light theme (blue-tinted)
+  static const lightBg = Color(0xFFF6F8FC);
+  static const lightBorder = Color(0xFFE5EAF3);
+  static const lightText = Color(0xFF0F172A);
+  static const lightTextSec = Color(0xFF64748B);
+  static const lightTextTer = Color(0xFF94A3B8);
+
+  static Color bg(bool d) => d ? darkBg : lightBg;
+  static Color surface(bool d) => d ? darkSurface : Colors.white;
+  static Color surfaceAlt(bool d) => d ? darkSurfaceAlt : const Color(0xFFF1F4FA);
+  static Color border(bool d) => d ? Colors.white.withOpacity(0.07) : lightBorder;
+  static Color text(bool d) => d ? Colors.white : lightText;
+  static Color textSec(bool d) => d ? Colors.white60 : lightTextSec;
+  static Color textTer(bool d) => d ? Colors.white38 : lightTextTer;
+
+  static Color btnBg(bool d) => accent;
+  static Color btnFg(bool d) => Colors.white;
+
+  static Color accentSoftBg(bool d) =>
+      d ? accent.withOpacity(0.15) : accentSoft;
+}
+
 class OwnerBookingManagementPage extends StatefulWidget {
   const OwnerBookingManagementPage({super.key});
 
@@ -104,7 +149,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       _staggerController.forward(from: 0);
     } catch (e) {
       if (mounted) {
-        _showSnack('Failed to load bookings', const Color(0xFFEF4444));
+        _showSnack('Failed to load bookings', _C.danger);
       }
     }
   }
@@ -117,14 +162,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       final ok = await p.acceptBookingRequest(requestId, response);
       if (!mounted || _disposed) return;
       if (ok) {
-        _showSnackWithUndo(
-            'Booking accepted', const Color(0xFF22C55E), requestId);
+        _showSnackWithUndo('Booking accepted', _C.success, requestId);
       } else {
-        _showSnack(p.error ?? 'Failed to accept', const Color(0xFFEF4444));
+        _showSnack(p.error ?? 'Failed to accept', _C.danger);
       }
     } catch (_) {
       if (mounted) {
-        _showSnack('Something went wrong', const Color(0xFFEF4444));
+        _showSnack('Something went wrong', _C.danger);
       }
     }
   }
@@ -137,14 +181,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       final ok = await p.rejectBookingRequest(requestId, response);
       if (!mounted || _disposed) return;
       if (ok) {
-        _showSnackWithUndo(
-            'Booking rejected', const Color(0xFFEF4444), requestId);
+        _showSnackWithUndo('Booking rejected', _C.danger, requestId);
       } else {
-        _showSnack(p.error ?? 'Failed to reject', const Color(0xFFEF4444));
+        _showSnack(p.error ?? 'Failed to reject', _C.danger);
       }
     } catch (_) {
       if (mounted) {
-        _showSnack('Something went wrong', const Color(0xFFEF4444));
+        _showSnack('Something went wrong', _C.danger);
       }
     }
   }
@@ -156,13 +199,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       final ok = await p.undoBookingResponse(requestId);
       if (!mounted || _disposed) return;
       if (ok) {
-        _showSnack('Response undone', const Color(0xFF7C3AED));
+        _showSnack('Response undone', _C.accent);
       } else {
-        _showSnack(p.error ?? 'Failed to undo', const Color(0xFFEF4444));
+        _showSnack(p.error ?? 'Failed to undo', _C.danger);
       }
     } catch (_) {
       if (mounted) {
-        _showSnack('Something went wrong', const Color(0xFFEF4444));
+        _showSnack('Something went wrong', _C.danger);
       }
     }
   }
@@ -237,13 +280,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   Color _statusColor(String s) {
     switch (s.toUpperCase()) {
       case 'PENDING':
-        return const Color(0xFFF59E0B);
+        return _C.warning;
       case 'ACCEPTED':
-        return const Color(0xFF22C55E);
+        return _C.success;
       case 'REJECTED':
-        return const Color(0xFFEF4444);
+        return _C.danger;
       default:
-        return const Color(0xFF7C3AED);
+        return _C.accent;
     }
   }
 
@@ -288,19 +331,10 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
     }
   }
 
-  Color _hexColor(String hex) {
-    try {
-      final h = hex.replaceAll('#', '');
-      return Color(int.parse('FF$h', radix: 16));
-    } catch (_) {
-      return const Color(0xFF8A8FA3);
-    }
-  }
-
   // ============ CONTACT ACTIONS ============
   Future<void> _callPhone(String? phone) async {
     if (phone == null || phone.trim().isEmpty) {
-      _showSnack('Phone number not available', const Color(0xFFEF4444));
+      _showSnack('Phone number not available', _C.danger);
       return;
     }
     try {
@@ -308,16 +342,16 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
       } else {
-        _showSnack('Cannot open dialer', const Color(0xFFEF4444));
+        _showSnack('Cannot open dialer', _C.danger);
       }
     } catch (_) {
-      _showSnack('Cannot open dialer', const Color(0xFFEF4444));
+      _showSnack('Cannot open dialer', _C.danger);
     }
   }
 
   Future<void> _openWhatsApp(String? phone) async {
     if (phone == null || phone.trim().isEmpty) {
-      _showSnack('Phone number not available', const Color(0xFFEF4444));
+      _showSnack('Phone number not available', _C.danger);
       return;
     }
     try {
@@ -327,16 +361,16 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        _showSnack('Cannot open WhatsApp', const Color(0xFFEF4444));
+        _showSnack('Cannot open WhatsApp', _C.danger);
       }
     } catch (_) {
-      _showSnack('Cannot open WhatsApp', const Color(0xFFEF4444));
+      _showSnack('Cannot open WhatsApp', _C.danger);
     }
   }
 
   Future<void> _sendEmail(String? email) async {
     if (email == null || email.trim().isEmpty) {
-      _showSnack('Email not available', const Color(0xFFEF4444));
+      _showSnack('Email not available', _C.danger);
       return;
     }
     try {
@@ -348,16 +382,21 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
       } else {
-        _showSnack('Cannot open email app', const Color(0xFFEF4444));
+        _showSnack('Cannot open email app', _C.danger);
       }
     } catch (_) {
-      _showSnack('Cannot open email app', const Color(0xFFEF4444));
+      _showSnack('Cannot open email app', _C.danger);
     }
   }
 
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
-    _showSnack('$label copied', const Color(0xFF22C55E));
+    _showSnack('$label copied', _C.success);
+  }
+
+  // ✅ Bottom safe-area padding helper
+  double _bottomSafePad(BuildContext context) {
+    return MediaQuery.of(context).padding.bottom;
   }
 
   // ============================================================
@@ -373,8 +412,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor:
-            isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF7F8FC),
+        backgroundColor: _C.bg(isDark),
         body: SafeArea(
           child: Consumer<OwnerProvider>(
             builder: (context, p, _) {
@@ -418,10 +456,8 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                     ['PENDING', 'ACCEPTED', 'REJECTED'][i];
                                 return RefreshIndicator(
                                   onRefresh: _loadAll,
-                                  color: const Color(0xFF7C3AED),
-                                  backgroundColor: isDark
-                                      ? const Color(0xFF1A1F33)
-                                      : Colors.white,
+                                  color: _C.accent,
+                                  backgroundColor: _C.surface(isDark),
                                   child: _buildBookingList(
                                     context,
                                     lists[i],
@@ -456,12 +492,12 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             height: 44,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                colors: [_C.accent, _C.accentLight],
               ),
               borderRadius: BorderRadius.circular(13),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF7C3AED).withOpacity(0.3),
+                  color: _C.accent.withOpacity(0.30),
                   blurRadius: 12,
                   offset: const Offset(0, 5),
                 ),
@@ -484,7 +520,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       width: 10,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
+                        color: _C.danger,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 1.5),
                       ),
@@ -503,7 +539,8 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
                     fontSize: 18,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: _C.text(isDark),
+                    letterSpacing: -0.3,
                   ),
                 ),
                 Text(
@@ -514,8 +551,8 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     fontSize: 10.5,
                     fontWeight: FontWeight.w500,
                     color: pending > 0
-                        ? const Color(0xFFF59E0B)
-                        : (isDark ? Colors.white54 : const Color(0xFF8A8FA3)),
+                        ? _C.warning
+                        : _C.textSec(isDark),
                   ),
                 ),
               ],
@@ -560,19 +597,18 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
         width: 38,
         height: 38,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+          color: _C.surface(isDark),
           shape: BoxShape.circle,
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.08)
-                : const Color(0xFFE8E8F0),
-          ),
+          border: Border.all(color: _C.border(isDark)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.20 : 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-        ),
+        child: Icon(icon, size: 18, color: _C.text(isDark)),
       ),
     );
   }
@@ -586,35 +622,27 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
+          color: _C.surface(isDark),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.08)
-                : const Color(0xFFE8E8F0),
-          ),
+          border: Border.all(color: _C.border(isDark)),
         ),
         child: TextField(
           controller: _searchController,
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-          ),
+          style: GoogleFonts.poppins(fontSize: 13, color: _C.text(isDark)),
+          cursorColor: _C.accent,
           decoration: InputDecoration(
-            icon: Icon(
-              Icons.search_rounded,
-              size: 18,
-              color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
-            ),
+            icon: Icon(Icons.search_rounded,
+                size: 18, color: _C.textTer(isDark)),
             hintText: 'Search by name, ID, or email...',
             hintStyle: GoogleFonts.poppins(
               fontSize: 12,
-              color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+              color: _C.textTer(isDark),
             ),
             border: InputBorder.none,
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    icon: Icon(Icons.clear_rounded,
+                        size: 18, color: _C.textTer(isDark)),
                     onPressed: () {
                       _searchController.clear();
                       p.updateBookingFilters(clearSearch: true);
@@ -638,7 +666,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   }
 
   // ============================================================
-  // STATS SECTION (ANALYTICS)
+  // STATS SECTION
   // ============================================================
   Widget _buildStatsSection(
       bool isDark, BookingStats? stats, bool isLoading) {
@@ -648,7 +676,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
         child: Container(
           height: 120,
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF121729) : Colors.white,
+            color: _C.surface(isDark),
             borderRadius: BorderRadius.circular(18),
           ),
         ),
@@ -661,7 +689,6 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
       child: Column(
         children: [
-          // Row 1: Mini stat cards
           Row(
             children: [
               Expanded(
@@ -670,7 +697,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   value: '${stats.todayNew}',
                   subtitle: 'new',
                   icon: Icons.today_rounded,
-                  color: const Color(0xFF7C3AED),
+                  color: _C.accent,
                   isDark: isDark,
                 ),
               ),
@@ -683,7 +710,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       ? '${stats.urgentPending} urgent'
                       : 'all fresh',
                   icon: Icons.schedule_rounded,
-                  color: const Color(0xFFF59E0B),
+                  color: _C.warning,
                   isDark: isDark,
                 ),
               ),
@@ -695,44 +722,35 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   subtitle: _growthText(stats.weeklyGrowthPercent),
                   icon: Icons.trending_up_rounded,
                   color: stats.weeklyGrowthPercent >= 0
-                      ? const Color(0xFF22C55E)
-                      : const Color(0xFFEF4444),
+                      ? _C.success
+                      : _C.danger,
                   isDark: isDark,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          // Row 2: Performance card with graph
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF121729) : Colors.white,
+              color: _C.surface(isDark),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : const Color(0xFFF0F0F8),
-              ),
+              border: Border.all(color: _C.border(isDark)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.insights_rounded,
-                      size: 16,
-                      color: const Color(0xFF7C3AED),
-                    ),
+                    const Icon(Icons.insights_rounded,
+                        size: 16, color: _C.accent),
                     const SizedBox(width: 6),
                     Text(
                       'Performance',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color:
-                            isDark ? Colors.white : const Color(0xFF1A1A2E),
+                        color: _C.text(isDark),
                       ),
                     ),
                     const Spacer(),
@@ -740,58 +758,42 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       'Last 7 days',
                       style: GoogleFonts.poppins(
                         fontSize: 10,
-                        color: isDark
-                            ? Colors.white38
-                            : const Color(0xFFB0B3C0),
+                        color: _C.textTer(isDark),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
-                // Custom mini bar chart
                 SizedBox(
                   height: 70,
                   child: _buildMiniChart(stats, isDark),
                 ),
                 const SizedBox(height: 12),
-                // Bottom metrics row
                 Row(
                   children: [
                     Expanded(
                       child: _metricTile(
                         label: 'Acceptance',
                         value: '${stats.acceptanceRate.toStringAsFixed(1)}%',
-                        color: const Color(0xFF22C55E),
+                        color: _C.success,
                         isDark: isDark,
                       ),
                     ),
-                    Container(
-                      width: 1,
-                      height: 28,
-                      color: isDark
-                          ? Colors.white.withOpacity(0.06)
-                          : const Color(0xFFF0F0F8),
-                    ),
+                    Container(width: 1, height: 28, color: _C.border(isDark)),
                     Expanded(
                       child: _metricTile(
                         label: 'Avg Response',
                         value: _formatResponseTime(stats.avgResponseHours),
-                        color: const Color(0xFF4ECDC4),
+                        color: _C.accent,
                         isDark: isDark,
                       ),
                     ),
-                    Container(
-                      width: 1,
-                      height: 28,
-                      color: isDark
-                          ? Colors.white.withOpacity(0.06)
-                          : const Color(0xFFF0F0F8),
-                    ),
+                    Container(width: 1, height: 28, color: _C.border(isDark)),
                     Expanded(
                       child: _metricTile(
                         label: 'This Month',
                         value: '${stats.thisMonthBookings}',
-                        color: const Color(0xFFF59E0B),
+                        color: _C.warning,
                         isDark: isDark,
                       ),
                     ),
@@ -816,13 +818,9 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121729) : Colors.white,
+        color: _C.surface(isDark),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.06)
-              : const Color(0xFFF0F0F8),
-        ),
+        border: Border.all(color: _C.border(isDark)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -847,7 +845,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              color: _C.text(isDark),
               height: 1.1,
             ),
           ),
@@ -857,7 +855,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             style: GoogleFonts.poppins(
               fontSize: 9.5,
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+              color: _C.textSec(isDark),
             ),
           ),
           Text(
@@ -874,7 +872,6 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   }
 
   Widget _buildMiniChart(BookingStats stats, bool isDark) {
-    // Last 7 days mock data (real data aane par replace kar sakte ho)
     final now = DateTime.now();
     final List<double> values = [
       (stats.thisWeekBookings * 0.15).clamp(0, 100).toDouble(),
@@ -907,7 +904,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     height: (50 * heightRatio).clamp(4.0, 50.0),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                        colors: [_C.accent, _C.accentLight],
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                       ),
@@ -921,7 +918,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   style: GoogleFonts.poppins(
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+                    color: _C.textTer(isDark),
                   ),
                 ),
               ],
@@ -954,7 +951,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
           style: GoogleFonts.poppins(
             fontSize: 9,
             fontWeight: FontWeight.w500,
-            color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+            color: _C.textSec(isDark),
           ),
         ),
       ],
@@ -990,7 +987,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
               selected: !p.bookingOnlyNew &&
                   !p.bookingOnlyUrgent &&
                   p.bookingSortBy == 'newest',
-              color: const Color(0xFF7C3AED),
+              color: _C.accent,
               isDark: isDark,
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -1001,7 +998,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             _quickFilterChip(
               label: 'New',
               selected: p.bookingOnlyNew,
-              color: const Color(0xFF22C55E),
+              color: _C.success,
               isDark: isDark,
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -1015,7 +1012,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             _quickFilterChip(
               label: 'Urgent',
               selected: p.bookingOnlyUrgent,
-              color: const Color(0xFFEF4444),
+              color: _C.danger,
               isDark: isDark,
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -1029,7 +1026,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             _quickFilterChip(
               label: 'Newest',
               selected: p.bookingSortBy == 'newest',
-              color: const Color(0xFF4ECDC4),
+              color: _C.accent,
               isDark: isDark,
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -1040,7 +1037,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             _quickFilterChip(
               label: 'Move-in Date',
               selected: p.bookingSortBy == 'moveindate',
-              color: const Color(0xFFF59E0B),
+              color: _C.warning,
               isDark: isDark,
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -1069,16 +1066,12 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
           gradient: selected
               ? LinearGradient(colors: [color, color.withOpacity(0.75)])
               : null,
-          color: selected
-              ? null
-              : (isDark ? const Color(0xFF1A1F33) : Colors.white),
+          color: selected ? null : _C.surface(isDark),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
                 ? Colors.transparent
-                : (isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : const Color(0xFFE8E8F0)),
+                : _C.border(isDark),
           ),
           boxShadow: selected
               ? [
@@ -1102,9 +1095,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : const Color(0xFF666680)),
+                color: selected ? Colors.white : _C.textSec(isDark),
               ),
             ),
           ],
@@ -1119,9 +1110,9 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   Widget _buildSegmentChips(
       bool isDark, int pending, int accepted, int rejected) {
     final items = [
-      {'label': 'Pending', 'count': pending, 'color': const Color(0xFFF59E0B)},
-      {'label': 'Accepted', 'count': accepted, 'color': const Color(0xFF22C55E)},
-      {'label': 'Rejected', 'count': rejected, 'color': const Color(0xFFEF4444)},
+      {'label': 'Pending', 'count': pending, 'color': _C.warning},
+      {'label': 'Accepted', 'count': accepted, 'color': _C.success},
+      {'label': 'Rejected', 'count': rejected, 'color': _C.danger},
     ];
 
     return Padding(
@@ -1129,13 +1120,9 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121729) : Colors.white,
+          color: _C.surface(isDark),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : const Color(0xFFF0F0F8),
-          ),
+          border: Border.all(color: _C.border(isDark)),
         ),
         child: Row(
           children: List.generate(3, (i) {
@@ -1169,7 +1156,8 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                         : null,
                     borderRadius: BorderRadius.circular(12),
                     border: selected
-                        ? Border.all(color: color.withOpacity(0.35), width: 1.2)
+                        ? Border.all(
+                            color: color.withOpacity(0.35), width: 1.2)
                         : null,
                   ),
                   child: Row(
@@ -1184,11 +1172,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                             fontSize: 11,
                             fontWeight:
                                 selected ? FontWeight.w700 : FontWeight.w500,
-                            color: selected
-                                ? color
-                                : (isDark
-                                    ? Colors.white70
-                                    : const Color(0xFF666680)),
+                            color: selected ? color : _C.textSec(isDark),
                           ),
                         ),
                       ),
@@ -1199,9 +1183,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                         decoration: BoxDecoration(
                           color: selected
                               ? color
-                              : (isDark
-                                  ? Colors.white10
-                                  : const Color(0xFFF0F0F8)),
+                              : _C.surfaceAlt(isDark),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -1211,9 +1193,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                             fontWeight: FontWeight.w700,
                             color: selected
                                 ? Colors.white
-                                : (isDark
-                                    ? Colors.white54
-                                    : const Color(0xFF8A8FA3)),
+                                : _C.textSec(isDark),
                           ),
                         ),
                       ),
@@ -1242,7 +1222,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             margin: const EdgeInsets.only(bottom: 12),
             height: 200,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF121729) : Colors.white,
+              color: _C.surface(isDark),
               borderRadius: BorderRadius.circular(18),
             ),
           ),
@@ -1311,13 +1291,9 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121729) : Colors.white,
+        color: _C.surface(isDark),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.06)
-              : const Color(0xFFF0F0F8),
-        ),
+        border: Border.all(color: _C.border(isDark)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.22 : 0.04),
@@ -1339,25 +1315,24 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ============ STUDENT HEADER ============
+                // STUDENT HEADER
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar
                     Container(
                       width: 44,
                       height: 44,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF4ECDC4), Color(0xFF7C3AED)],
+                          colors: [_C.accent, _C.accentLight],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF4ECDC4).withOpacity(0.3),
+                            color: _C.accent.withOpacity(0.30),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -1403,9 +1378,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                   style: GoogleFonts.poppins(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13.5,
-                                    color: isDark
-                                        ? Colors.white
-                                        : const Color(0xFF1A1A2E),
+                                    color: _C.text(isDark),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1417,7 +1390,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 1.5),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF22C55E),
+                                    color: _C.success,
                                     borderRadius: BorderRadius.circular(5),
                                   ),
                                   child: Text(
@@ -1437,7 +1410,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 1.5),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFEF4444),
+                                    color: _C.danger,
                                     borderRadius: BorderRadius.circular(5),
                                   ),
                                   child: Text(
@@ -1461,8 +1434,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 5, vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF7C3AED)
-                                        .withOpacity(0.1),
+                                    color: _C.accent.withOpacity(0.10),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
@@ -1470,7 +1442,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                     style: GoogleFonts.poppins(
                                       fontSize: 8.5,
                                       fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF7C3AED),
+                                      color: _C.accent,
                                     ),
                                   ),
                                 ),
@@ -1481,9 +1453,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                   '· ${_timeAgo(booking.requestedAt)}',
                                   style: GoogleFonts.poppins(
                                     fontSize: 10,
-                                    color: isDark
-                                        ? Colors.white54
-                                        : const Color(0xFF8A8FA3),
+                                    color: _C.textSec(isDark),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1494,7 +1464,6 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                         ],
                       ),
                     ),
-                    // Status chip
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 9, vertical: 4),
@@ -1533,18 +1502,10 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                 ),
 
                 const SizedBox(height: 10),
-
-                // ============ DIVIDER ============
-                Container(
-                  height: 1,
-                  color: isDark
-                      ? Colors.white.withOpacity(0.06)
-                      : const Color(0xFFF0F0F8),
-                ),
-
+                Container(height: 1, color: _C.border(isDark)),
                 const SizedBox(height: 10),
 
-                // ============ PROPERTY INFO ============
+                // PROPERTY INFO
                 Row(
                   children: [
                     Container(
@@ -1553,15 +1514,12 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
+                          colors: [_C.accent, _C.accentLight],
                         ),
                         borderRadius: BorderRadius.circular(9),
                       ),
-                      child: Icon(
-                        Icons.apartment_rounded,
-                        color: Colors.white,
-                        size: 15,
-                      ),
+                      child: const Icon(Icons.apartment_rounded,
+                          color: Colors.white, size: 15),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1573,9 +1531,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF1A1A2E),
+                              color: _C.text(isDark),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1584,9 +1540,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                             '${_safeCity(booking)} · Room ${booking.roomNumber ?? 'N/A'}',
                             style: GoogleFonts.poppins(
                               fontSize: 10,
-                              color: isDark
-                                  ? Colors.white54
-                                  : const Color(0xFF8A8FA3),
+                              color: _C.textSec(isDark),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1599,7 +1553,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
 
                 const SizedBox(height: 10),
 
-                // ============ INFO CHIPS ============
+                // INFO CHIPS
                 Row(
                   children: [
                     Expanded(
@@ -1625,15 +1579,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                             : Icons.payment_rounded,
                         booking.isPaid ? 'Paid' : 'Not Paid',
                         isDark,
-                        color: booking.isPaid
-                            ? const Color(0xFF22C55E)
-                            : const Color(0xFFF59E0B),
+                        color: booking.isPaid ? _C.success : _C.warning,
                       ),
                     ),
                   ],
                 ),
 
-                // ============ MESSAGE ============
+                // MESSAGE
                 if (booking.message != null &&
                     booking.message!.trim().isNotEmpty) ...[
                   const SizedBox(height: 10),
@@ -1641,9 +1593,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.04)
-                          : const Color(0xFFF8F9FC),
+                      color: _C.surfaceAlt(isDark),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -1652,9 +1602,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                         Icon(
                           Icons.format_quote_rounded,
                           size: 13,
-                          color: isDark
-                              ? Colors.white38
-                              : const Color(0xFFB0B3C0),
+                          color: _C.textTer(isDark),
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -1663,9 +1611,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                             style: GoogleFonts.poppins(
                               fontSize: 11,
                               fontStyle: FontStyle.italic,
-                              color: isDark
-                                  ? Colors.white54
-                                  : const Color(0xFF8A8FA3),
+                              color: _C.textSec(isDark),
                               height: 1.4,
                             ),
                             maxLines: 2,
@@ -1679,12 +1625,12 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
 
                 const SizedBox(height: 12),
 
-                // ============ CONTACT ROW ============
+                // CONTACT ROW
                 Row(
                   children: [
                     _iconActionBtn(
                       icon: Icons.call_rounded,
-                      color: const Color(0xFF22C55E),
+                      color: _C.success,
                       isDark: isDark,
                       enabled: hasPhone,
                       onTap: () => _callPhone(booking.studentPhone),
@@ -1692,7 +1638,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     const SizedBox(width: 6),
                     _iconActionBtn(
                       icon: Icons.chat_rounded,
-                      color: const Color(0xFF25D366),
+                      color: _C.whatsapp,
                       isDark: isDark,
                       enabled: hasPhone,
                       onTap: () => _openWhatsApp(booking.studentPhone),
@@ -1700,7 +1646,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     const SizedBox(width: 6),
                     _iconActionBtn(
                       icon: Icons.email_rounded,
-                      color: const Color(0xFF4ECDC4),
+                      color: _C.accent,
                       isDark: isDark,
                       enabled: hasEmail,
                       onTap: () => _sendEmail(booking.studentEmail),
@@ -1709,18 +1655,18 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     if (hasPhone)
                       _iconActionBtn(
                         icon: Icons.copy_rounded,
-                        color: const Color(0xFF7C3AED),
+                        color: _C.accent,
                         isDark: isDark,
                         enabled: true,
-                        onTap: () => _copyToClipboard(
-                            booking.studentPhone!, 'Phone'),
+                        onTap: () =>
+                            _copyToClipboard(booking.studentPhone!, 'Phone'),
                       ),
                   ],
                 ),
 
                 const SizedBox(height: 10),
 
-                // ============ ACTIONS ============
+                // ACTIONS
                 if (isPending)
                   Row(
                     children: [
@@ -1729,7 +1675,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                           label: 'Accept',
                           icon: Icons.check_rounded,
                           filled: true,
-                          color: const Color(0xFF22C55E),
+                          color: _C.success,
                           onTap: () => _showAcceptDialog(
                               context, booking.requestId, isDark),
                         ),
@@ -1740,7 +1686,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                           label: 'Reject',
                           icon: Icons.close_rounded,
                           filled: false,
-                          color: const Color(0xFFEF4444),
+                          color: _C.danger,
                           onTap: () => _showRejectDialog(
                               context, booking.requestId, isDark),
                         ),
@@ -1752,7 +1698,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     label: 'View Details',
                     icon: Icons.arrow_forward_rounded,
                     filled: false,
-                    color: const Color(0xFF7C3AED),
+                    color: _C.accent,
                     fullWidth: true,
                     onTap: () => _showDetailsSheet(context, booking, isDark),
                   ),
@@ -1778,22 +1724,16 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: enabled
-              ? color.withOpacity(0.1)
-              : (isDark ? Colors.white.withOpacity(0.03) : const Color(0xFFF8F9FC)),
+          color: enabled ? color.withOpacity(0.10) : _C.surfaceAlt(isDark),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: enabled
-                ? color.withOpacity(0.2)
-                : (isDark ? Colors.white10 : const Color(0xFFE8E8F0)),
+            color: enabled ? color.withOpacity(0.20) : _C.border(isDark),
           ),
         ),
         child: Icon(
           icon,
           size: 16,
-          color: enabled
-              ? color
-              : (isDark ? Colors.white24 : const Color(0xFFB0B3C0)),
+          color: enabled ? color : _C.textTer(isDark),
         ),
       ),
     );
@@ -1801,7 +1741,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
 
   Widget _infoChip(IconData icon, String value, bool isDark,
       {Color? color}) {
-    final c = color ?? (isDark ? Colors.white54 : const Color(0xFF8A8FA3));
+    final c = color ?? _C.textSec(isDark);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       decoration: BoxDecoration(
@@ -1849,11 +1789,11 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
           decoration: filled
               ? BoxDecoration(
                   gradient:
-                      LinearGradient(colors: [color, color.withOpacity(0.8)]),
+                      LinearGradient(colors: [color, color.withOpacity(0.85)]),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withOpacity(0.3),
+                      color: color.withOpacity(0.30),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1886,7 +1826,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   }
 
   // ============================================================
-  // ACCEPT DIALOG WITH TEMPLATES
+  // ACCEPT DIALOG — with bottom safe-area fix
   // ============================================================
   void _showAcceptDialog(
       BuildContext context, int requestId, bool isDark) {
@@ -1907,34 +1847,43 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
         ),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF121729) : Colors.white,
+            color: _C.surface(isDark),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          padding: const EdgeInsets.all(20),
+          // ✅ BOTTOM SAFE AREA FIX
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            20 + _bottomSafePad(sheetContext),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : const Color(0xFFE0E0E8),
-                  borderRadius: BorderRadius.circular(10),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white24
+                        : const Color(0xFFE0E0E8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                alignment: Alignment.center,
-                margin: const EdgeInsets.only(bottom: 16),
               ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E).withOpacity(0.12),
+                      color: _C.success.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.check_rounded,
-                        color: Color(0xFF22C55E), size: 20),
+                        color: _C.success, size: 20),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -1942,7 +1891,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      color: _C.text(isDark),
                     ),
                   ),
                 ],
@@ -1953,7 +1902,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                 style: GoogleFonts.poppins(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                  color: _C.textSec(isDark),
                 ),
               ),
               const SizedBox(height: 6),
@@ -1969,17 +1918,17 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E).withOpacity(0.1),
+                        color: _C.success.withOpacity(0.10),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFF22C55E).withOpacity(0.25),
+                          color: _C.success.withOpacity(0.25),
                         ),
                       ),
                       child: Text(
                         t.length > 30 ? '${t.substring(0, 30)}...' : t,
                         style: GoogleFonts.poppins(
                           fontSize: 10,
-                          color: const Color(0xFF22C55E),
+                          color: _C.success,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -1991,9 +1940,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.05)
-                      : const Color(0xFFF8F9FC),
+                  color: _C.surfaceAlt(isDark),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
@@ -2001,14 +1948,14 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   maxLines: 3,
                   style: GoogleFonts.poppins(
                     fontSize: 13,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: _C.text(isDark),
                   ),
+                  cursorColor: _C.accent,
                   decoration: InputDecoration(
                     hintText: 'Write your response...',
                     hintStyle: GoogleFonts.poppins(
                       fontSize: 12,
-                      color:
-                          isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+                      color: _C.textTer(isDark),
                     ),
                     border: InputBorder.none,
                   ),
@@ -2022,7 +1969,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       label: 'Cancel',
                       icon: Icons.close_rounded,
                       filled: false,
-                      color: const Color(0xFF8A8FA3),
+                      color: _C.textSec(isDark),
                       onTap: () => Navigator.pop(sheetContext),
                     ),
                   ),
@@ -2033,7 +1980,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       label: 'Accept Booking',
                       icon: Icons.check_rounded,
                       filled: true,
-                      color: const Color(0xFF22C55E),
+                      color: _C.success,
                       onTap: () {
                         final text = controller.text.trim();
                         Navigator.pop(sheetContext);
@@ -2054,7 +2001,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   }
 
   // ============================================================
-  // REJECT DIALOG WITH TEMPLATES
+  // REJECT DIALOG — with bottom safe-area fix
   // ============================================================
   void _showRejectDialog(
       BuildContext context, int requestId, bool isDark) {
@@ -2075,34 +2022,43 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
         ),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF121729) : Colors.white,
+            color: _C.surface(isDark),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          padding: const EdgeInsets.all(20),
+          // ✅ BOTTOM SAFE AREA FIX
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            20 + _bottomSafePad(sheetContext),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : const Color(0xFFE0E0E8),
-                  borderRadius: BorderRadius.circular(10),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white24
+                        : const Color(0xFFE0E0E8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                alignment: Alignment.center,
-                margin: const EdgeInsets.only(bottom: 16),
               ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444).withOpacity(0.12),
+                      color: _C.danger.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.close_rounded,
-                        color: Color(0xFFEF4444), size: 20),
+                        color: _C.danger, size: 20),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -2110,7 +2066,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      color: _C.text(isDark),
                     ),
                   ),
                 ],
@@ -2121,7 +2077,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                 style: GoogleFonts.poppins(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                  color: _C.textSec(isDark),
                 ),
               ),
               const SizedBox(height: 6),
@@ -2135,17 +2091,17 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444).withOpacity(0.1),
+                        color: _C.danger.withOpacity(0.10),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFFEF4444).withOpacity(0.25),
+                          color: _C.danger.withOpacity(0.25),
                         ),
                       ),
                       child: Text(
                         t.length > 30 ? '${t.substring(0, 30)}...' : t,
                         style: GoogleFonts.poppins(
                           fontSize: 10,
-                          color: const Color(0xFFEF4444),
+                          color: _C.danger,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -2157,9 +2113,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.05)
-                      : const Color(0xFFF8F9FC),
+                  color: _C.surfaceAlt(isDark),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
@@ -2167,14 +2121,14 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   maxLines: 3,
                   style: GoogleFonts.poppins(
                     fontSize: 13,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: _C.text(isDark),
                   ),
+                  cursorColor: _C.accent,
                   decoration: InputDecoration(
                     hintText: 'Reason for rejection...',
                     hintStyle: GoogleFonts.poppins(
                       fontSize: 12,
-                      color:
-                          isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+                      color: _C.textTer(isDark),
                     ),
                     border: InputBorder.none,
                   ),
@@ -2188,7 +2142,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       label: 'Cancel',
                       icon: Icons.arrow_back_rounded,
                       filled: false,
-                      color: const Color(0xFF8A8FA3),
+                      color: _C.textSec(isDark),
                       onTap: () => Navigator.pop(sheetContext),
                     ),
                   ),
@@ -2199,7 +2153,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       label: 'Reject Booking',
                       icon: Icons.close_rounded,
                       filled: true,
-                      color: const Color(0xFFEF4444),
+                      color: _C.danger,
                       onTap: () {
                         final text = controller.text.trim();
                         Navigator.pop(sheetContext);
@@ -2221,7 +2175,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   }
 
   // ============================================================
-  // DETAILS SHEET
+  // DETAILS SHEET — with bottom safe-area fix
   // ============================================================
   void _showDetailsSheet(
     BuildContext context,
@@ -2243,13 +2197,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
+        initialChildSize: 0.78,
         minChildSize: 0.45,
         maxChildSize: 0.95,
         expand: false,
         builder: (_, scrollController) => Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF121729) : Colors.white,
+            color: _C.surface(isDark),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(
@@ -2266,7 +2220,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  // ✅ BOTTOM SAFE AREA FIX
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    16,
+                    20,
+                    24 + _bottomSafePad(sheetContext),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2283,7 +2243,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                               borderRadius: BorderRadius.circular(14),
                               boxShadow: [
                                 BoxShadow(
-                                  color: color.withOpacity(0.3),
+                                  color: color.withOpacity(0.30),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -2305,9 +2265,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                   style: GoogleFonts.poppins(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 17,
-                                    color: isDark
-                                        ? Colors.white
-                                        : const Color(0xFF1A1A2E),
+                                    color: _C.text(isDark),
                                   ),
                                 ),
                                 Text(
@@ -2331,12 +2289,12 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(colors: [
-                            const Color(0xFF4ECDC4).withOpacity(0.08),
-                            const Color(0xFF7C3AED).withOpacity(0.05),
+                            _C.accent.withOpacity(0.08),
+                            _C.accentLight.withOpacity(0.05),
                           ]),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: const Color(0xFF4ECDC4).withOpacity(0.2),
+                            color: _C.accent.withOpacity(0.20),
                           ),
                         ),
                         child: Column(
@@ -2345,7 +2303,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                             Row(
                               children: [
                                 const Icon(Icons.person_rounded,
-                                    size: 14, color: Color(0xFF4ECDC4)),
+                                    size: 14, color: _C.accent),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Requested By',
@@ -2353,7 +2311,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.5,
-                                    color: const Color(0xFF4ECDC4),
+                                    color: _C.accent,
                                   ),
                                 ),
                                 const Spacer(),
@@ -2362,8 +2320,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF22C55E)
-                                          .withOpacity(0.15),
+                                      color: _C.success.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -2371,7 +2328,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                       style: GoogleFonts.poppins(
                                         fontSize: 8,
                                         fontWeight: FontWeight.w800,
-                                        color: const Color(0xFF22C55E),
+                                        color: _C.success,
                                       ),
                                     ),
                                   ),
@@ -2386,10 +2343,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFF4ECDC4),
-                                        Color(0xFF7C3AED)
-                                      ],
+                                      colors: [_C.accent, _C.accentLight],
                                     ),
                                     shape: BoxShape.circle,
                                   ),
@@ -2432,9 +2386,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                         style: GoogleFonts.poppins(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 14,
-                                          color: isDark
-                                              ? Colors.white
-                                              : const Color(0xFF1A1A2E),
+                                          color: _C.text(isDark),
                                         ),
                                       ),
                                       if (booking.studentDisplayId != null) ...[
@@ -2444,7 +2396,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                           style: GoogleFonts.poppins(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
-                                            color: const Color(0xFF7C3AED),
+                                            color: _C.accent,
                                           ),
                                         ),
                                       ],
@@ -2455,9 +2407,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                           '${booking.studentAcceptedBookings ?? 0} accepted · ${booking.studentTotalBookings} total bookings',
                                           style: GoogleFonts.poppins(
                                             fontSize: 9.5,
-                                            color: isDark
-                                                ? Colors.white54
-                                                : const Color(0xFF8A8FA3),
+                                            color: _C.textSec(isDark),
                                           ),
                                         ),
                                       ],
@@ -2502,9 +2452,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.5,
-                          color: isDark
-                              ? Colors.white54
-                              : const Color(0xFF8A8FA3),
+                          color: _C.textSec(isDark),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -2534,7 +2482,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                           booking.ownerResponse!.trim().isNotEmpty)
                         _sheetRow(Icons.reply_rounded, 'Your Response',
                             booking.ownerResponse!, isDark,
-                            valueColor: const Color(0xFF22C55E)),
+                            valueColor: _C.success),
                       _sheetRow(Icons.upload_rounded, 'Requested',
                           _formatDate(booking.requestedAt), isDark),
                       if (booking.respondedAt != null)
@@ -2550,15 +2498,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.5,
-                            color: isDark
-                                ? Colors.white54
-                                : const Color(0xFF8A8FA3),
+                            color: _C.textSec(isDark),
                           ),
                         ),
                         const SizedBox(height: 8),
                         _sheetRow(Icons.check_circle_rounded, 'Status',
                             'Paid', isDark,
-                            valueColor: const Color(0xFF22C55E)),
+                            valueColor: _C.success),
                         if (booking.paidAmount != null)
                           _sheetRow(Icons.currency_rupee_rounded, 'Amount',
                               '₹${booking.paidAmount!.toStringAsFixed(0)}',
@@ -2579,7 +2525,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                 label: 'Accept',
                                 icon: Icons.check_rounded,
                                 filled: true,
-                                color: const Color(0xFF22C55E),
+                                color: _C.success,
                                 onTap: () {
                                   Navigator.pop(sheetContext);
                                   _showAcceptDialog(
@@ -2593,7 +2539,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                                 label: 'Reject',
                                 icon: Icons.close_rounded,
                                 filled: false,
-                                color: const Color(0xFFEF4444),
+                                color: _C.danger,
                                 onTap: () {
                                   Navigator.pop(sheetContext);
                                   _showRejectDialog(
@@ -2608,7 +2554,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                           label: 'Close',
                           icon: Icons.close_rounded,
                           filled: false,
-                          color: const Color(0xFF7C3AED),
+                          color: _C.accent,
                           fullWidth: true,
                           onTap: () => Navigator.pop(sheetContext),
                         ),
@@ -2639,17 +2585,13 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            color: _C.surface(isDark),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.08)
-                  : const Color(0xFFF0F0F8),
-            ),
+            border: Border.all(color: _C.border(isDark)),
           ),
           child: Row(
             children: [
-              Icon(icon, size: 14, color: const Color(0xFF7C3AED)),
+              Icon(icon, size: 14, color: _C.accent),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -2660,8 +2602,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       style: GoogleFonts.poppins(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w500,
-                        color:
-                            isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                        color: _C.textSec(isDark),
                       ),
                     ),
                     Text(
@@ -2669,8 +2610,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color:
-                            isDark ? Colors.white : const Color(0xFF1A1A2E),
+                        color: _C.text(isDark),
                       ),
                     ),
                   ],
@@ -2684,8 +2624,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                     child: Icon(
                       Icons.copy_rounded,
                       size: 14,
-                      color:
-                          isDark ? Colors.white38 : const Color(0xFFB0B3C0),
+                      color: _C.textTer(isDark),
                     ),
                   ),
                 ),
@@ -2712,10 +2651,10 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: const Color(0xFF7C3AED).withOpacity(0.08),
+              color: _C.accent.withOpacity(0.08),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 15, color: const Color(0xFF7C3AED)),
+            child: Icon(icon, size: 15, color: _C.accent),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2727,7 +2666,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   style: GoogleFonts.poppins(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                    color: _C.textSec(isDark),
                   ),
                 ),
                 const SizedBox(height: 1),
@@ -2736,8 +2675,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   style: GoogleFonts.poppins(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: valueColor ??
-                        (isDark ? Colors.white : const Color(0xFF1A1A2E)),
+                    color: valueColor ?? _C.text(isDark),
                   ),
                 ),
               ],
@@ -2786,7 +2724,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
               style: GoogleFonts.poppins(
                 fontSize: 16.5,
                 fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                color: _C.text(isDark),
               ),
             ),
             const SizedBox(height: 6),
@@ -2794,7 +2732,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
               'Pull down to refresh',
               style: GoogleFonts.poppins(
                 fontSize: 11.5,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                color: _C.textSec(isDark),
               ),
             ),
           ],

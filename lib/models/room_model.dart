@@ -58,16 +58,42 @@ class Room {
   };
 
   // ✅ Helper getters
+  // status AVAILABLE  = at least one free bed (room may be partially filled)
+  // status OCCUPIED   = every bed taken
+  // status MAINTENANCE = owner paused the room
   bool get isAvailable => status == 'AVAILABLE';
   bool get isOccupied => status == 'OCCUPIED';
   bool get isUnderMaintenance => status == 'MAINTENANCE';
-  
+
+  // ============================================
+  // ✅ NEW — Bed-level info (safe to show to students)
+  // ============================================
+  int get bedsLeft {
+    if (isUnderMaintenance) return 0;
+    final left = capacity - occupiedCount;
+    return left < 0 ? 0 : left;
+  }
+
+  bool get isFull => !isUnderMaintenance && bedsLeft == 0;
+
+  bool get isPartiallyOccupied =>
+      !isUnderMaintenance && occupiedCount > 0 && bedsLeft > 0;
+
+  String get availabilityLabel {
+    if (isUnderMaintenance) return 'Under Maintenance';
+    if (bedsLeft == 0) return 'Fully Booked';
+    if (occupiedCount == 0) {
+      return capacity <= 1 ? 'Available' : 'All $capacity beds free';
+    }
+    return bedsLeft == 1 ? '1 bed left' : '$bedsLeft beds left';
+  }
+
   String get statusDisplay {
     switch (status) {
       case 'AVAILABLE':
-        return 'Available ✅';
+        return isPartiallyOccupied ? availabilityLabel : 'Available ✅';
       case 'OCCUPIED':
-        return 'Occupied';
+        return 'Fully Booked';
       case 'MAINTENANCE':
         return 'Under Maintenance';
       default:
@@ -78,7 +104,7 @@ class Room {
   Color get statusColor {
     switch (status) {
       case 'AVAILABLE':
-        return Colors.green;
+        return isPartiallyOccupied ? Colors.blue : Colors.green;
       case 'OCCUPIED':
         return Colors.red;
       case 'MAINTENANCE':

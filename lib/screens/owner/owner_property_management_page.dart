@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,6 +13,51 @@ import 'add_edit_property_page.dart';
 import 'property_rooms_page.dart';
 import 'property_access_subscription_page.dart';
 
+// ══════════════════════════════════════════════════════════════
+// DESIGN TOKENS — Blue premium theme
+// ══════════════════════════════════════════════════════════════
+class _C {
+  // ── Brand: professional blue ──
+  static const accent = Color(0xFF2563EB);        // primary blue
+  static const accentDark = Color(0xFF1D4ED8);    // blue on light bg text
+  static const accentLight = Color(0xFF3B82F6);   // lighter blue
+  static const accentSoft = Color(0xFFEBF1FF);    // very light blue tint
+  static const ink = Color(0xFF0F172A);           // deep ink for contrast
+
+  static const success = Color(0xFF10B981);
+  static const warning = Color(0xFFF59E0B);
+  static const danger = Color(0xFFEF4444);
+  static const info = Color(0xFF3B82F6);
+
+  // ── Dark theme (unchanged) ──
+  static const darkBg = Color(0xFF0B1020);
+  static const darkSurface = Color(0xFF131A2E);
+  static const darkSurfaceAlt = Color(0xFF1C2540);
+
+  // ── Light theme (clean, blue-tinted) ──
+  static const lightBg = Color(0xFFF6F8FC);
+  static const lightBorder = Color(0xFFE5EAF3);
+  static const lightText = Color(0xFF0F172A);
+  static const lightTextSec = Color(0xFF64748B);
+  static const lightTextTer = Color(0xFF94A3B8);
+
+  static Color bg(bool d) => d ? darkBg : lightBg;
+  static Color surface(bool d) => d ? darkSurface : Colors.white;
+  static Color surfaceAlt(bool d) => d ? darkSurfaceAlt : const Color(0xFFF1F4FA);
+  static Color border(bool d) => d ? Colors.white.withOpacity(0.07) : lightBorder;
+  static Color text(bool d) => d ? Colors.white : lightText;
+  static Color textSec(bool d) => d ? Colors.white60 : lightTextSec;
+  static Color textTer(bool d) => d ? Colors.white38 : lightTextTer;
+
+  // Primary buttons: solid blue in BOTH modes (consistent, professional)
+  static Color btnBg(bool d) => accent;
+  static Color btnFg(bool d) => Colors.white;
+
+  // Blue tinted soft backgrounds for chips/badges
+  static Color accentSoftBg(bool d) =>
+      d ? accent.withOpacity(0.15) : accentSoft;
+}
+
 class OwnerPropertyManagementPage extends StatefulWidget {
   const OwnerPropertyManagementPage({super.key});
 
@@ -20,16 +67,16 @@ class OwnerPropertyManagementPage extends StatefulWidget {
 }
 
 class _OwnerPropertyManagementPageState
-    extends State<OwnerPropertyManagementPage>
-    with TickerProviderStateMixin {
+    extends State<OwnerPropertyManagementPage> with TickerProviderStateMixin {
+  static const double _hPad = 8.0;
+
   bool _isFirstLoad = true;
-  late AnimationController _fadeController;
-  late AnimationController _staggerController;
+  late final AnimationController _fadeController;
+  late final AnimationController _staggerController;
+  late final AnimationController _pulseController;
 
-  // Filter state
   String _searchQuery = '';
-  String _filter = 'ALL'; // ALL | PUBLISHED | DRAFT
-
+  String _filter = 'ALL';
   final _searchCtrl = TextEditingController();
 
   @override
@@ -45,6 +92,11 @@ class _OwnerPropertyManagementPageState
       vsync: this,
     );
 
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 900),
+      vsync: this,
+    )..repeat(reverse: true);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isFirstLoad && mounted) {
         _isFirstLoad = false;
@@ -57,6 +109,7 @@ class _OwnerPropertyManagementPageState
   void dispose() {
     _fadeController.dispose();
     _staggerController.dispose();
+    _pulseController.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -67,150 +120,106 @@ class _OwnerPropertyManagementPageState
     if (mounted) _staggerController.forward(from: 0);
   }
 
-  // ================= SUBSCRIPTION DIALOG =================
-  void _showSubscriptionRequiredDialog() {
+  // ══════════════════════════════════════════════════════════
+  // DIALOGS
+  // ══════════════════════════════════════════════════════════
+  Future<bool?> _showActionDialog({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String message,
+    required String cancelLabel,
+    required String confirmLabel,
+    Color? confirmColor,
+    Widget? extra,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
+
+    return showDialog<bool>(
       context: context,
-      barrierDismissible: true,
-      builder: (_) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF121729) : Colors.white,
+      builder: (ctx) => Dialog(
+        backgroundColor: _C.surface(isDark),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 68,
-                height: 68,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF7C3AED).withOpacity(0.15),
-                      const Color(0xFF4ECDC4).withOpacity(0.1),
-                    ],
-                  ),
+                  color: color.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.lock_rounded,
-                  color: Color(0xFF7C3AED),
-                  size: 34,
-                ),
+                child: Icon(icon, color: color, size: 30),
               ),
               const SizedBox(height: 18),
               Text(
-                'Subscription Required',
+                title,
+                textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: 18,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  color: _C.text(isDark),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
-                'You need an active Property Access Subscription to add, edit, or manage properties.',
+                message,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: isDark ? Colors.white60 : const Color(0xFF8A8FA3),
-                  height: 1.5,
+                  fontSize: 12.5,
+                  height: 1.55,
+                  color: _C.textSec(isDark),
                 ),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFF59E0B).withOpacity(0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        color: Color(0xFFF59E0B), size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Unlock unlimited property management with one subscription.',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11.5,
-                          color: const Color(0xFFB45309),
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
+              if (extra != null) ...[
+                const SizedBox(height: 16),
+                extra,
+              ],
+              const SizedBox(height: 22),
               Row(
                 children: [
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: _C.border(isDark)),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: isDark
-                                ? Colors.white12
-                                : const Color(0xFFE8E8F0),
-                          ),
-                        ),
+                            borderRadius: BorderRadius.circular(14)),
                       ),
                       child: Text(
-                        'Not Now',
+                        cancelLabel,
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color:
-                              isDark ? Colors.white70 : const Color(0xFF666680),
+                          color: _C.textSec(isDark),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    flex: 2,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF7C3AED), Color(0xFF4ECDC4)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF7C3AED).withOpacity(0.3),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: confirmColor ?? color,
+                        foregroundColor: confirmColor == null
+                            ? Colors.white
+                            : _C.btnFg(isDark),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
                       ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _navigateToSubscription();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            alignment: Alignment.center,
-                            child: Text(
-                              'Buy Subscription',
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                      child: Text(
+                        confirmLabel,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
                         ),
                       ),
                     ),
@@ -224,14 +233,53 @@ class _OwnerPropertyManagementPageState
     );
   }
 
+  Future<void> _showSubscriptionRequiredDialog() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirmed = await _showActionDialog(
+      icon: Icons.lock_rounded,
+      color: _C.accent,
+      title: 'Subscription Required',
+      message:
+          'You need an active Property Access Subscription to add, edit or manage properties.',
+      cancelLabel: 'Not Now',
+      confirmLabel: 'Subscribe',
+      confirmColor: _C.btnBg(isDark),
+      extra: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _C.accentSoftBg(isDark),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded,
+                color: _C.accent, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'One subscription unlocks unlimited property management.',
+                style: GoogleFonts.poppins(
+                  fontSize: 11.5,
+                  height: 1.4,
+                  color: _C.accentDark,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true && mounted) _navigateToSubscription();
+  }
+
   void _navigateToSubscription() {
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
     int propertyId = 0;
     String propertyTitle = 'Property Access';
     if (ownerProvider.myProperties.isNotEmpty) {
-      final firstProperty = ownerProvider.myProperties.first;
-      propertyId = firstProperty.propertyId;
-      propertyTitle = firstProperty.title;
+      final first = ownerProvider.myProperties.first;
+      propertyId = first.propertyId;
+      propertyTitle = first.title;
     }
     Navigator.push(
       context,
@@ -244,7 +292,9 @@ class _OwnerPropertyManagementPageState
     ).then((_) => _loadAllData());
   }
 
-  // ================= DELETE =================
+  // ══════════════════════════════════════════════════════════
+  // ACTIONS
+  // ══════════════════════════════════════════════════════════
   Future<void> _deleteProperty(Property property) async {
     final ownerProvider = Provider.of<OwnerProvider>(context, listen: false);
 
@@ -253,129 +303,88 @@ class _OwnerPropertyManagementPageState
       return;
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF121729) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: Color(0xFFEF4444),
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Delete Property?',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '"${property.title}" will be permanently removed along with all its rooms and media.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 12.5,
-                  color: isDark ? Colors.white60 : const Color(0xFF8A8FA3),
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: isDark
-                                ? Colors.white12
-                                : const Color(0xFFE8E8F0),
-                          ),
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color:
-                              isDark ? Colors.white70 : const Color(0xFF666680),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      onPressed: () => Navigator.pop(context, true),
-                      child: Text(
-                        'Delete',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    final confirm = await _showActionDialog(
+      icon: Icons.delete_outline_rounded,
+      color: _C.danger,
+      title: 'Delete Property?',
+      message:
+          '"${property.title}" will be permanently removed along with all its rooms and media.',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Delete',
     );
 
-    if (confirm == true) {
-      final success = await ownerProvider.deleteProperty(property.propertyId);
-      if (success && mounted) {
-        _showSnack('Property deleted');
-        _loadAllData();
-      }
+    if (confirm != true) return;
+
+    final success = await ownerProvider.deleteProperty(property.propertyId);
+    if (!mounted) return;
+    if (success) {
+      _showSnack('Property deleted');
+      _loadAllData();
+    } else {
+      _showSnack('Could not delete property. Please try again.',
+          isError: true);
     }
   }
 
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
-        backgroundColor: const Color(0xFF22C55E),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        margin: const EdgeInsets.all(16),
-      ),
+  void _openRooms(Property property) {
+    HapticFeedback.selectionClick();
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PropertyRoomsPage(property: property)),
     );
   }
 
-  // ================= FILTER =================
+  Future<void> _openEdit(Property property) async {
+    HapticFeedback.selectionClick();
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => AddEditPropertyPage(property: property)),
+    );
+    if (result == true) _loadAllData();
+  }
+
+  Future<void> _openAddProperty() async {
+    HapticFeedback.selectionClick();
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddEditPropertyPage()),
+    );
+    if (result == true) _loadAllData();
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                isError
+                    ? Icons.error_outline_rounded
+                    : Icons.check_circle_outline_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
+              ),
+            ],
+          ),
+          backgroundColor: isError ? _C.danger : _C.success,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // FILTER
+  // ══════════════════════════════════════════════════════════
   List<Property> _filtered(List<Property> all) {
     var list = all;
     if (_filter == 'PUBLISHED') {
@@ -383,8 +392,8 @@ class _OwnerPropertyManagementPageState
     } else if (_filter == 'DRAFT') {
       list = list.where((p) => !p.isPublished).toList();
     }
-    if (_searchQuery.trim().isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isNotEmpty) {
       list = list
           .where((p) =>
               p.title.toLowerCase().contains(q) ||
@@ -395,33 +404,32 @@ class _OwnerPropertyManagementPageState
     return list;
   }
 
-  // ================= BUILD =================
+  // ══════════════════════════════════════════════════════════
+  // BUILD
+  // ══════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF7F8FC),
+      backgroundColor: _C.bg(isDark),
       body: SafeArea(
         child: Consumer<OwnerProvider>(
           builder: (context, ownerProvider, _) {
-            final allProperties = ownerProvider.myProperties;
-            final properties = _filtered(allProperties);
+            final all = ownerProvider.myProperties;
+            final visible = _filtered(all);
             final hasAccess = ownerProvider.canAddProperty;
             final accessStatus = ownerProvider.propertyAccessStatus;
-            final isLoading =
-                ownerProvider.isLoading && allProperties.isEmpty;
+            final isLoading = ownerProvider.isLoading && all.isEmpty;
 
             return Column(
               children: [
-                _buildHeader(isDark, hasAccess, allProperties.length),
+                _buildHeader(isDark, all.length, hasAccess),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: _loadAllData,
-                    color: const Color(0xFF7C3AED),
-                    backgroundColor:
-                        isDark ? const Color(0xFF1A1F33) : Colors.white,
+                    color: _C.accent,
+                    backgroundColor: _C.surface(isDark),
                     child: isLoading
                         ? _buildSkeleton(isDark)
                         : FadeTransition(
@@ -430,45 +438,44 @@ class _OwnerPropertyManagementPageState
                               physics: const BouncingScrollPhysics(
                                 parent: AlwaysScrollableScrollPhysics(),
                               ),
-                              padding: const EdgeInsets.fromLTRB(16, 6, 16, 100),
+                              padding: const EdgeInsets.fromLTRB(
+                                  _hPad, 8, _hPad, 100),
                               children: [
-                                _buildSubscriptionPill(
-                                  isDark,
-                                  hasAccess,
-                                  accessStatus,
-                                ),
-                                const SizedBox(height: 14),
-                                if (allProperties.isNotEmpty) ...[
-                                  _buildStatsRow(isDark, allProperties),
+                                _buildSubscriptionBanner(
+                                    isDark, hasAccess, accessStatus),
+                                if (all.isNotEmpty) ...[
                                   const SizedBox(height: 14),
-                                  _buildSearchAndFilter(isDark),
-                                  const SizedBox(height: 14),
+                                  _buildStatsCard(isDark, all),
+                                  const SizedBox(height: 18),
+                                  _buildSearchField(isDark),
+                                  const SizedBox(height: 12),
+                                  _buildSegmentedFilter(isDark, all),
                                 ],
-                                if (properties.isEmpty)
-                                  allProperties.isEmpty
+                                const SizedBox(height: 18),
+                                if (visible.isEmpty)
+                                  all.isEmpty
                                       ? _buildEmptyState(isDark, hasAccess)
                                       : _buildNoResults(isDark)
                                 else
-                                  ...List.generate(properties.length, (i) {
+                                  ...List.generate(visible.length, (i) {
                                     final delay = i * 0.05;
                                     return AnimatedBuilder(
                                       animation: _staggerController,
                                       builder: (context, child) {
-                                        final t =
-                                            Curves.easeOutCubic.transform(
-                                          ((_staggerController.value - delay)
-                                                  .clamp(0.0, 1.0))
-                                              .toDouble(),
-                                        );
+                                        final t = Curves.easeOutCubic
+                                            .transform((_staggerController
+                                                        .value -
+                                                    delay)
+                                                .clamp(0.0, 1.0)
+                                                .toDouble());
                                         return Transform.translate(
                                           offset: Offset(0, 24 * (1 - t)),
-                                          child:
-                                              Opacity(opacity: t, child: child),
+                                          child: Opacity(
+                                              opacity: t, child: child),
                                         );
                                       },
                                       child: _buildPropertyCard(
-                                        context,
-                                        properties[i],
+                                        visible[i],
                                         isDark,
                                         hasAccess,
                                       ),
@@ -484,44 +491,17 @@ class _OwnerPropertyManagementPageState
           },
         ),
       ),
-      floatingActionButton: Consumer<OwnerProvider>(
-        builder: (context, ownerProvider, _) {
-          final hasAccess = ownerProvider.canAddProperty;
-          return _buildFab(isDark, hasAccess);
-        },
-      ),
     );
   }
 
-  // ================= HEADER =================
-  Widget _buildHeader(bool isDark, bool hasAccess, int totalCount) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+  // ══════════════════════════════════════════════════════════
+  // HEADER
+  // ══════════════════════════════════════════════════════════
+  Widget _buildHeader(bool isDark, int totalCount, bool hasAccess) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_hPad + 4, 14, _hPad, 6),
       child: Row(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF7C3AED).withOpacity(0.3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.apartment_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,185 +510,153 @@ class _OwnerPropertyManagementPageState
                   'My Properties',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    fontSize: 24,
+                    letterSpacing: -0.5,
+                    height: 1.15,
+                    color: _C.text(isDark),
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   totalCount == 0
-                      ? 'No properties yet'
-                      : '$totalCount propert${totalCount == 1 ? 'y' : 'ies'} total',
+                      ? 'Add your first listing to get started'
+                      : 'Manage your $totalCount listing${totalCount == 1 ? '' : 's'}',
                   style: GoogleFonts.poppins(
-                    fontSize: 11.5,
-                    color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                    fontSize: 12,
+                    color: _C.textSec(isDark),
                   ),
                 ),
               ],
             ),
           ),
-          _circleBtn(
-            icon: Icons.refresh_rounded,
-            onTap: _loadAllData,
-            isDark: isDark,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _circleBtn({
-    required IconData icon,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(50),
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F33) : Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.08)
-                : const Color(0xFFE8E8F0),
-          ),
-        ),
-        child: Icon(
-          icon,
-          size: 19,
-          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-        ),
-      ),
-    );
-  }
-
-  // ================= FAB =================
-  Widget _buildFab(bool isDark, bool hasAccess) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: hasAccess
-            ? const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFF4ECDC4)],
-              )
-            : const LinearGradient(
-                colors: [Color(0xFF9CA3AF), Color(0xFF6B7280)],
+          InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              _loadAllData();
+            },
+            borderRadius: BorderRadius.circular(50),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: _C.surface(isDark),
+                shape: BoxShape.circle,
+                border: Border.all(color: _C.border(isDark)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.20 : 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: (hasAccess
-                    ? const Color(0xFF7C3AED)
-                    : const Color(0xFF6B7280))
-                .withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+              child: Icon(Icons.refresh_rounded,
+                  size: 20, color: _C.text(isDark)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Always-visible Add button
+          GestureDetector(
+            onTap: hasAccess
+                ? _openAddProperty
+                : _showSubscriptionRequiredDialog,
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: hasAccess ? _C.btnBg(isDark) : _C.surfaceAlt(isDark),
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: hasAccess
+                    ? [
+                        BoxShadow(
+                          color: _C.accent.withOpacity(0.30),
+                          blurRadius: 14,
+                          offset: const Offset(0, 5),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    hasAccess ? Icons.add_rounded : Icons.lock_rounded,
+                    size: 19,
+                    color: hasAccess ? _C.btnFg(isDark) : _C.textSec(isDark),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    hasAccess ? 'Add' : 'Unlock',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: hasAccess ? _C.btnFg(isDark) : _C.textSec(isDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            if (hasAccess) {
-              _openAddProperty();
-            } else {
-              _showSubscriptionRequiredDialog();
-            }
-          },
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  hasAccess ? Icons.add_rounded : Icons.lock_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  hasAccess ? 'Add Property' : 'Unlock',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
-  Future<void> _openAddProperty() async {
-    HapticFeedback.selectionClick();
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const AddEditPropertyPage()),
-    );
-    if (result == true) _loadAllData();
-  }
-
-  // ================= SUBSCRIPTION PILL =================
-  Widget _buildSubscriptionPill(
+  // ══════════════════════════════════════════════════════════
+  // SUBSCRIPTION BANNER
+  // ══════════════════════════════════════════════════════════
+  Widget _buildSubscriptionBanner(
     bool isDark,
     bool hasAccess,
     PropertyAccessStatus? status,
   ) {
-    Color color;
-    IconData icon;
-    String title;
-    String? subtitle;
-    String buttonLabel;
-    VoidCallback buttonTap;
+    final Color color;
+    final IconData icon;
+    final String title;
+    final String? subtitle;
+    final String buttonLabel;
 
     if (hasAccess) {
       final daysLeft = status?.daysRemaining ?? 0;
       final isExpiring = status?.isExpiringSoon ?? false;
-      color = isExpiring ? const Color(0xFFF59E0B) : const Color(0xFF22C55E);
-      icon = isExpiring ? Icons.warning_rounded : Icons.check_circle_rounded;
+      color = isExpiring ? _C.warning : _C.success;
+      icon = isExpiring ? Icons.schedule_rounded : Icons.verified_rounded;
       title = isExpiring ? 'Expiring Soon' : 'Property Access Active';
       subtitle = daysLeft > 0 ? '$daysLeft days remaining' : null;
       buttonLabel = 'Renew';
-      buttonTap = _navigateToSubscription;
     } else {
       final isExpired = (status?.status ?? 'EXPIRED') == 'EXPIRED';
-      color = isExpired ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
-      icon = isExpired ? Icons.cancel_rounded : Icons.lock_rounded;
+      color = isExpired ? _C.danger : _C.warning;
+      icon = isExpired ? Icons.error_outline_rounded : Icons.lock_outline_rounded;
       title = isExpired ? 'Subscription Expired' : 'No Active Subscription';
-      subtitle = 'Buy to manage properties';
-      buttonLabel = isExpired ? 'Renew' : 'Buy Now';
-      buttonTap = _navigateToSubscription;
+      subtitle = 'Subscribe to add and manage properties';
+      buttonLabel = isExpired ? 'Renew' : 'Subscribe';
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.1),
-            color.withOpacity(0.04),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2), width: 1.2),
+        color: _C.surface(isDark),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(isDark ? 0.10 : 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              shape: BoxShape.circle,
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 19),
+            child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -718,38 +666,35 @@ class _OwnerPropertyManagementPageState
                 Text(
                   title,
                   style: GoogleFonts.poppins(
-                    fontSize: 12.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    color: _C.text(isDark),
                   ),
                 ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 1),
+                if (subtitle != null)
                   Text(
                     subtitle,
                     style: GoogleFonts.poppins(
-                      fontSize: 10.5,
-                      color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+                      fontSize: 11,
+                      color: _C.textSec(isDark),
                     ),
                   ),
-                ],
               ],
             ),
           ),
+          const SizedBox(width: 8),
           GestureDetector(
-            onTap: buttonTap,
+            onTap: _navigateToSubscription,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [color, color.withOpacity(0.75)],
-                ),
-                borderRadius: BorderRadius.circular(10),
+                color: color,
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: color.withOpacity(0.30),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -768,273 +713,263 @@ class _OwnerPropertyManagementPageState
     );
   }
 
-  // ================= STATS ROW =================
-  Widget _buildStatsRow(bool isDark, List<Property> properties) {
+  // ══════════════════════════════════════════════════════════
+  // STATS
+  // ══════════════════════════════════════════════════════════
+  Widget _buildStatsCard(bool isDark, List<Property> properties) {
     final total = properties.length;
     final published = properties.where((p) => p.isPublished).length;
     final draft = total - published;
 
-    return Row(
-      children: [
-        _statCard(
-          label: 'Total',
-          value: total,
-          icon: Icons.apartment_rounded,
-          color: const Color(0xFF7C3AED),
-          isDark: isDark,
-        ),
-        const SizedBox(width: 10),
-        _statCard(
-          label: 'Published',
-          value: published,
-          icon: Icons.check_circle_rounded,
-          color: const Color(0xFF22C55E),
-          isDark: isDark,
-        ),
-        const SizedBox(width: 10),
-        _statCard(
-          label: 'Draft',
-          value: draft,
-          icon: Icons.drafts_rounded,
-          color: const Color(0xFFF59E0B),
-          isDark: isDark,
-        ),
-      ],
-    );
-  }
-
-  Widget _statCard({
-    required String label,
-    required int value,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121729) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : const Color(0xFFF0F0F8),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 16),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '$value',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-                color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-              ),
-            ),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ================= SEARCH & FILTER =================
-  Widget _buildSearchAndFilter(bool isDark) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF121729) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.06)
-                  : const Color(0xFFF0F0F8),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.search_rounded,
-                size: 18,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _searchCtrl,
-                  onChanged: (v) => setState(() => _searchQuery = v),
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search by title, city...',
-                    hintStyle: GoogleFonts.poppins(
-                      fontSize: 12.5,
-                      color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
-                    ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
-                  ),
-                ),
-              ),
-              if (_searchQuery.isNotEmpty)
-                GestureDetector(
-                  onTap: () {
-                    _searchCtrl.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 18,
-                    color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _filterChip('ALL', 'All', isDark),
-              const SizedBox(width: 8),
-              _filterChip('PUBLISHED', 'Published', isDark),
-              const SizedBox(width: 8),
-              _filterChip('DRAFT', 'Draft', isDark),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _filterChip(String value, String label, bool isDark) {
-    final selected = _filter == value;
-    return GestureDetector(
-      onTap: () => setState(() => _filter = value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          gradient: selected
-              ? const LinearGradient(
-                  colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
-                )
-              : null,
-          color: selected
-              ? null
-              : (isDark ? const Color(0xFF121729) : Colors.white),
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: selected
-                ? Colors.transparent
-                : (isDark ? Colors.white12 : const Color(0xFFE8E8F0)),
-            width: 1.3,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF7C3AED).withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-            color: selected
-                ? Colors.white
-                : (isDark ? Colors.white70 : const Color(0xFF666680)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ================= PROPERTY CARD =================
-  Widget _buildPropertyCard(
-    BuildContext context,
-    Property property,
-    bool isDark,
-    bool hasAccess,
-  ) {
-    final isPublished = property.isPublished;
-    final hasImage = property.coverImage.isNotEmpty;
-    final statusColor =
-        isPublished ? const Color(0xFF22C55E) : const Color(0xFFF59E0B);
+    Widget divider() => Container(
+          width: 1,
+          height: 36,
+          color: _C.border(isDark),
+        );
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121729) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.06)
-              : const Color(0xFFF0F0F8),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.25 : 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: _cardDeco(isDark, radius: 18),
+      child: Row(
+        children: [
+          _statItem('Total', total, _C.accent, isDark),
+          divider(),
+          _statItem('Published', published, _C.success, isDark),
+          divider(),
+          _statItem('Draft', draft, _C.warning, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _statItem(String label, int value, Color color, bool isDark) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            '$value',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w800,
+              fontSize: 24,
+              height: 1.1,
+              letterSpacing: -0.5,
+              color: _C.text(isDark),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: _C.textSec(isDark),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // SEARCH + FILTER
+  // ══════════════════════════════════════════════════════════
+  Widget _buildSearchField(bool isDark) {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: _C.surface(isDark),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _C.border(isDark)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, size: 20, color: _C.textTer(isDark)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _searchQuery = v),
+              textInputAction: TextInputAction.search,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: _C.text(isDark),
+              ),
+              cursorColor: _C.accent,
+              decoration: InputDecoration(
+                hintText: 'Search by title, city or state',
+                hintStyle: GoogleFonts.poppins(
+                  fontSize: 12.5,
+                  color: _C.textTer(isDark),
+                ),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                _searchCtrl.clear();
+                setState(() => _searchQuery = '');
+              },
+              child: Icon(Icons.close_rounded,
+                  size: 18, color: _C.textTer(isDark)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentedFilter(bool isDark, List<Property> all) {
+    final publishedCount = all.where((p) => p.isPublished).length;
+    final items = <List<dynamic>>[
+      ['ALL', 'All', all.length],
+      ['PUBLISHED', 'Published', publishedCount],
+      ['DRAFT', 'Draft', all.length - publishedCount],
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: _C.surfaceAlt(isDark),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: items.map((it) {
+          final value = it[0] as String;
+          final label = it[1] as String;
+          final count = it[2] as int;
+          final selected = _filter == value;
+
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _filter = value);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected ? _C.surface(isDark) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(11),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected
+                            ? (isDark ? Colors.white : _C.accentDark)
+                            : _C.textSec(isDark),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? _C.accent.withOpacity(0.15)
+                            : _C.textTer(isDark).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: selected
+                              ? _C.accent
+                              : _C.textSec(isDark),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // PROPERTY CARD
+  // ══════════════════════════════════════════════════════════
+  BoxDecoration _cardDeco(bool isDark, {double radius = 20}) {
+    return BoxDecoration(
+      color: _C.surface(isDark),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: _C.border(isDark)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPropertyCard(Property property, bool isDark, bool hasAccess) {
+    final isPublished = property.isPublished;
+    final hasImage = property.coverImage.isNotEmpty;
+    final statusColor = isPublished ? _C.success : _C.warning;
+
+    final int total = (property.totalRooms as num?)?.toInt() ?? 0;
+    final int available = (property.availableRooms as num?)?.toInt() ?? 0;
+    final int occupied = (total - available).clamp(0, total).toInt();
+    final double occupancy = total > 0 ? occupied / total : 0.0;
+
+    final placeholder = Container(
+      color: _C.surfaceAlt(isDark),
+      child: Icon(Icons.apartment_rounded,
+          size: 44, color: _C.textTer(isDark)),
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: _cardDeco(isDark, radius: 22),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: hasAccess
-              ? () {
-                  HapticFeedback.selectionClick();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => PropertyRoomsPage(property: property),
-                    ),
-                  );
-                }
+              ? () => _openRooms(property)
               : _showSubscriptionRequiredDialog,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ============ COVER IMAGE ============
+              // Cover image
               ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(22)),
@@ -1042,270 +977,243 @@ class _OwnerPropertyManagementPageState
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: Container(
-                        color: isDark ? Colors.grey[900] : Colors.grey[100],
-                        child: hasImage
-                            ? CachedNetworkImage(
-                                imageUrl: property.coverImage,
-                                fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
-                                  color: isDark
-                                      ? Colors.grey[900]
-                                      : Colors.grey[100],
-                                  child: const Center(
-                                    child: SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Color(0xFF7C3AED),
-                                      ),
+                      child: hasImage
+                          ? CachedNetworkImage(
+                              imageUrl: property.coverImage,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(
+                                color: _C.surfaceAlt(isDark),
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: _C.accent,
                                     ),
                                   ),
                                 ),
-                                errorWidget: (_, __, ___) => Icon(
-                                  Icons.apartment_rounded,
-                                  size: 46,
-                                  color: isDark
-                                      ? Colors.grey[700]
-                                      : Colors.grey[400],
-                                ),
-                              )
-                            : Icon(
-                                Icons.apartment_rounded,
-                                size: 46,
-                                color: isDark
-                                    ? Colors.grey[700]
-                                    : Colors.grey[400],
                               ),
-                      ),
+                              errorWidget: (_, __, ___) => placeholder,
+                            )
+                          : placeholder,
                     ),
-                    // Gradient overlay
-                    Positioned.fill(
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 70,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
+                              Colors.black.withOpacity(0.35),
                               Colors.transparent,
-                              Colors.black.withOpacity(0.55),
                             ],
-                            stops: const [0.5, 1.0],
                           ),
                         ),
                       ),
                     ),
-                    // Status pill top-left
                     Positioned(
                       top: 12,
                       left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          borderRadius: BorderRadius.circular(100),
-                          boxShadow: [
-                            BoxShadow(
-                              color: statusColor.withOpacity(0.4),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isPublished
-                                  ? Icons.check_circle_rounded
-                                  : Icons.drafts_rounded,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              isPublished ? 'Published' : 'Draft',
-                              style: GoogleFonts.poppins(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: _imageChip(
+                        icon: isPublished
+                            ? Icons.check_circle_rounded
+                            : Icons.edit_note_rounded,
+                        label: isPublished ? 'Published' : 'Draft',
+                        color: statusColor,
                       ),
                     ),
-                    // Lock badge top-right (if no access)
                     if (!hasAccess)
                       Positioned(
                         top: 12,
                         right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.lock_rounded,
-                                color: Colors.white,
-                                size: 11,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Locked',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: _imageChip(
+                          icon: Icons.lock_rounded,
+                          label: 'Locked',
+                          color: _C.danger,
                         ),
                       ),
-                    // Bottom info on image
-                    Positioned(
-                      left: 14,
-                      right: 14,
-                      bottom: 12,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            property.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on_rounded,
-                                size: 12,
-                                color: Colors.white70,
-                              ),
-                              const SizedBox(width: 3),
-                              Expanded(
-                                child: Text(
-                                  '${property.city}, ${property.state}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
 
-              // ============ STATS + ACTIONS ============
+              // Body
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Stats
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _propertyStat(
-                          icon: Icons.meeting_room_rounded,
-                          label: 'Rooms',
-                          value: '${property.totalRooms}',
-                          color: const Color(0xFF7C3AED),
-                          isDark: isDark,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                property.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  letterSpacing: -0.2,
+                                  color: _C.text(isDark),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Icon(Icons.location_on_outlined,
+                                      size: 14, color: _C.textSec(isDark)),
+                                  const SizedBox(width: 3),
+                                  Expanded(
+                                    child: Text(
+                                      '${property.city}, ${property.state}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: _C.textSec(isDark),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        _propertyStat(
-                          icon: Icons.check_circle_rounded,
-                          label: 'Available',
-                          value: '${property.availableRooms}',
-                          color: const Color(0xFF22C55E),
-                          isDark: isDark,
-                        ),
-                        const SizedBox(width: 8),
-                        _propertyStat(
-                          icon: Icons.category_rounded,
-                          label: 'Type',
-                          value: property.propertyType,
-                          color: const Color(0xFF8B5CF6),
-                          isDark: isDark,
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _C.accentSoftBg(isDark),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${property.propertyType}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: _C.accent,
+                            ),
+                          ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+
+                    // Room facts
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _C.surfaceAlt(isDark),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          _fact(Icons.meeting_room_outlined, '$total',
+                              'Rooms', isDark),
+                          _factDivider(isDark),
+                          _fact(Icons.check_circle_outline_rounded,
+                              '$available', 'Available', isDark,
+                              valueColor: _C.success),
+                          _factDivider(isDark),
+                          _fact(Icons.person_outline_rounded, '$occupied',
+                              'Occupied', isDark),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 14),
+
+                    // Occupancy bar
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Occupancy',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: _C.textSec(isDark),
+                          ),
+                        ),
+                        Text(
+                          '${(occupancy * 100).round()}%',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: _C.text(isDark),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: occupancy,
+                        minHeight: 6,
+                        backgroundColor: _C.surfaceAlt(isDark),
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(_C.accent),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
                     // Actions
                     Row(
                       children: [
                         Expanded(
-                          child: _actionBtn(
-                            icon: Icons.room_preferences_rounded,
-                            label: 'Rooms',
-                            color: const Color(0xFF7C3AED),
-                            isDark: isDark,
-                            onTap: hasAccess
-                                ? () {
-                                    HapticFeedback.selectionClick();
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            PropertyRoomsPage(property: property),
-                                      ),
-                                    );
-                                  }
-                                : _showSubscriptionRequiredDialog,
+                          child: SizedBox(
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              onPressed: hasAccess
+                                  ? () => _openRooms(property)
+                                  : _showSubscriptionRequiredDialog,
+                              icon: const Icon(Icons.meeting_room_rounded,
+                                  size: 18),
+                              label: Text(
+                                'Manage Rooms',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _C.btnBg(isDark),
+                                foregroundColor: _C.btnFg(isDark),
+                                elevation: 0,
+                                shadowColor: _C.accent.withOpacity(0.4),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: _actionBtn(
-                            icon: Icons.edit_rounded,
-                            label: 'Edit',
-                            color: const Color(0xFF3B82F6),
-                            isDark: isDark,
-                            onTap: hasAccess
-                                ? () async {
-                                    HapticFeedback.selectionClick();
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => AddEditPropertyPage(
-                                            property: property),
-                                      ),
-                                    );
-                                    if (result == true) _loadAllData();
-                                  }
-                                : _showSubscriptionRequiredDialog,
-                          ),
+                        _squareAction(
+                          icon: Icons.edit_outlined,
+                          color: _C.info,
+                          isDark: isDark,
+                          tooltip: 'Edit',
+                          onTap: hasAccess
+                              ? () => _openEdit(property)
+                              : _showSubscriptionRequiredDialog,
                         ),
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: _actionBtn(
-                            icon: Icons.delete_outline_rounded,
-                            label: 'Delete',
-                            color: const Color(0xFFEF4444),
-                            isDark: isDark,
-                            onTap: () => _deleteProperty(property),
-                          ),
+                        _squareAction(
+                          icon: Icons.delete_outline_rounded,
+                          color: _C.danger,
+                          isDark: isDark,
+                          tooltip: 'Delete',
+                          onTap: () => _deleteProperty(property),
                         ),
                       ],
                     ),
@@ -1319,170 +1227,35 @@ class _OwnerPropertyManagementPageState
     );
   }
 
-  Widget _propertyStat({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-    required bool isDark,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(height: 3),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                color: color,
-              ),
-            ),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 9.5,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _actionBtn({
+  Widget _imageChip({
     required IconData icon,
     required String label,
     required Color color,
-    required bool isDark,
-    required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.2), width: 1.2),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(100),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.35),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 15),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
-    );
-  }
-
-  // ================= SKELETON =================
-  Widget _buildSkeleton(bool isDark) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
-      children: [
-        Container(
-          height: 62,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF121729) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        const SizedBox(height: 14),
-        Row(
-          children: List.generate(
-            3,
-            (i) => Expanded(
-              child: Container(
-                margin: EdgeInsets.only(right: i < 2 ? 10 : 0),
-                height: 90,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF121729) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        ...List.generate(
-          2,
-          (i) => Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            height: 300,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF121729) : Colors.white,
-              borderRadius: BorderRadius.circular(22),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ================= NO RESULTS =================
-  Widget _buildNoResults(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60),
-      child: Column(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 90,
-            height: 90,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF121729) : Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : const Color(0xFFF0F0F8),
-              ),
-            ),
-            child: Icon(
-              Icons.search_off_rounded,
-              size: 40,
-              color: isDark ? Colors.white38 : const Color(0xFFB0B3C0),
-            ),
-          ),
-          const SizedBox(height: 16),
+          Icon(icon, color: Colors.white, size: 13),
+          const SizedBox(width: 4),
           Text(
-            'No Results',
+            label,
             style: GoogleFonts.poppins(
-              fontSize: 16,
+              fontSize: 10.5,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Try a different search or filter',
-            style: GoogleFonts.poppins(
-              fontSize: 12.5,
-              color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
+              color: Colors.white,
             ),
           ),
         ],
@@ -1490,92 +1263,236 @@ class _OwnerPropertyManagementPageState
     );
   }
 
-  // ================= EMPTY =================
-  Widget _buildEmptyState(bool isDark, bool hasAccess) {
+  Widget _fact(
+    IconData icon,
+    String value,
+    String label,
+    bool isDark, {
+    Color? valueColor,
+  }) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 16, color: _C.textSec(isDark)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              height: 1.1,
+              color: valueColor ?? _C.text(isDark),
+            ),
+          ),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 10.5,
+              color: _C.textSec(isDark),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _factDivider(bool isDark) => Container(
+        width: 1,
+        height: 38,
+        color: _C.border(isDark),
+      );
+
+  Widget _squareAction({
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: color.withOpacity(isDark ? 0.14 : 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withOpacity(0.25)),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // SKELETON
+  // ══════════════════════════════════════════════════════════
+  Widget _skelBox(bool isDark, {double? height, double radius = 16}) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: _C.surface(isDark),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: _C.border(isDark)),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(bool isDark) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.45, end: 1.0).animate(
+        CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+      ),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(_hPad, 8, _hPad, 24),
+        children: [
+          _skelBox(isDark, height: 70, radius: 18),
+          const SizedBox(height: 14),
+          _skelBox(isDark, height: 78, radius: 18),
+          const SizedBox(height: 18),
+          _skelBox(isDark, height: 50),
+          const SizedBox(height: 12),
+          _skelBox(isDark, height: 44, radius: 14),
+          const SizedBox(height: 18),
+          _skelBox(isDark, height: 380, radius: 22),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // EMPTY / NO RESULTS
+  // ══════════════════════════════════════════════════════════
+  Widget _buildNoResults(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40),
+      padding: const EdgeInsets.symmetric(vertical: 48),
       child: Column(
         children: [
           Container(
-            width: 120,
-            height: 120,
+            width: 84,
+            height: 84,
             decoration: BoxDecoration(
+              color: _C.surface(isDark),
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF7C3AED).withOpacity(0.15),
-                  const Color(0xFF4ECDC4).withOpacity(0.08),
-                ],
+              border: Border.all(color: _C.border(isDark)),
+            ),
+            child: Icon(Icons.search_off_rounded,
+                size: 38, color: _C.textTer(isDark)),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No matching properties',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _C.text(isDark),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Try a different keyword or filter',
+            style: GoogleFonts.poppins(
+              fontSize: 12.5,
+              color: _C.textSec(isDark),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () {
+              _searchCtrl.clear();
+              setState(() {
+                _searchQuery = '';
+                _filter = 'ALL';
+              });
+            },
+            child: Text(
+              'Clear filters',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: _C.accent,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isDark, bool hasAccess) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36),
+      child: Column(
+        children: [
+          Container(
+            width: 112,
+            height: 112,
+            decoration: BoxDecoration(
+              color: _C.accent.withOpacity(0.10),
+              shape: BoxShape.circle,
+            ),
             child: Icon(
-              hasAccess ? Icons.apartment_outlined : Icons.lock_outlined,
-              size: 56,
-              color: const Color(0xFF7C3AED),
+              hasAccess ? Icons.apartment_rounded : Icons.lock_outline_rounded,
+              size: 52,
+              color: _C.accent,
             ),
           ),
           const SizedBox(height: 22),
           Text(
-            hasAccess ? 'No Properties Yet' : 'Unlock Property Management',
+            hasAccess ? 'No properties yet' : 'Unlock property management',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
               fontSize: 19,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              letterSpacing: -0.3,
+              color: _C.text(isDark),
             ),
           ),
           const SizedBox(height: 8),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 36),
             child: Text(
               hasAccess
-                  ? 'Add your first property to start accepting bookings.'
-                  : 'Buy a Property Access Subscription to add and manage properties.',
+                  ? 'Add your first property to start accepting bookings from students.'
+                  : 'Subscribe to Property Access to add and manage your listings.',
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 12.5,
-                color: isDark ? Colors.white54 : const Color(0xFF8A8FA3),
-                height: 1.5,
+                height: 1.55,
+                color: _C.textSec(isDark),
               ),
             ),
           ),
-          const SizedBox(height: 26),
-          GestureDetector(
-            onTap: hasAccess ? _openAddProperty : _navigateToSubscription,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF7C3AED), Color(0xFF4ECDC4)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF7C3AED).withOpacity(0.35),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: hasAccess ? _openAddProperty : _navigateToSubscription,
+              icon: Icon(
+                hasAccess ? Icons.add_rounded : Icons.lock_open_rounded,
+                size: 18,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    hasAccess ? Icons.add_rounded : Icons.lock_open_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    hasAccess ? 'Add First Property' : 'Buy Subscription',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+              label: Text(
+                hasAccess ? 'Add First Property' : 'Subscribe Now',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _C.btnBg(isDark),
+                foregroundColor: _C.btnFg(isDark),
+                elevation: 0,
+                shadowColor: _C.accent.withOpacity(0.4),
+                padding: const EdgeInsets.symmetric(horizontal: 26),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
           ),
