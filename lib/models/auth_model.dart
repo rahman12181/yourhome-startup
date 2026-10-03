@@ -28,9 +28,9 @@ class AuthData {
   final String displayId;
   final String name;
   final String email;
-  final String? phone; // ✅ ADDED - Phone from API
+  final String? phone;
   final bool isEmailVerified;
-  final String? profileImage; // Profile image URL from server
+  final String? profileImage;
 
   AuthData({
     required this.accessToken,
@@ -56,13 +56,13 @@ class AuthData {
       displayId: json['displayId'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
-      phone: json['phone'], // ✅ ADDED
+      phone: json['phone'],
       isEmailVerified: json['isEmailVerified'] ?? false,
-      profileImage: json['profilePic'] ?? json['profileImage'] ?? json['profile_image'], // ✅ Support all formats
+      profileImage:
+          json['profilePic'] ?? json['profileImage'] ?? json['profile_image'],
     );
   }
 
-  // ✅ COPYWITH - FIXED
   AuthData copyWith({
     String? accessToken,
     String? refreshToken,
@@ -91,52 +91,58 @@ class AuthData {
     );
   }
 
-  // ✅ TOJSON - FIXED
   Map<String, dynamic> toJson() => {
-    'accessToken': accessToken,
-    'refreshToken': refreshToken,
-    'tokenType': tokenType,
-    'role': role,
-    'userId': userId,
-    'displayId': displayId,
-    'name': name,
-    'email': email,
-    'phone': phone,
-    'isEmailVerified': isEmailVerified,
-    'profileImage': profileImage,
-  };
+        'accessToken': accessToken,
+        'refreshToken': refreshToken,
+        'tokenType': tokenType,
+        'role': role,
+        'userId': userId,
+        'displayId': displayId,
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'isEmailVerified': isEmailVerified,
+        'profileImage': profileImage,
+      };
 }
 
-// ✅ REGISTER REQUEST
-// ✅ FIND THIS CLASS
+// ══════════════════════════════════════════════════════════════
+// ✅ REGISTER REQUEST — with role field for owner signup
+// ══════════════════════════════════════════════════════════════
 class RegisterRequest {
   final String name;
   final String email;
   final String phone;
   final String password;
-  final String? referralCode; // ✅ YEH LINE ADD KARO
+  final String? referralCode;
+  final String? role; // ⬅️ NEW — "STUDENT" (default) or "OWNER"
 
   RegisterRequest({
     required this.name,
     required this.email,
     required this.phone,
     required this.password,
-    this.referralCode, // ✅ YEH LINE ADD KARO
+    this.referralCode,
+    this.role, // ⬅️ NEW
   });
 
   Map<String, dynamic> toJson() {
-    final data = {
+    final data = <String, dynamic>{
       'name': name,
       'email': email,
       'phone': phone,
       'password': password,
     };
-    
-    // ✅ YEH IF BLOCK ADD KARO
+
     if (referralCode != null && referralCode!.isNotEmpty) {
       data['referralCode'] = referralCode!;
     }
-    
+
+    // ⬅️ NEW — Owner signup ke liye (backend `/auth/register-owner` me use karega)
+    if (role != null && role!.isNotEmpty) {
+      data['role'] = role!;
+    }
+
     return data;
   }
 }
@@ -152,9 +158,9 @@ class LoginRequest {
   });
 
   Map<String, dynamic> toJson() => {
-    'email': email,
-    'password': password,
-  };
+        'email': email,
+        'password': password,
+      };
 }
 
 // ✅ VERIFY OTP REQUEST
@@ -168,9 +174,9 @@ class VerifyOtpRequest {
   });
 
   Map<String, dynamic> toJson() => {
-    'email': email,
-    'otp': otp,
-  };
+        'email': email,
+        'otp': otp,
+      };
 }
 
 // ✅ RESET PASSWORD REQUEST
@@ -186,10 +192,10 @@ class ResetPasswordRequest {
   });
 
   Map<String, dynamic> toJson() => {
-    'email': email,
-    'otp': otp,
-    'newPassword': newPassword,
-  };
+        'email': email,
+        'otp': otp,
+        'newPassword': newPassword,
+      };
 }
 
 // ✅ FORGOT PASSWORD REQUEST
@@ -201,8 +207,8 @@ class ForgotPasswordRequest {
   });
 
   Map<String, dynamic> toJson() => {
-    'email': email,
-  };
+        'email': email,
+      };
 }
 
 // ✅ UPDATE PROFILE REQUEST
@@ -218,10 +224,10 @@ class UpdateProfileRequest {
   });
 
   Map<String, dynamic> toJson() => {
-    if (name != null) 'name': name,
-    if (phone != null) 'phone': phone,
-    if (profileImage != null) 'profileImage': profileImage,
-  };
+        if (name != null) 'name': name,
+        if (phone != null) 'phone': phone,
+        if (profileImage != null) 'profileImage': profileImage,
+      };
 }
 
 // ✅ CHANGE PASSWORD REQUEST
@@ -235,7 +241,7 @@ class ChangePasswordRequest {
   });
 
   Map<String, dynamic> toJson() => {
-    'currentPassword': currentPassword,
-    'newPassword': newPassword,
-  };
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      };
 }

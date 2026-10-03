@@ -1,12 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/property_model.dart';
 import '../../providers/owner_provider.dart';
+import '../../utils/constants.dart';
 
 // ══════════════════════════════════════════════════════════════
 // DESIGN TOKENS — Blue premium
@@ -94,14 +97,18 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
   bool _submitted = false;
   int? _createdPropertyId;
 
+  // 🆕 Location state
+  bool _fetchingLocation = false;
+  bool _locationCaptured = false;
+  double? _capturedLat;
+  double? _capturedLng;
+
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
   final _stateCtrl = TextEditingController();
   final _pincodeCtrl = TextEditingController();
-  final _latCtrl = TextEditingController();
-  final _lngCtrl = TextEditingController();
   final _rentMinCtrl = TextEditingController();
   final _rentMaxCtrl = TextEditingController();
   final _depositCtrl = TextEditingController();
@@ -136,8 +143,6 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
       _cityCtrl.text = p.city;
       _stateCtrl.text = p.state;
       _pincodeCtrl.text = p.pincode;
-      _latCtrl.text = p.latitude?.toString() ?? '';
-      _lngCtrl.text = p.longitude?.toString() ?? '';
       _rentMinCtrl.text = p.monthlyRentMin?.toStringAsFixed(0) ?? '';
       _rentMaxCtrl.text = p.monthlyRentMax?.toStringAsFixed(0) ?? '';
       _depositCtrl.text = p.securityDeposit?.toStringAsFixed(0) ?? '';
@@ -145,6 +150,13 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
       _genderAllowed = p.genderAllowed;
       _isNegotiable = p.isNegotiable;
       _selectedAmenities.addAll(p.amenities);
+
+      // Existing property ki location
+      if (p.latitude != null && p.longitude != null) {
+        _capturedLat = p.latitude;
+        _capturedLng = p.longitude;
+        _locationCaptured = true;
+      }
     }
   }
 
@@ -157,12 +169,105 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     _cityCtrl.dispose();
     _stateCtrl.dispose();
     _pincodeCtrl.dispose();
-    _latCtrl.dispose();
-    _lngCtrl.dispose();
     _rentMinCtrl.dispose();
     _rentMaxCtrl.dispose();
     _depositCtrl.dispose();
     super.dispose();
+  }
+
+  // ================= LOCATION =================
+  Future<void> _fetchCurrentLocation() async {
+    setState(() => _fetchingLocation = true);
+
+    try {
+      // 1. Location service check
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('GPS is disabled. Please enable location services.');
+      }
+
+      // 2. Permission check
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Location permission denied');
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception(
+            'Location permission permanently denied. Please enable from Settings.');
+      }
+
+      // 3. Get current position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      // 4. Reverse geocode
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (!mounted) return;
+
+      String addressLine = '';
+      String city = '';
+      String state = '';
+      String pincode = '';
+
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        addressLine = [
+          p.street,
+          p.subLocality,
+          p.locality,
+        ].where((e) => e != null && e.trim().isNotEmpty).join(', ');
+        city = p.locality ?? p.subAdministrativeArea ?? '';
+        state = p.administrativeArea ?? '';
+        pincode = p.postalCode ?? '';
+      }
+
+      setState(() {
+        _capturedLat = position.latitude;
+        _capturedLng = position.longitude;
+        _locationCaptured = true;
+
+        // Auto-fill only if fields are empty
+        if (_addressCtrl.text.trim().isEmpty && addressLine.isNotEmpty) {
+          _addressCtrl.text = addressLine;
+        }
+        if (_cityCtrl.text.trim().isEmpty && city.isNotEmpty) {
+          _cityCtrl.text = city;
+        }
+        if (_stateCtrl.text.trim().isEmpty && state.isNotEmpty) {
+          _stateCtrl.text = state;
+        }
+        if (_pincodeCtrl.text.trim().isEmpty && pincode.isNotEmpty) {
+          _pincodeCtrl.text = pincode;
+        }
+      });
+
+      _showSnackBar('✅ Location captured — verify address below');
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _fetchingLocation = false);
+    }
+  }
+
+  void _clearLocation() {
+    setState(() {
+      _locationCaptured = false;
+      _capturedLat = null;
+      _capturedLng = null;
+    });
   }
 
   // ================= VALIDATION =================
@@ -245,10 +350,8 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         'city': _cityCtrl.text.trim(),
         'state': _stateCtrl.text.trim(),
         'pincode': _pincodeCtrl.text.trim(),
-        if (_latCtrl.text.isNotEmpty)
-          'latitude': double.tryParse(_latCtrl.text),
-        if (_lngCtrl.text.isNotEmpty)
-          'longitude': double.tryParse(_lngCtrl.text),
+        if (_capturedLat != null) 'latitude': _capturedLat,
+        if (_capturedLng != null) 'longitude': _capturedLng,
         if (_rentMinCtrl.text.isNotEmpty)
           'monthlyRentMin': double.tryParse(_rentMinCtrl.text),
         if (_rentMaxCtrl.text.isNotEmpty)
@@ -349,6 +452,7 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -717,14 +821,145 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
     );
   }
 
-  // ============ STEP 1: LOCATION ============
+  // ============ STEP 1: LOCATION (UPDATED) ============
   Widget _buildStepLocation(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ⭐ Auto-detect location card
         _sectionCard(
           isDark: isDark,
           children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_C.accent, _C.accentLight],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.my_location_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Auto-detect Location',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: _C.text(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Stand at your property & tap below',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11.5,
+                          color: _C.textSec(isDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _gradientButton(
+              label: _fetchingLocation
+                  ? 'Getting location…'
+                  : (_locationCaptured
+                      ? 'Refresh Location'
+                      : 'Use My Current Location'),
+              icon: Icons.gps_fixed_rounded,
+              loading: _fetchingLocation,
+              onTap: _fetchingLocation ? null : _fetchCurrentLocation,
+            ),
+            if (_locationCaptured) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _C.success.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _C.success.withOpacity(0.25),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: _C.success,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Location captured',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _C.success,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _clearLocation,
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: _C.success.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Address fields
+        _sectionCard(
+          isDark: isDark,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.home_rounded,
+                  size: 16,
+                  color: _C.accent,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Address Details',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: _C.text(isDark),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '(auto-filled, editable)',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10.5,
+                    fontStyle: FontStyle.italic,
+                    color: _C.textTer(isDark),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             _label('Address Line', required: true, isDark: isDark),
             _textField(
               controller: _addressCtrl,
@@ -785,69 +1020,110 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        _sectionCard(
-          isDark: isDark,
-          children: [
-            _label('Coordinates (Optional)', isDark: isDark),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: _textField(
-                    controller: _latCtrl,
-                    hint: 'Latitude',
-                    isDark: isDark,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _textField(
-                    controller: _lngCtrl,
-                    hint: 'Longitude',
-                    isDark: isDark,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: _C.accentSoftBg(isDark),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _C.accent.withOpacity(0.20),
-                ),
-              ),
-              child: Row(
+
+        // Map preview
+        if (_locationCaptured && _capturedLat != null && _capturedLng != null) ...[
+          const SizedBox(height: 14),
+          _sectionCard(
+            isDark: isDark,
+            children: [
+              Row(
                 children: [
                   const Icon(
-                    Icons.location_on_rounded,
+                    Icons.map_rounded,
                     size: 16,
                     color: _C.accent,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Add coordinates for location-based search results',
+                      'Verify Location on Map',
                       style: GoogleFonts.poppins(
-                        fontSize: 11.5,
-                        color: _C.accent,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: _C.text(isDark),
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 4),
+              Text(
+                'Lat: ${_capturedLat!.toStringAsFixed(6)}, Lng: ${_capturedLng!.toStringAsFixed(6)}',
+                style: GoogleFonts.poppins(
+                  fontSize: 10.5,
+                  color: _C.textTer(isDark),
+                ),
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  height: 180,
+                  width: double.infinity,
+                  color: _C.surfaceAlt(isDark),
+                  child: Image.network(
+                    'https://maps.googleapis.com/maps/api/staticmap?'
+                    'center=$_capturedLat,$_capturedLng&'
+                    'zoom=16&size=600x300&'
+                    'markers=color:red%7C$_capturedLat,$_capturedLng&'
+                    'key=${AppConstants.googleMapsApiKey}',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.location_on_rounded,
+                            size: 40,
+                            color: _C.accent,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Map preview unavailable',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11.5,
+                              color: _C.textSec(isDark),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: _C.accentSoftBg(isDark),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 14,
+                      color: _C.accent,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Make sure the pin is at your property location',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: _C.accent,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -1312,14 +1588,15 @@ class _AddEditPropertyPageState extends State<AddEditPropertyPage>
                   _cityCtrl.clear();
                   _stateCtrl.clear();
                   _pincodeCtrl.clear();
-                  _latCtrl.clear();
-                  _lngCtrl.clear();
                   _rentMinCtrl.clear();
                   _rentMaxCtrl.clear();
                   _depositCtrl.clear();
                   _propertyType = '';
                   _genderAllowed = '';
                   _isNegotiable = false;
+                  _locationCaptured = false;
+                  _capturedLat = null;
+                  _capturedLng = null;
                 });
                 _fadeController.forward(from: 0);
               },

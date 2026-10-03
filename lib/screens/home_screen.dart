@@ -268,8 +268,8 @@ class HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           specs: specs,
           selectedIndex: _selectedIndex,
           isDark: isDark,
-          accent: _HP.ownerPrimary,
-          gradient: const [_HP.ownerPrimary, _HP.ownerGold],
+          accent: const Color.fromARGB(255, 315, 19, 228),
+          gradient: const [Color.fromARGB(255, 15, 19, 228), Color.fromARGB(255, 15, 19, 228)],
           onTap: changeTab,
         );
         break;

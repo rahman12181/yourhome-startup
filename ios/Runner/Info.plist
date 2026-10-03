@@ -27,6 +27,10 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>We need your location to auto-fill property address</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>We need your location to auto-fill property address</string>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>

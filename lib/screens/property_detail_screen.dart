@@ -141,6 +141,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     if (mounted) setState(() => _isLoading = false);
   }
 
+  // ══════════════════════════════════════════════════════════
+  // IMAGE GALLERY
+  // ══════════════════════════════════════════════════════════
   List<String> get _galleryImages {
     final p = _property;
     if (p == null) return [];
@@ -160,27 +163,19 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   }
 
   // ══════════════════════════════════════════════════════════
-  // BOOKING LOGIC — FIXED
+  // BOOKING LOGIC
   // ══════════════════════════════════════════════════════════
 
-  /// Booking is "paid" if:
-  /// - isPaid flag is true, OR
-  /// - status equals 'PAID', OR
-  /// - status equals 'COMPLETED'
   bool _isBookingPaid(BookingRequest b) {
     final s = (b.status ?? '').toUpperCase();
     return b.isPaid == true || s == 'PAID' || s == 'COMPLETED';
   }
 
-  /// Booking is "awaiting payment" if:
-  /// - status is ACCEPTED AND not paid yet
   bool _isBookingAwaitingPayment(BookingRequest b) {
     final s = (b.status ?? '').toUpperCase();
     return s == 'ACCEPTED' && !_isBookingPaid(b);
   }
 
-  /// Booking is active (should be shown in MyBookings section) if:
-  /// - PENDING, ACCEPTED, or PAID
   bool _isBookingActive(BookingRequest b) {
     final s = (b.status ?? '').toUpperCase();
     if (s == 'PENDING' || s == 'ACCEPTED' || s == 'PAID' || s == 'COMPLETED') {
@@ -216,10 +211,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           }
         }
 
-        // Sort:
-        // 0. ACCEPTED but not paid → Pay Now (top)
-        // 1. PENDING → Waiting for owner
-        // 2. PAID → Paid & Booked
         int rank(BookingRequest b) {
           if (_isBookingAwaitingPayment(b)) return 0;
           final s = (b.status ?? '').toUpperCase();
@@ -252,7 +243,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     if (mounted) setState(() => _isCheckingBooking = false);
   }
 
-  // ✅ CHANGED — a room is bookable only if it is open AND still has a free bed
   List<Room> get _availableRoomsForUser => _rooms
       .where((r) =>
           r.isAvailable &&
@@ -260,7 +250,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
           !_bookedRoomIds.contains(r.roomId))
       .toList();
 
-  // ✅ NEW — total free beds across the property (student-safe number)
   int get _totalBedsFree => _rooms
       .where((r) => !r.isUnderMaintenance)
       .fold<int>(0, (sum, r) => sum + r.bedsLeft);
@@ -445,7 +434,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     }
   }
 
-  // ✅ CHANGED — optional preselectRoomId (used by the room detail sheet)
   Future<void> _bookNow({int? preselectRoomId}) async {
     if (!_isUserLoggedIn) {
       _showLoginPrompt();
@@ -887,7 +875,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
   }
 
   // ══════════════════════════════════════════════════════════
-  // FIXED: "Your Bookings Here" section
+  // "Your bookings here" section
   // ══════════════════════════════════════════════════════════
   Widget _buildMyBookingsSection(bool isDark) {
     if (!_isUserLoggedIn || _myBookings.isEmpty) {
@@ -1007,7 +995,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
               ],
             ),
           ),
-          // Pay Now button ONLY when payment actually needed
           if (needsPay)
             ElevatedButton.icon(
               onPressed: () => _payForBooking(booking),
@@ -1144,6 +1131,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
+  // ⭐ IMAGE SLIDER — swipe between all property images
   Widget _buildImageSlider() {
     final images = _galleryImages;
 
@@ -1863,7 +1851,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                 color: const Color(0xFF11998E).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              // ✅ CHANGED — rooms open + beds free
               child: Text(
                 '${_rooms.where((r) => r.isAvailable).length} rooms • $_totalBedsFree beds free',
                 style: GoogleFonts.poppins(
@@ -1903,7 +1890,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ✅ NEW — one icon per bed (red = taken, green = free). No tenant info.
   Widget _bedDots(Room room) {
     final total = room.capacity.clamp(1, 12);
     final textColor = Colors.grey[600];
@@ -1940,7 +1926,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     final needsPay = _needsPayment(booking);
     final paid = _isPaid(booking);
 
-    // ✅ NEW — tap a room to see its (student-safe) details
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _showRoomSheet(room),
@@ -2071,7 +2056,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                       ],
                     ],
                   ),
-                  // ✅ NEW — bed icons
                   const SizedBox(height: 6),
                   _bedDots(room),
                 ],
@@ -2109,7 +2093,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
                             : Colors.grey.withOpacity(0.1)),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  // ✅ CHANGED — "1 bed left" / "Fully Booked" / "Under Maintenance"
                   child: Text(
                     isBooked ? _roomStateLabel(booking) : room.availabilityLabel,
                     style: GoogleFonts.poppins(
@@ -2154,7 +2137,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen>
     );
   }
 
-  // ✅ NEW — student-safe room sheet (beds, rent, features, book). No tenant data.
   void _showRoomSheet(Room room) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final alreadyMine = _bookedRoomIds.contains(room.roomId);
@@ -2702,7 +2684,6 @@ class BookingBottomSheet extends StatefulWidget {
   final List<Room> rooms;
   final Set<int> bookedRoomIds;
   final VoidCallback onSuccess;
-  // ✅ NEW — room to preselect (when opened from the room detail sheet)
   final int? initialRoomId;
 
   const BookingBottomSheet({
@@ -3126,7 +3107,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
               enabled: canBook,
               isBooked: isBooked,
               title: 'Room ${room.roomNumber ?? room.roomId}',
-              // ✅ CHANGED — bed info in the subtitle
               subtitle: isBooked
                   ? 'Already booked by you'
                   : (isAvailable

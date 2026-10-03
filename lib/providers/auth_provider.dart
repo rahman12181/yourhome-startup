@@ -70,35 +70,72 @@ class AuthProvider extends ChangeNotifier {
     return await _storage.isLoggedIn();
   }
 
- Future<bool> register({
-  required String name,
-  required String email,
-  required String password,
-  String? phone,
-  String? profileImage,
-  String? referralCode,
-}) async {
-  _setLoading(true);
-  _clearError();
+  // ══════════════════════════════════════════════════════════════
+  // EXISTING — Student Register (UNCHANGED)
+  // ══════════════════════════════════════════════════════════════
+  Future<bool> register({
+    required String name,
+    required String email,
+    required String password,
+    String? phone,
+    String? profileImage,
+    String? referralCode,
+  }) async {
+    _setLoading(true);
+    _clearError();
 
-  final request = RegisterRequest(
-    name: name,
-    email: email,
-    password: password,
-    phone: phone ?? '',
-    referralCode: referralCode,
-  );
+    final request = RegisterRequest(
+      name: name,
+      email: email,
+      password: password,
+      phone: phone ?? '',
+      referralCode: referralCode,
+    );
 
-  final response = await _authService.register(request);
-  if (response.success) {
-    _setLoading(false);
-    return true;
-  } else {
-    _error = response.message;
-    _setLoading(false);
-    return false;
+    final response = await _authService.register(request);
+    if (response.success) {
+      _setLoading(false);
+      return true;
+    } else {
+      _error = response.message;
+      _setLoading(false);
+      return false;
+    }
   }
-}
+
+  // ══════════════════════════════════════════════════════════════
+  // ✅ NEW — Owner Register (calls /auth/register-owner)
+  // ══════════════════════════════════════════════════════════════
+  Future<bool> registerAsOwner({
+    required String name,
+    required String email,
+    required String password,
+    String? phone,
+    String? profileImage,
+    String? referralCode,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    final request = RegisterRequest(
+      name: name,
+      email: email,
+      password: password,
+      phone: phone ?? '',
+      referralCode: referralCode,
+      role: 'OWNER', // ⬅️ Backend identifies this as owner signup
+    );
+
+    final response = await _authService.registerAsOwner(request);
+    if (response.success) {
+      _setLoading(false);
+      return true;
+    } else {
+      _error = response.message;
+      _setLoading(false);
+      return false;
+    }
+  }
 
   Future<bool> verifyOtp(String email, String otp) async {
     _setLoading(true);
@@ -205,7 +242,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> resetPassword(String email, String otp, String newPassword) async {
+  Future<bool> resetPassword(
+      String email, String otp, String newPassword) async {
     _setLoading(true);
     _clearError();
 
@@ -270,7 +308,6 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> loadLocalProfileImagePublic() async {
-    
     await loadLocalProfileImage();
   }
 
@@ -311,7 +348,7 @@ class AuthProvider extends ChangeNotifier {
       final userEmail = await _storage.getUserEmail();
       final userName = await _storage.getUserName();
       final profileImage = await _storage.getProfileImage();
-      
+
       if (userId != null && userRole != null && userEmail != null) {
         final accessToken = await _storage.getAccessToken() ?? '';
         _user = AuthData(
@@ -362,7 +399,7 @@ class AuthProvider extends ChangeNotifier {
 
     await _authService.logout();
     await clearProfileImage();
-    
+
     try {
       final wsManager = WebSocketManager();
       wsManager.disconnect();
@@ -370,7 +407,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       print('❌ Error disconnecting WebSocket: $e');
     }
-    
+
     _user = null;
     _localProfileImagePath = null;
     _setLoading(false);

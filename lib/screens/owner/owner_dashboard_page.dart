@@ -31,29 +31,30 @@ import 'property_access_subscription_page.dart';
 import 'listing_subscription_page.dart';
 import 'owner_apply_page.dart';
 
+// ══════════════════════════════════════════════════════════════
+// ROUTE OBSERVER — register this in main.dart:
+//   MaterialApp(navigatorObservers: [routeObserver], ...)
+// ══════════════════════════════════════════════════════════════
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
+
 // ============================================================
 // DESIGN TOKENS — Blue brand palette
-//   • Blue family  = brand / charts / neutral actions
-//   • Green/Amber/Red = status only (success / warning / error)
 // ============================================================
 class _P {
-  // Brand blues
   static const primary = Color(0xFF1E5EFF);
   static const primaryLight = Color(0xFF4B7BFF);
   static const primaryDeep = Color(0xFF1247D6);
   static const primarySoft = Color(0xFFEBF1FF);
 
-  // Supporting cool tones (for chart / category variety)
   static const sky = Color(0xFF0EA5E9);
   static const indigo = Color(0xFF6366F1);
   static const teal = Color(0xFF06B6D4);
 
-  // Status colours
   static const success = Color(0xFF16A34A);
   static const gold = Color(0xFFF59E0B);
   static const danger = Color(0xFFDC2626);
 
-  // Surfaces
   static const darkBg = Color(0xFF0A0E1A);
   static const darkSurface = Color(0xFF141A2C);
   static const darkCard = Color(0xFF1B2338);
@@ -70,11 +71,10 @@ class _P {
       d ? Colors.white.withOpacity(0.05) : const Color(0xFFF1F4FB);
 }
 
-/// Horizontal page margin shared by every card (change once to adjust all).
-const double _kPad = 16.0;
+const double _kPad = 6.0;   
 
 // ============================================================
-// SAFE ACCESSORS (model fields can be missing — never crash the UI)
+// SAFE ACCESSORS
 // ============================================================
 dynamic _d(dynamic Function() f) {
   try {
@@ -141,7 +141,6 @@ final NumberFormat _inr0 =
 final NumberFormat _inr2 =
     NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
-/// Exact rupee amount with Indian digit grouping (₹3,85,000).
 String _inr(double v) => (v - v.roundToDouble()).abs() < 0.005
     ? _inr0.format(v.roundToDouble())
     : _inr2.format(v);
@@ -151,7 +150,6 @@ String _trim(double x) {
   return r.endsWith('.0') ? r.substring(0, r.length - 2) : r;
 }
 
-/// 1.2K / 3.5L / 1.1Cr
 String _compact(double v) {
   final a = v.abs();
   final s = v < 0 ? '-' : '';
@@ -471,7 +469,7 @@ class _CountUp extends StatelessWidget {
 }
 
 class _AnimBar extends StatelessWidget {
-  final double value; // 0..1
+  final double value;
   final Color color;
   final Color track;
   final double height;
@@ -672,7 +670,7 @@ class _Skel extends StatelessWidget {
 }
 
 // ============================================================
-// CHART DATA MODELS (plain, decoupled from API models)
+// CHART DATA MODELS
 // ============================================================
 class _Pt {
   final double x;
@@ -814,7 +812,7 @@ class _DayPt {
 }
 
 // ============================================================
-// REVENUE CARD — interactive area chart (brand blue)
+// REVENUE CARD
 // ============================================================
 class _RevenueCard extends StatefulWidget {
   final _RevenueData data;
@@ -826,7 +824,7 @@ class _RevenueCard extends StatefulWidget {
 }
 
 class _RevenueCardState extends State<_RevenueCard> {
-  int _range = 0; // 0 = daily(30D), 1 = monthly(6M)
+  int _range = 0;
   int? _touched;
 
   @override
@@ -1272,14 +1270,14 @@ class _RevenueCardState extends State<_RevenueCard> {
 }
 
 // ============================================================
-// WEEKLY TRENDS CARD — stacked bars (bookings) / bars (views)
+// WEEKLY TRENDS CARD
 // ============================================================
 class _TrendCard extends StatefulWidget {
   final bool isDark;
   final List<_DayPt> bookings;
   final List<_DayPt> views;
   final int totalThisWeek;
-  final int totalLastWeek; // -1 when unknown
+  final int totalLastWeek;
   final double growth;
   final int viewsTotal;
 
@@ -1298,7 +1296,7 @@ class _TrendCard extends StatefulWidget {
 }
 
 class _TrendCardState extends State<_TrendCard> {
-  int _mode = 0; // 0 bookings, 1 views
+  int _mode = 0;
   int? _touched;
 
   @override
@@ -1662,7 +1660,7 @@ class OwnerDashboardPage extends StatefulWidget {
 }
 
 class _OwnerDashboardPageState extends State<OwnerDashboardPage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, RouteAware {   // ✅ RouteAware added
   bool _isFirstLoad = true;
   int _unreadNotifications = 0;
 
@@ -1700,7 +1698,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       vsync: this,
     )..repeat();
 
-    // Internet listener (works with connectivity_plus v5 and v6)
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((dynamic result) {
       if (!mounted || _isDisposed) return;
@@ -1715,7 +1712,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
       }
     });
 
-    // Auto-reconnect loop — keeps trying while offline
     _retryTimer = Timer.periodic(const Duration(seconds: 7), (_) {
       if (!mounted || _isDisposed) return;
       final p = Provider.of<OwnerProvider>(context, listen: false);
@@ -1731,8 +1727,38 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     });
   }
 
+  // ✅ Subscribe to route observer
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  // ✅ Called when returning from pushed screens (e.g., ProfileScreen)
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    _refreshProfileAndData();
+  }
+
+  Future<void> _refreshProfileAndData() async {
+    if (!mounted) return;
+    try {
+      // Refresh profile (profile pic)
+      await Provider.of<ProfileProvider>(context, listen: false)
+          .getProfile();
+      if (!mounted) return;
+      // Refresh owner data (stats, subscriptions, etc.)
+      await _loadAll();
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);   // ✅ Unsubscribe
     _isDisposed = true;
     _connectivitySub?.cancel();
     _retryTimer?.cancel();
@@ -1921,12 +1947,10 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final loading = ownerProvider.isLoading || _isLoadingAll;
     final showSkeleton = !hasData && (loading || offline);
 
-    // bell badge: prefer summary.unreadNotifications
     final sumNotif = _di(() => sm.unreadNotifications, -1);
     final notifCount = sumNotif >= 0 ? sumNotif : _unreadNotifications;
     final unreadMessages = _di(() => sm.unreadMessages, 0);
 
-    // one-time intro animation once real content is on screen
     if (!showSkeleton && !_introPlayed) {
       _introPlayed = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1941,25 +1965,21 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     void add(String key, Widget w) => sections.add(_animated(order++, key, w));
 
     if (!showSkeleton) {
-      // ---------- ACTION REQUIRED ----------
       final actions = _d(() => sm.actionsRequired);
       final actionCount = _di(() => actions.totalActions);
       if (actions != null && actionCount > 0) {
         add('actions', _actionRequiredSection(isDark, actions, actionCount));
       }
 
-      // ---------- REVENUE ----------
       final rev = _d(() => sm.revenue);
       if (rev != null) {
         add('revenue',
             _RevenueCard(data: _RevenueData.from(rev), isDark: isDark));
       }
 
-      // ---------- OCCUPANCY ----------
       final occ = _d(() => sm.occupancy);
       if (occ != null) add('occupancy', _occupancySection(isDark, occ));
 
-      // ---------- WEEKLY PERFORMANCE ----------
       final trends = _d(() => sm.trends);
       if (trends != null) {
         add(
@@ -1976,40 +1996,31 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         );
       }
 
-      // ---------- TODAY'S SCHEDULE ----------
       final schedule = _d(() => sm.todaySchedule);
       if (schedule != null && _di(() => schedule.totalEvents) > 0) {
         add('schedule', _todayScheduleSection(isDark, schedule));
       }
 
-      // ---------- TOP PROPERTY ----------
       final top = _d(() => sm.topProperty);
       if (top != null) add('top', _topPropertySection(isDark, top));
 
-      // ---------- RECENT ACTIVITY ----------
       final activity = _d(() => sm.recentActivity);
       if (activity != null && _dl(() => activity.activities).isNotEmpty) {
         add('activity', _activitySection(isDark, activity));
       }
 
-      // ---------- PAYOUT ----------
       add('payout', _payoutCard(isDark, ownerProvider));
 
-      // ---------- QUICK STATS ----------
       if (stats != null) add('stats', _statsGrid(isDark, stats));
 
-      // ---------- VERIFICATION ----------
       if (verification != null) {
         add('verify', _verificationCard(isDark, verification));
       }
 
-      // ---------- SUBSCRIPTIONS ----------
       add('subs', _subscriptionSection(isDark, accessStatus, listingSub));
 
-      // ---------- REELS ----------
       add('reels', _reelsSection(isDark));
 
-      // ---------- QUICK ACTIONS ----------
       add(
         'quick',
         _quickActions(
@@ -2021,10 +2032,8 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
         ),
       );
 
-      // ---------- BOOKING OVERVIEW ----------
       add('bookings', _bookingOverview(isDark, counts));
 
-      // ---------- couldn't load anything ----------
       if (!hasData && !loading && !offline) {
         sections.insert(0, _loadErrorCard(isDark));
       }
@@ -2107,9 +2116,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
-  // ============================================================
-  // BOOKING COUNTS (from real list; falls back to dashboard stats)
-  // ============================================================
   Map<String, int> _bookingCounts(OwnerProvider p, dynamic stats) {
     final counts = <String, int>{
       'PENDING': 0,
@@ -2194,6 +2200,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                           imageUrl: profileImage,
                           fit: BoxFit.cover,
                           fadeInDuration: const Duration(milliseconds: 250),
+                          cacheKey: profileImage,  // ✅ cache key
                           placeholder: (_, __) => _avatarFallback(initial),
                           errorWidget: (_, __, ___) => _avatarFallback(initial),
                         )
@@ -2368,7 +2375,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   // ============================================================
-  // CONNECTION BANNER (offline / reconnecting / back online)
+  // CONNECTION BANNER
   // ============================================================
   Widget _connectionBanner(
     bool isDark, {
@@ -2549,7 +2556,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   // ============================================================
-  // SKELETON (shown while loading / offline with nothing cached)
+  // SKELETON
   // ============================================================
   Widget _skeleton(bool isDark) {
     return AnimatedBuilder(
@@ -2707,9 +2714,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     );
   }
 
-  // ============================================================
-  // ACTION REQUIRED  (colour by priority: urgent=red, medium=amber, else blue)
-  // ============================================================
   Color _priorityColor(String priority) {
     switch (priority.toUpperCase()) {
       case 'HIGH':
@@ -2939,7 +2943,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final sum = occupied + available + maintenance;
     final donutTotal = math.max(total, sum).toDouble();
 
-    // blue-family cycle for per-property bars
     const propColors = [_P.primary, _P.sky, _P.indigo, _P.teal];
 
     Widget legend(String name, int v, Color c) {
@@ -3162,7 +3165,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   // ============================================================
-  // TODAY'S SCHEDULE — timeline
+  // TODAY'S SCHEDULE
   // ============================================================
   Widget _todayScheduleSection(bool isDark, dynamic schedule) {
     final events = _dl(() => schedule.events);
@@ -3633,7 +3636,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   // ============================================================
-  // PAYOUT / PAYMENTS
+  // PAYOUT
   // ============================================================
   Widget _payoutCard(bool isDark, OwnerProvider ownerProvider) {
     final hasUpi = ownerProvider.hasPayoutUpi;
@@ -3655,7 +3658,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
             scale: Tween<double>(begin: 0.97, end: 1).animate(a), child: c),
       ),
       child: hasUpi
-          // ---------- ACTIVE: clean card with green status ----------
           ? Container(
               key: const ValueKey('upi_on'),
               margin: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
@@ -3716,7 +3718,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
                 ],
               ),
             )
-          // ---------- SETUP: brand blue gradient ----------
           : Container(
               key: const ValueKey('upi_off'),
               margin: const EdgeInsets.fromLTRB(_kPad, 0, _kPad, 14),
@@ -4222,7 +4223,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   // ============================================================
   Widget _subscriptionSection(
       bool isDark, dynamic accessStatus, dynamic listingSub) {
-    // Property access
     final accessActive = _db(() => accessStatus.hasActiveSubscription);
     final accessDays = _di(() => accessStatus.daysRemaining);
     final accessMonths = _di(() => accessStatus.durationMonths);
@@ -4230,7 +4230,6 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
     final accessEnd = _endDate(_d(() => accessStatus.endDate));
     final accessTotal = accessMonths > 0 ? accessMonths * 30 : 30;
 
-    // Listing
     final listActive = _db(() => listingSub.isActive);
     final listDays = _di(() => listingSub.daysRemaining);
     final listPlan = _ds(() => listingSub.planDisplayName);
@@ -4596,7 +4595,7 @@ class _OwnerDashboardPageState extends State<OwnerDashboardPage>
   }
 
   // ============================================================
-  // QUICK ACTIONS (with live badges)
+  // QUICK ACTIONS
   // ============================================================
   Widget _quickActions(
     bool isDark, {

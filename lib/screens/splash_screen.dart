@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,7 +19,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  // Main entrance animations
+  // ─── Main entrance animations ───
   late final AnimationController _entranceController;
   late final Animation<double> _logoFade;
   late final Animation<double> _logoScale;
@@ -30,11 +31,11 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _taglineFade;
   late final Animation<Offset> _taglineSlide;
 
-  // Breathing pulse for logo
+  // ─── Breathing pulse for logo ───
   late final AnimationController _pulseController;
   late final Animation<double> _pulseScale;
 
-  // Background floating elements
+  // ─── Background floating elements ───
   late final AnimationController _bgController;
   late final Animation<double> _bgFloat1;
   late final Animation<double> _bgFloat2;
@@ -50,16 +51,15 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Call this every time dependencies change to update navigation bar
     _updateSystemUIOverlay();
   }
 
   void _updateSystemUIOverlay() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final navBarColor = isDark 
-        ? const Color(0xFF0A0E1A)  // Dark mode - matches gradient
-        : const Color(0xFFF8F9FC); // Light mode - matches gradient
+
+    final navBarColor = isDark
+        ? const Color(0xFF0A0E1A)
+        : const Color(0xFFF8F9FC);
 
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -67,7 +67,8 @@ class _SplashScreenState extends State<SplashScreen>
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: navBarColor,
-        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarIconBrightness:
+            isDark ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor: navBarColor,
         systemNavigationBarContrastEnforced: true,
       ),
@@ -75,7 +76,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _setupAnimations() {
-    // Main entrance controller
     _entranceController = AnimationController(
       duration: const Duration(milliseconds: 1400),
       vsync: this,
@@ -176,11 +176,12 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _checkAuthStatus() async {
     await Future.delayed(const Duration(milliseconds: 2600));
-
     if (!mounted) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isLoggedIn = await authProvider.isLoggedIn();
+
+    if (!mounted) return;
 
     if (isLoggedIn) {
       await authProvider.checkAuthStatus();
@@ -222,7 +223,6 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Same blue gradient as login screen
     final gradientColors = isDark
         ? [
             const Color(0xFF0A0E1A),
@@ -236,13 +236,12 @@ class _SplashScreenState extends State<SplashScreen>
           ];
 
     final blobColor = isDark
-        ? const Color(0xFF2563EB).withOpacity(0.08)
-        : const Color(0xFF2563EB).withOpacity(0.06);
+        ? const Color(0xFF2563EB).withOpacity(0.10)
+        : const Color(0xFF2563EB).withOpacity(0.07);
 
-    final textColor = isDark ? Colors.white : const Color(0xFF1F2937);
-    final subtitleColor = isDark 
-        ? Colors.white.withOpacity(0.7) 
-        : const Color(0xFF6B7280);
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final subtitleColor =
+        isDark ? Colors.white.withOpacity(0.65) : const Color(0xFF64748B);
 
     final primaryBlue = const Color(0xFF2563EB);
 
@@ -268,94 +267,88 @@ class _SplashScreenState extends State<SplashScreen>
         child: SafeArea(
           child: Stack(
             children: [
-              // Floating background blobs - Blue themed like login
-              AnimatedBuilder(
-                animation: _bgController,
-                builder: (context, _) {
-                  return Positioned(
-                    top: -80 + _bgFloat1.value,
-                    right: -60 - _bgFloat2.value,
-                    child: Container(
-                      width: 300,
-                      height: 300,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: blobColor,
+              // ─── Soft blurred background blobs ───
+              Positioned(
+                top: -80,
+                right: -60,
+                child: AnimatedBuilder(
+                  animation: _bgController,
+                  builder: (_, __) => Transform.translate(
+                    offset: Offset(0, _bgFloat1.value - _bgFloat2.value),
+                    child: ImageFiltered(
+                      imageFilter:
+                          ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+                      child: Container(
+                        width: 300,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: blobColor,
+                        ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-              AnimatedBuilder(
-                animation: _bgController,
-                builder: (context, _) {
-                  return Positioned(
-                    bottom: -40 + _bgFloat2.value,
-                    left: -50 + _bgFloat3.value,
-                    child: Container(
-                      width: 220,
-                      height: 220,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: blobColor.withOpacity(0.7),
+              Positioned(
+                bottom: -40,
+                left: -50,
+                child: AnimatedBuilder(
+                  animation: _bgController,
+                  builder: (_, __) => Transform.translate(
+                    offset: Offset(_bgFloat3.value, _bgFloat2.value),
+                    child: ImageFiltered(
+                      imageFilter:
+                          ImageFilter.blur(sigmaX: 36, sigmaY: 36),
+                      child: Container(
+                        width: 220,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: blobColor.withOpacity(0.7),
+                        ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-              AnimatedBuilder(
-                animation: _bgController,
-                builder: (context, _) {
-                  return Positioned(
-                    top: MediaQuery.of(context).size.height * 0.3,
-                    right: -30 + _bgFloat3.value,
-                    child: Container(
-                      width: 160,
-                      height: 160,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: blobColor.withOpacity(0.5),
+              Positioned(
+                top: MediaQuery.of(context).size.height * 0.3,
+                right: -30,
+                child: AnimatedBuilder(
+                  animation: _bgController,
+                  builder: (_, __) => Transform.translate(
+                    offset: Offset(_bgFloat3.value, 0),
+                    child: ImageFiltered(
+                      imageFilter:
+                          ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                      child: Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: blobColor.withOpacity(0.5),
+                        ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
 
-              // Theme toggle - Matching login screen style
+              // ─── Theme toggle ───
               Positioned(
                 top: 16,
                 right: 16,
                 child: FadeTransition(
                   opacity: _logoFade,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.05)
-                          : Colors.black.withOpacity(0.04),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                        color: isDark
-                            ? Colors.white.withOpacity(0.08)
-                            : Colors.black.withOpacity(0.06),
-                        width: 1,
-                      ),
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        isDark
-                            ? Icons.wb_sunny_outlined
-                            : Icons.nightlight_round_outlined,
-                        color: isDark
-                            ? primaryBlue
-                            : const Color(0xFF4B5563),
-                        size: 26,
-                      ),
-                      tooltip: 'Toggle theme',
-                      onPressed: () {
-                        final themeProvider = Provider.of<ThemeProvider>(
-                          context,
-                          listen: false,
-                        );
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        final themeProvider =
+                            Provider.of<ThemeProvider>(context, listen: false);
                         final current = themeProvider.themeMode;
                         final next = current == ThemeMode.light
                             ? ThemeMode.dark
@@ -364,17 +357,50 @@ class _SplashScreenState extends State<SplashScreen>
                                 : ThemeMode.light;
                         themeProvider.setThemeMode(next);
                       },
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.06)
+                              : Colors.white.withOpacity(0.75),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withOpacity(0.08)
+                                : Colors.black.withOpacity(0.04),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black
+                                  .withOpacity(isDark ? 0.25 : 0.05),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          isDark
+                              ? Icons.wb_sunny_outlined
+                              : Icons.nightlight_round_outlined,
+                          color: isDark
+                              ? primaryBlue
+                              : const Color(0xFF4B5563),
+                          size: 22,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
 
-              // Main content
+              // ─── Main content ───
               Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Logo with blue theme
+                    // ─── Logo with blue theme ───
                     FadeTransition(
                       opacity: _logoFade,
                       child: ScaleTransition(
@@ -385,40 +411,48 @@ class _SplashScreenState extends State<SplashScreen>
                             return Transform.scale(
                               scale: _pulseScale.value,
                               child: Container(
-                                padding: const EdgeInsets.all(6),
+                                padding: const EdgeInsets.all(5),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   gradient: LinearGradient(
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                     colors: [
-                                      Colors.white.withOpacity(0.15),
-                                      Colors.white.withOpacity(0.03),
+                                      Colors.white
+                                          .withOpacity(isDark ? 0.10 : 0.6),
+                                      Colors.white.withOpacity(0.02),
                                     ],
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: primaryBlue.withOpacity(isDark ? 0.3 : 0.15),
-                                      blurRadius: 50,
-                                      spreadRadius: 5,
+                                      color: primaryBlue.withOpacity(
+                                          isDark ? 0.32 : 0.18),
+                                      blurRadius: 55,
+                                      spreadRadius: 6,
                                     ),
                                   ],
                                 ),
                                 child: Container(
-                                  width: 140,
-                                  height: 140,
+                                  width: 136,
+                                  height: 136,
                                   padding: const EdgeInsets.all(22),
                                   decoration: BoxDecoration(
                                     color: isDark
                                         ? const Color(0xFF1B2436)
                                         : Colors.white,
                                     shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: primaryBlue.withOpacity(
+                                          isDark ? 0.18 : 0.10),
+                                      width: 1.2,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.15),
-                                        blurRadius: 30,
+                                        color: Colors.black.withOpacity(
+                                            isDark ? 0.35 : 0.10),
+                                        blurRadius: 32,
                                         spreadRadius: 2,
-                                        offset: const Offset(0, 10),
+                                        offset: const Offset(0, 12),
                                       ),
                                     ],
                                   ),
@@ -426,7 +460,8 @@ class _SplashScreenState extends State<SplashScreen>
                                     child: Image.asset(
                                       'assets/icons/logo.png',
                                       fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stack) {
+                                      errorBuilder:
+                                          (context, error, stack) {
                                         return Icon(
                                           Icons.home_rounded,
                                           size: 56,
@@ -442,80 +477,89 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 22),
 
-                    // Brand name - Same as login screen style
+                    // ─── Brand name ───
                     FadeTransition(
                       opacity: _logoFade,
                       child: Text(
                         'yourhome',
                         style: GoogleFonts.poppins(
-                          fontSize: 26,
+                          fontSize: 28,
                           fontWeight: FontWeight.w700,
                           color: textColor,
-                          letterSpacing: 1.5,
+                          letterSpacing: -0.4,
+                          height: 1.1,
                         ),
                       ),
                     ),
                     const SizedBox(height: 36),
 
-                    // Tagline with blue accent - Like login screen
+                    // ─── Tagline ───
                     SlideTransition(
                       position: _titleSlide,
                       child: FadeTransition(
                         opacity: _titleFade,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 8,
+                            horizontal: 22,
+                            vertical: 9,
                           ),
                           decoration: BoxDecoration(
                             color: isDark
                                 ? Colors.white.withOpacity(0.05)
-                                : Colors.black.withOpacity(0.04),
+                                : Colors.white.withOpacity(0.75),
                             borderRadius: BorderRadius.circular(30),
                             border: Border.all(
                               color: isDark
                                   ? Colors.white.withOpacity(0.08)
-                                  : Colors.black.withOpacity(0.06),
+                                  : Colors.black.withOpacity(0.05),
                               width: 1,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(
+                                    isDark ? 0.20 : 0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: Text(
                             'FIND YOUR PERFECT STAY',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: textColor,
-                              letterSpacing: 2.5,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: primaryBlue,
+                              letterSpacing: 2.4,
                             ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
-                    // Subtitle - Same style as login
+                    // ─── Subtitle ───
                     SlideTransition(
                       position: _subtitleSlide,
                       child: FadeTransition(
                         opacity: _subtitleFade,
                         child: Text(
-                          'PG  •  HOSTEL  •  HOTEL  •  VILLA  •  FLAT',
+                          'PG   •   HOSTEL   •   HOTEL   •   VILLA   •   FLAT',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w400,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
                             color: subtitleColor,
-                            letterSpacing: 1.5,
+                            letterSpacing: 1.8,
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 56),
 
-                    // Elegant loader - Blue themed
+                    // ─── Loader ───
                     FadeTransition(
                       opacity: _loaderFade,
                       child: const _ElegantLoader(),
@@ -524,7 +568,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
 
-              // Bottom tagline
+              // ─── Bottom tagline ───
               Positioned(
                 bottom: 28,
                 left: 0,
@@ -535,12 +579,12 @@ class _SplashScreenState extends State<SplashScreen>
                     opacity: _taglineFade,
                     child: Center(
                       child: Text(
-                        '✨ Made with care, for your next home ✨',
+                        'Made with care, for your next home',
                         style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w300,
-                          color: subtitleColor.withOpacity(0.5),
-                          letterSpacing: 0.8,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                          color: subtitleColor.withOpacity(0.55),
+                          letterSpacing: 0.6,
                         ),
                       ),
                     ),
@@ -555,7 +599,9 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-/// Elegant animated loader matching login screen style
+// ══════════════════════════════════════════════════════════════
+// ELEGANT LOADER — smooth, glowing dots
+// ══════════════════════════════════════════════════════════════
 class _ElegantLoader extends StatefulWidget {
   const _ElegantLoader();
 
@@ -592,26 +638,25 @@ class _ElegantLoaderState extends State<_ElegantLoader>
       builder: (context, _) {
         return Column(
           children: [
-            // Animated dots with blue theme
             Row(
               mainAxisSize: MainAxisSize.min,
               children: List.generate(3, (index) {
                 final delay = index * 0.2;
                 final t = (_controller.value - delay) % 1.0;
                 final scale = t < 0.5
-                    ? 1.0 + (t / 0.5) * 0.8
-                    : 1.8 - ((t - 0.5) / 0.5) * 0.8;
+                    ? 1.0 + (t / 0.5) * 0.6
+                    : 1.6 - ((t - 0.5) / 0.5) * 0.6;
                 final opacity = t < 0.5
-                    ? 0.3 + (t / 0.5) * 0.7
-                    : 1.0 - ((t - 0.5) / 0.5) * 0.7;
+                    ? 0.35 + (t / 0.5) * 0.65
+                    : 1.0 - ((t - 0.5) / 0.5) * 0.65;
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
                   child: Transform.scale(
-                    scale: scale.clamp(0.5, 1.8),
+                    scale: scale.clamp(0.5, 1.6),
                     child: Container(
-                      width: 10,
-                      height: 10,
+                      width: 9,
+                      height: 9,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isDark
@@ -620,9 +665,9 @@ class _ElegantLoaderState extends State<_ElegantLoader>
                         boxShadow: [
                           BoxShadow(
                             color: (isDark ? Colors.white : primaryBlue)
-                                .withOpacity(opacity * 0.2),
-                            blurRadius: 8,
-                            spreadRadius: 2,
+                                .withOpacity(opacity * 0.25),
+                            blurRadius: 10,
+                            spreadRadius: 1,
                           ),
                         ],
                       ),
@@ -631,17 +676,16 @@ class _ElegantLoaderState extends State<_ElegantLoader>
                 );
               }),
             ),
-            const SizedBox(height: 12),
-            // Loading text
+            const SizedBox(height: 14),
             Text(
-              'Loading',
+              'LOADING',
               style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w300,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
                 color: isDark
-                    ? Colors.white.withOpacity(0.5)
-                    : const Color(0xFF6B7280).withOpacity(0.7),
-                letterSpacing: 1.5,
+                    ? Colors.white.withOpacity(0.45)
+                    : const Color(0xFF64748B).withOpacity(0.75),
+                letterSpacing: 2.5,
               ),
             ),
           ],

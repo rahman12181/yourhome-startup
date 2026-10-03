@@ -9,9 +9,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:yourhome/screens/favorites_screen.dart';
 import 'package:yourhome/screens/help_support_screen.dart';
 import 'package:yourhome/screens/owner/owner_apply_page.dart';
 import 'package:yourhome/screens/privacy_policy_screen.dart';
+import 'package:yourhome/screens/rental/my_rentals_screen.dart';
 import 'package:yourhome/utils/constants.dart';
 import '../providers/profile_provider.dart';
 import '../providers/auth_provider.dart';
@@ -1045,8 +1047,21 @@ String _getBaseUrl() {
         'screen': const HelpSupportScreen(),
         'color': const Color(0xFF8B5CF6),
       },
+      {
+        'icon': Icons.save_outlined,
+        'title': 'Your Saved Properties',
+        'subtitle': 'View properties you have saved',
+        'screen': const FavoritesScreen(),
+        'color': Color.fromARGB(255, 20, 30, 237),
+      },
+      {
+        'icon': Icons.real_estate_agent_rounded,
+        'title': 'Your Rental Agreements',
+        'subtitle': 'see your rental agreements',
+        'screen': const MyRentalsScreen(),
+        'color': Color.fromARGB(255, 20, 30, 237),
+      },
     ];
-
     return Container(
       decoration: BoxDecoration(
         color: isDark ? _Palette.darkSurface : Colors.white,

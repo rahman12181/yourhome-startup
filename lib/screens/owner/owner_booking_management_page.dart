@@ -13,7 +13,7 @@ import '../../models/booking_model.dart';
 import '../../models/booking_stats_model.dart';
 
 // ══════════════════════════════════════════════════════════════
-// DESIGN TOKENS — Blue premium theme (matches OwnerPropertyManagementPage)
+// DESIGN TOKENS — Blue premium theme
 // ══════════════════════════════════════════════════════════════
 class _C {
   static const accent = Color(0xFF2563EB);
@@ -30,12 +30,10 @@ class _C {
   static const teal = Color(0xFF14B8A6);
   static const whatsapp = Color(0xFF25D366);
 
-  // Dark theme (unchanged)
   static const darkBg = Color(0xFF0B1020);
   static const darkSurface = Color(0xFF131A2E);
   static const darkSurfaceAlt = Color(0xFF1C2540);
 
-  // Light theme (blue-tinted)
   static const lightBg = Color(0xFFF6F8FC);
   static const lightBorder = Color(0xFFE5EAF3);
   static const lightText = Color(0xFF0F172A);
@@ -56,6 +54,13 @@ class _C {
   static Color accentSoftBg(bool d) =>
       d ? accent.withOpacity(0.15) : accentSoft;
 }
+
+// ══════════════════════════════════════════════════════════════
+// Shared horizontal page margin
+//   • change this ONE value to adjust padding on ALL sections
+//   • applies to: header, search, stats, filters, chips, list
+// ══════════════════════════════════════════════════════════════
+const double _kPad = 6.0; // ⬅️ change to 8.0 / 10.0 for tighter spacing
 
 class OwnerBookingManagementPage extends StatefulWidget {
   const OwnerBookingManagementPage({super.key});
@@ -484,7 +489,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   Widget _buildHeader(
       bool isDark, int total, int pending, int unreadCount) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+      padding: const EdgeInsets.fromLTRB(_kPad, 8, _kPad, 4),
       child: Row(
         children: [
           Container(
@@ -550,9 +555,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                   style: GoogleFonts.poppins(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w500,
-                    color: pending > 0
-                        ? _C.warning
-                        : _C.textSec(isDark),
+                    color: pending > 0 ? _C.warning : _C.textSec(isDark),
                   ),
                 ),
               ],
@@ -618,7 +621,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   // ============================================================
   Widget _buildSearchBar(bool isDark, OwnerProvider p) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+      padding: const EdgeInsets.fromLTRB(_kPad, 8, _kPad, 4),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
@@ -672,7 +675,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
       bool isDark, BookingStats? stats, bool isLoading) {
     if (isLoading && stats == null) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+        padding: const EdgeInsets.fromLTRB(_kPad, 8, _kPad, 4),
         child: Container(
           height: 120,
           decoration: BoxDecoration(
@@ -686,7 +689,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
     if (stats == null) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+      padding: const EdgeInsets.fromLTRB(_kPad, 8, _kPad, 4),
       child: Column(
         children: [
           Row(
@@ -976,7 +979,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   // ============================================================
   Widget _buildQuickFilters(bool isDark, OwnerProvider p) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+      padding: const EdgeInsets.fromLTRB(_kPad, 8, _kPad, 4),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -1069,9 +1072,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
           color: selected ? null : _C.surface(isDark),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected
-                ? Colors.transparent
-                : _C.border(isDark),
+            color: selected ? Colors.transparent : _C.border(isDark),
           ),
           boxShadow: selected
               ? [
@@ -1116,7 +1117,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
     ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      padding: const EdgeInsets.fromLTRB(_kPad, 8, _kPad, 8),
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
@@ -1181,9 +1182,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 1),
                         decoration: BoxDecoration(
-                          color: selected
-                              ? color
-                              : _C.surfaceAlt(isDark),
+                          color: selected ? color : _C.surfaceAlt(isDark),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -1214,7 +1213,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
   Widget _buildSkeleton(bool isDark) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
+      padding: const EdgeInsets.fromLTRB(_kPad, 4, _kPad, 24),
       children: [
         ...List.generate(
           3,
@@ -1244,7 +1243,7 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
 
     return ListView.builder(
       key: PageStorageKey('booking_list_$status'),
-      padding: const EdgeInsets.fromLTRB(14, 2, 14, 20),
+      padding: const EdgeInsets.fromLTRB(_kPad, 2, _kPad, 20),
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
@@ -1850,7 +1849,6 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             color: _C.surface(isDark),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          // ✅ BOTTOM SAFE AREA FIX
           padding: EdgeInsets.fromLTRB(
             20,
             20,
@@ -2025,7 +2023,6 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
             color: _C.surface(isDark),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          // ✅ BOTTOM SAFE AREA FIX
           padding: EdgeInsets.fromLTRB(
             20,
             20,
@@ -2220,7 +2217,6 @@ class _OwnerBookingManagementPageState extends State<OwnerBookingManagementPage>
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  // ✅ BOTTOM SAFE AREA FIX
                   padding: EdgeInsets.fromLTRB(
                     20,
                     16,

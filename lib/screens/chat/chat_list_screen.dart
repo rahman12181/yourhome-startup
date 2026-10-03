@@ -446,109 +446,130 @@ class _ChatListScreenState extends State<ChatListScreen>
   // ============================================
   // SEARCH
   // ============================================
-  Widget _buildSearchBar(bool isDark) {
+    Widget _buildSearchBar(bool isDark) {
     final hasFocus = _searchFocusNode.hasFocus;
     final hasText = _searchController.text.isNotEmpty;
 
+    // iPhone-style palette
+    final bgColor = isDark
+        ? const Color(0xFF1C1C1E)                        // iOS dark
+        : const Color(0xFFF2F2F7);                       // iOS light grey
+
+    final focusBgColor = isDark
+        ? const Color(0xFF2C2C2E)
+        : const Color(0xFFE8E8ED);
+
+    final iconColor = isDark
+        ? const Color(0xFF8E8E93)                        // iOS grey
+        : const Color(0xFF8E8E93);
+
+    final hintColor = isDark
+        ? const Color(0xFF8E8E93)
+        : const Color(0xFF8E8E93);
+
+    final textColor = isDark
+        ? const Color(0xFFFFFFFF)
+        : const Color(0xFF1C1C1E);
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      padding: const EdgeInsets.fromLTRB(17, 8, 17, 8),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        height: 48,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        height: 40,
         decoration: BoxDecoration(
-          color: isDark ? _darkSurface : _lightSurface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: hasFocus ? _primary.withOpacity(0.8) : Colors.transparent,
-            width: 1.5,
-          ),
-          boxShadow: hasFocus
-              ? [
-                  BoxShadow(
-                    color: _primary.withOpacity(0.12),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
+          color: hasFocus ? focusBgColor : bgColor,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           children: [
             const SizedBox(width: 14),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                Icons.search_rounded,
-                key: ValueKey(hasFocus),
-                size: 21,
-                color: hasFocus
-                    ? _primary
-                    : (isDark ? Colors.grey[500] : Colors.grey[500]),
-              ),
+
+            // Left search icon — iOS style
+            Icon(
+              Icons.search_rounded,
+              color: iconColor,
+              size: 18,
             ),
-            const SizedBox(width: 10),
+
+            const SizedBox(width: 8),
+
+            // Input
             Expanded(
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
                 cursorColor: _primary,
                 textInputAction: TextInputAction.search,
+                onSubmitted: (_) {
+                  _filterConversations();
+                  _searchFocusNode.unfocus();
+                },
                 style: GoogleFonts.poppins(
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: -0.1,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Search chats, people or properties',
+                  hintText: 'Search',
                   hintStyle: GoogleFonts.poppins(
-                    color: isDark ? Colors.grey[500] : Colors.grey[500],
-                    fontSize: 13.5,
+                    color: hintColor,
+                    fontSize: 15,
                     fontWeight: FontWeight.w400,
+                    letterSpacing: -0.1,
                   ),
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
+
+            // Clear button (X) — iOS style
             AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (child, anim) =>
-                  ScaleTransition(scale: anim, child: child),
+              duration: const Duration(milliseconds: 150),
+              transitionBuilder: (child, animation) {
+                return ScaleTransition(
+                  scale: animation,
+                  child: FadeTransition(opacity: animation, child: child),
+                );
+              },
               child: hasText
-                  ? _TapScale(
+                  ? Padding(
                       key: const ValueKey('clear'),
-                      onTap: () {
-                        _searchController.clear();
-                        _filterConversations();
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.only(right: 6),
+                      child: GestureDetector(
+                        onTap: () {
+                          _searchController.clear();
+                          _filterConversations();
+                        },
                         child: Container(
-                          padding: const EdgeInsets.all(3),
+                          width: 18,
+                          height: 18,
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white.withOpacity(0.12)
-                                : Colors.black.withOpacity(0.08),
+                            color: iconColor.withOpacity(0.35),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.close_rounded,
-                            size: 14,
-                            color: isDark ? Colors.white70 : Colors.black54,
+                            size: 12,
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     )
-                  : const SizedBox(key: ValueKey('no_clear'), width: 14),
+                  : const SizedBox.shrink(key: ValueKey('empty')),
             ),
+
+            const SizedBox(width: 14),
           ],
         ),
       ),
     );
   }
-
   // ============================================
   // FILTER CHIPS
   // ============================================
